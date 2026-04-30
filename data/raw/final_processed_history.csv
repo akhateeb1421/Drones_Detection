@@ -1,0 +1,75 @@
+incident_id,attack_date,attack_type,target_location,region,latitude,longitude
+1,2026-02-28,Ballistic Missiles + Drones,Prince Sultan Air Base + Riyadh Airport,Riyadh,24.7136,46.6753
+2,2026-03-02,Drones,Ras Tanura Oil Refinery,Eastern Region,26.4207,50.0888
+3,2026-03-04,Drones,Ras Tanura Oil Refinery,Eastern Region,26.4207,50.0888
+4,2026-03-05,Cruise Missiles,East of Kharj City,Al-Kharj,24.1503,47.3346
+5,2026-03-05,Drones,East of Kharj Governorate,Al-Kharj,24.1503,47.3346
+6,2026-03-05,Drone,East of Al-Jouf Region,Al-Jouf,29.9697,40.2064
+7,2026-03-06,Ballistic Missiles,Prince Sultan Air Base,Al-Kharj,24.1503,47.3346
+8,2026-03-06,Drone,Eastern Region,Eastern Region,26.4207,50.0888
+9,2026-03-06,Drone,East of Kharj Governorate,Al-Kharj,24.1503,47.3346
+10,2026-03-06,Cruise Missile,East of Kharj Governorate,Al-Kharj,24.1503,47.3346
+11,2026-03-07,Ballistic Missiles,Riyadh Region,Riyadh,24.7136,46.6753
+12,2026-03-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+13,2026-03-07,Drone,Embassy District – Riyadh,Riyadh,24.7136,46.6753
+14,2026-03-07,Drones,Empty Quarter – Shaybah Field,Eastern Region,26.4207,50.0888
+15,2026-03-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+16,2026-03-07,Drone,Empty Quarter – Shaybah Field,Eastern Region,26.4207,50.0888
+17,2026-03-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+18,2026-03-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+19,2026-03-07,Ballistic Missiles,Riyadh Region,Riyadh,24.7136,46.6753
+20,2026-03-07,Drones,Hafr Al-Batin,Hafr Al-Batin,28.4328,45.9708
+21,2026-03-07,Drones,East of Kharj Governorate,Al-Kharj,24.1503,47.3346
+22,2026-03-07,Drones,Empty Quarter – Shaybah Field,Eastern Region,26.4207,50.0888
+23,2026-03-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+24,2026-03-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+25,2026-03-07,Drones,Riyadh + Eastern Region,Riyadh + Eastern Region,24.7136,46.6753
+26,2026-03-07,Ballistic Missiles,Prince Sultan Air Base,Al-Kharj,24.1503,47.3346
+27,2026-03-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+28,2026-03-07,Drone,Eastern Region,Eastern Region,26.4207,50.0888
+29,2026-03-07,Drone,Eastern Region,Eastern Region,26.4207,50.0888
+30,2026-03-08,Ballistic Missiles,Prince Sultan Air Base,Al-Kharj,24.1503,47.3346
+31,2026-03-08,Ballistic Missile,Prince Sultan Air Base,Al-Kharj,24.1503,47.3346
+32,2026-03-08,Drones,North of Riyadh City,Riyadh,24.7136,46.6753
+33,2026-03-08,Drone,Empty Quarter – Shaybah Field,Eastern Region,26.4207,50.0888
+34,2026-03-08,Drone,Empty Quarter – Shaybah Field,Eastern Region,26.4207,50.0888
+35,2026-03-08,Drones,Riyadh City,Riyadh,24.7136,46.6753
+36,2026-03-08,Drones,Riyadh City – US Embassy,Riyadh,24.7136,46.6753
+37,2026-03-09,Ballistic Missiles,Prince Sultan Air Base,Al-Kharj,24.1503,47.3346
+38,2026-03-09,Drone,East of Al-Jouf Region,Al-Jouf,29.9697,40.2064
+39,2026-03-09,Drone,Empty Quarter – Shaybah Field,Eastern Region,26.4207,50.0888
+40,2026-03-09,Drones,Empty Quarter – Shaybah Field,Eastern Region,26.4207,50.0888
+41,2026-03-09,Drones,Empty Quarter – Shaybah Field,Eastern Region,26.4207,50.0888
+42,2026-03-09,Drone,Empty Quarter – Shaybah Field,Eastern Region,26.4207,50.0888
+43,2026-03-09,Drone,East of Al-Jouf Region,Al-Jouf,29.9697,40.2064
+44,2026-03-11,Ballistic Missiles + Drones,Multiple Locations,Riyadh + Eastern Region,24.7136,46.6753
+45,2026-03-12,Ballistic Missiles,Kharj Governorate,Al-Kharj,24.1503,47.3346
+46,2026-03-12,Drones,Riyadh + Eastern Region,Riyadh + Eastern Region,24.7136,46.6753
+47,2026-03-13,Drones,Multiple Locations,Riyadh + Eastern Region,24.7136,46.6753
+48,2026-03-14,Ballistic Missiles + Drones,Multiple Locations,Riyadh + Eastern Region,24.7136,46.6753
+49,2026-03-18,Ballistic Missiles,Riyadh Region,Riyadh,24.7136,46.6753
+50,2026-03-18,Drone,Gas facility – Eastern Region,Eastern Region,26.4207,50.0888
+51,2026-03-24,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+52,2026-03-28,Ballistic Missiles + Drones,Prince Sultan Air Base,Al-Kharj,24.1503,47.3346
+53,2026-03-29,Ballistic Missiles,Riyadh + Eastern Region,Riyadh + Eastern Region,24.7136,46.6753
+54,2026-03-30,Ballistic Missiles,Riyadh Region,Riyadh,24.7136,46.6753
+55,2026-03-30,Drones,Riyadh + Al-Kharj + Eastern Region,Riyadh + Al-Kharj + Eastern Region,24.7136,46.6753
+56,2026-03-30,Ballistic Missiles + Drones,Prince Sultan Air Base,Al-Kharj,24.1503,47.3346
+57,2026-04-07,Ballistic Missiles,Eastern Region,Eastern Region,26.4207,50.0888
+58,2026-04-07,Ballistic Missiles,Eastern Region,Eastern Region,26.4207,50.0888
+59,2026-04-07,Drones,Riyadh + Eastern Region,Riyadh + Eastern Region,24.7136,46.6753
+60,2026-04-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+61,2026-04-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+62,2026-04-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+63,2026-04-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+64,2026-04-07,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+65,2026-04-08,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+66,2026-04-08,Drones,Eastern Region,Eastern Region,26.4207,50.0888
+67,2026-04-08,Ballistic Missiles,Eastern Region,Eastern Region,26.4207,50.0888
+68,2026-04-08,Drones,Riyadh + Al-Kharj + Eastern Region,Riyadh + Al-Kharj + Eastern Region,24.7136,46.6753
+69,2026-04-08,Drones,Riyadh + Eastern Region,Riyadh + Eastern Region,24.7136,46.6753
+70,2026-04-08,Ballistic Missiles,Eastern Region,Eastern Region,26.4207,50.0888
+71,2026-04-10,Missiles + Drones,Oil / Gas / Petrochemical Facilities (multiple),Riyadh + Eastern Region + Yanbu,24.7136,46.6753
+SDB-8-20260424180200,2026-04-24,shahed_136,Area-A,Area-A,24.713788,46.675231
+LIVE-1-20260426112142,2026-04-26,orlan,Area-A,Area-A,24.713792,46.675379
+LIVE-1-20260426115027,2026-04-26,dji,Area-A,Area-A,24.713685,46.674984

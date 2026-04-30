@@ -1,0 +1,110 @@
+{
+  "app": {
+    "title": "Drone Defense System",
+    "subtitle": "Detection, tracking, and analytics for hostile drones"
+  },
+  "nav": {
+    "overview": "Overview",
+    "live": "Live Detection",
+    "history": "History Map",
+    "analysis": "Analysis",
+    "chatbot": "Chatbot",
+    "admin": "Admin",
+    "cameras": "Cameras",
+    "areas": "Sensitive Areas"
+  },
+  "common": {
+    "language": "Language",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "approve": "Approve",
+    "reject": "Reject",
+    "yes": "Yes",
+    "no": "No",
+    "from": "From",
+    "to": "To",
+    "all": "All",
+    "search": "Search",
+    "no_data": "No data available"
+  },
+  "overview": {
+    "total_attacks": "Total Attacks",
+    "regions": "Regions Affected",
+    "by_region": "Distribution by Region",
+    "by_type": "Attacks by Type",
+    "recent_threats": "Recent Threats"
+  },
+  "live": {
+    "title": "Live Detection",
+    "no_camera": "No camera available. Add one from the Admin section.",
+    "select_camera": "Select camera",
+    "details": "Detection details",
+    "track_id": "Track ID",
+    "drone_class": "Drone class",
+    "confidence": "Confidence",
+    "speed": "Speed",
+    "direction": "Direction",
+    "lat": "Latitude",
+    "lon": "Longitude",
+    "nearest_area": "Nearest area",
+    "eta": "ETA",
+    "predicted_path": "Predicted path",
+    "pending_approvals": "Pending approvals"
+  },
+  "history": {
+    "title": "Historical Attacks Map",
+    "filters": "Filters",
+    "date_from": "From date",
+    "date_to": "To date",
+    "region": "Region",
+    "attack_type": "Attack type",
+    "source": "Source",
+    "results": "Results"
+  },
+  "analysis": {
+    "title": "Analysis",
+    "timeline": "Timeline",
+    "by_region": "By region",
+    "by_type": "By type",
+    "risk": "Risk assessment",
+    "forecast": "Attack forecast",
+    "horizon": "Horizon (days)"
+  },
+  "chatbot": {
+    "title": "AI Assistant",
+    "placeholder": "Ask a question...",
+    "send": "Send",
+    "clear": "Clear conversation"
+  },
+  "admin": {
+    "token_label": "Admin token",
+    "token_save": "Save token",
+    "token_help": "Stored locally in your browser and sent as X-Admin-Token on writes.",
+    "cameras_title": "Camera management",
+    "areas_title": "Sensitive areas",
+    "fields": {
+      "name": "Name",
+      "stream_url": "Stream URL",
+      "lat": "Latitude",
+      "lon": "Longitude",
+      "heading": "Heading (deg)",
+      "altitude": "Altitude (m)",
+      "fov_h": "Horizontal FOV",
+      "fov_v": "Vertical FOV",
+      "sensor_w": "Sensor width (px)",
+      "assumed_distance": "Assumed target distance (m)",
+      "enabled": "Enabled",
+      "priority": "Priority"
+    }
+  },
+  "alarm": {
+    "banner": "🚨 Alert! Hostile drone detected",
+    "score": "Threat score"
+  }
+}

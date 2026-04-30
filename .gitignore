@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Node
+node_modules/
+.npm
+.yarn
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Frontend builds
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (NEVER commit these)
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# Data + model artifacts (large or sensitive)
+models/*.pt
+models/*.pth
+ml/artifacts/*.joblib
+ml/artifacts/*.pkl
+ml/artifacts/*.json
+data/synthetic/*.csv
+data/processed/*.csv
+
+# But keep the README/placeholder
+!ml/artifacts/.gitkeep
+!data/synthetic/.gitkeep
+!data/processed/.gitkeep
+!models/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Legacy reference files (kept in repo root for now, ignored from packaging)
+/sdb_agentic_analysis.json
+/live_assessment.csv
+/final_processed_history_fixed.csv

@@ -1,0 +1,58 @@
+[project]
+name = "drone-defense-backend"
+version = "0.1.0"
+description = "FastAPI backend for the drone defense system."
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "pydantic>=2.6",
+  "pydantic-settings>=2.2",
+  "sqlalchemy>=2.0",
+  "alembic>=1.13",
+  "psycopg2-binary>=2.9",
+  "python-multipart>=0.0.9",
+  "websockets>=12.0",
+  "httpx>=0.27",
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "scikit-learn>=1.4",
+  "xgboost>=2.0",
+  "ultralytics>=8.2",
+  "opencv-python>=4.9",
+  "torch>=2.2",
+  "pillow>=10.2",
+  "joblib>=1.3",
+  "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# Prophet wheels can lag behind new Python releases. If `pip install -e .[forecast]`
+# fails, you can either drop to Python 3.12 or skip it — the API has a heuristic
+# fallback that returns sensible numbers without Prophet.
+forecast = [
+  "prophet>=1.1.5",
+]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.4",
+  "black>=24.3",
+  "mypy>=1.9",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "seed*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]

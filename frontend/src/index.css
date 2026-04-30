@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  background-color: #050a14;
+  color: #e2e8f0;
+}
+
+body {
+  font-family: "Inter", "Tajawal", system-ui, Arial, sans-serif;
+}
+
+[dir="rtl"] body {
+  font-family: "Tajawal", "Inter", system-ui, Arial, sans-serif;
+}
+
+.leaflet-container {
+  background: #0a0f1e;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors;
+}
+
+.btn-primary {
+  @apply btn bg-accent text-black hover:bg-accent2 hover:text-white;
+}
+
+.btn-danger {
+  @apply btn bg-danger text-white hover:opacity-90;
+}
+
+.btn-ghost {
+  @apply btn border border-slate-700 text-slate-200 hover:bg-slate-800;
+}
+
+.card {
+  @apply rounded-xl border border-slate-800 bg-panel p-4 shadow-md;
+}
+
+.input {
+  @apply w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent;
+}
+
+.label {
+  @apply block text-xs uppercase tracking-wide text-slate-400 mb-1;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
