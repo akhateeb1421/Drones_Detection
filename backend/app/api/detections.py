@@ -10,6 +10,7 @@ from app.core.db import get_db
 from app.core.security import require_admin
 from app.models import Attack, Detection, Track
 from app.schemas.detection import ApprovalOut, DetectionOut, TrackOut
+from app.services.synthetic import _region_for  # canonicalize "Area-A" -> "Riyadh"
 
 router = APIRouter(prefix="/detections", tags=["detections"])
 
@@ -74,11 +75,14 @@ def approve_track(
     if latest is None:
         raise HTTPException(status_code=400, detail="No detections to snapshot.")
 
+    # Canonicalize the region so "Area-A" / "Area-B" etc. roll up into the
+    # parent city (Riyadh) instead of becoming their own pie-chart slice.
+    canonical_region = _region_for(latest.nearest_area or "", latest.nearest_area)
     attack = Attack(
         occurred_at=latest.captured_at,
         attack_type="drone",
         target_location=latest.nearest_area,
-        region=latest.nearest_area,  # nearest_area is the closest sensitive area; good fallback
+        region=canonical_region,
         latitude=latest.latitude if latest.latitude is not None else 0,
         longitude=latest.longitude if latest.longitude is not None else 0,
         source="live",

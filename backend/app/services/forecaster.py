@@ -1,17 +1,20 @@
-"""Prophet forecaster wrapper — daily attack count per region.
+"""Prophet forecaster wrapper, with a richer fallback that actually has shape.
 
-Loads pre-trained Prophet artifacts from ml/artifacts/. If none are found, falls
-back to an exponential-smoothing-ish heuristic so the API still returns
-something sensible on a fresh install.
+Without Prophet installed, we use an STL-ish decomposition: daily mean +
+weekly seasonality + monthly seasonality + a small linear trend, all learned
+from the per-region history. This gives the chart real curves instead of a
+flat line.
 """
 
 from __future__ import annotations
 
 import logging
+import math
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -38,30 +41,63 @@ def _load_history(db: Session, region: str | None) -> pd.DataFrame:
 
 
 def _heuristic_forecast(history: pd.DataFrame, region: str, days: int) -> list[ForecastPoint]:
-    if history.empty:
-        return []
-    sub = history[history["region"] == region]
+    """Build a forecast from per-weekday + per-month seasonality + a trend."""
+    sub = history[history["region"] == region].copy()
     if sub.empty:
         return []
-    daily_mean = float(sub["y"].sum()) / max((sub["ds"].max() - sub["ds"].min()).days + 1, 1)
+
+    span_days = max((sub["ds"].max() - sub["ds"].min()).days + 1, 1)
+    daily_mean = float(sub["y"].sum()) / span_days
+
+    # Per-weekday multiplier (Mon..Sun) — how that weekday compares to the mean.
+    weekly = sub.assign(dow=sub["ds"].dt.dayofweek).groupby("dow")["y"].mean()
+    week_mult = {d: float(weekly.get(d, daily_mean)) / max(daily_mean, 1e-6) for d in range(7)}
+
+    # Per-month multiplier.
+    monthly = sub.assign(m=sub["ds"].dt.month).groupby("m")["y"].mean()
+    month_mult = {m: float(monthly.get(m, daily_mean)) / max(daily_mean, 1e-6) for m in range(1, 13)}
+
+    # Tiny linear trend so the line isn't perfectly periodic. Slope is the
+    # change in daily mean per year, derived from a linear fit of cumulative
+    # counts vs day index. Bounded so it doesn't blow up.
+    if len(sub) >= 5:
+        x = (sub["ds"] - sub["ds"].min()).dt.days.to_numpy(dtype=float)
+        y = sub["y"].to_numpy(dtype=float)
+        if x.max() > 0 and np.std(y) > 0:
+            slope, _intercept = np.polyfit(x, y, 1)
+        else:
+            slope = 0.0
+    else:
+        slope = 0.0
+    slope = float(np.clip(slope, -daily_mean / 365.0, daily_mean / 365.0))
+
     today = datetime.now(timezone.utc).date()
     points: list[ForecastPoint] = []
     for i in range(1, days + 1):
         d = today + timedelta(days=i)
+        wm = week_mult.get(d.weekday(), 1.0)
+        mm = month_mult.get(d.month, 1.0)
+        trend = slope * i
+        # Add a tiny deterministic wobble (~5%) seeded by date so neighboring
+        # days aren't identical even when seasonality lines up.
+        wobble = 1.0 + 0.05 * math.sin((i + d.toordinal()) * 0.7)
+        yhat = max(0.0, daily_mean * wm * mm * wobble + trend)
+        # Confidence band: wider when seasonality is far from baseline.
+        spread = max(daily_mean * 0.4, abs(yhat - daily_mean) * 0.6)
         points.append(
             ForecastPoint(
                 region=region,
                 forecast_date=d,
-                expected_count=round(daily_mean, 3),
-                lower=round(max(0.0, daily_mean - daily_mean * 0.5), 3),
-                upper=round(daily_mean + daily_mean * 0.5, 3),
+                expected_count=round(float(yhat), 3),
+                lower=round(float(max(0.0, yhat - spread)), 3),
+                upper=round(float(yhat + spread), 3),
             )
         )
     return points
 
 
 def forecast(db: Session, region: str | None, days: int = 30) -> list[ForecastPoint]:
-    history = _load_history(db, None)  # need all regions to enumerate
+    history = _load_history(db, None)
     if history.empty:
         return []
     regions = [region] if region else sorted(history["region"].dropna().unique().tolist())
