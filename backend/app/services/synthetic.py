@@ -40,11 +40,17 @@ def generate(
     seed: int = 42,
     extend_days_forward: int = 365,
     burst_prob: float = 0.05,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> pd.DataFrame:
     """Return a synthetic DataFrame matching the schema of attacks rows.
 
     Expected columns in `real_df`: attack_date, attack_type, target_location,
     region, latitude, longitude.
+
+    If `start_date` and `end_date` (ISO strings, e.g. '2025-05-20') are
+    provided, sampled timestamps are constrained to that explicit range.
+    Otherwise the range defaults to [real_min, real_max + extend_days_forward].
     """
     rng = np.random.default_rng(seed)
 
@@ -61,10 +67,8 @@ def generate(
     loc_by_region: dict[str, tuple[list[str], np.ndarray, dict[str, tuple[float, float]]]] = {}
     for region in regions:
         sub = df[df["region"].fillna("Unknown") == region]
-        # type | region
         tc = sub["attack_type_canonical"].value_counts()
         type_by_region[region] = (tc.index.tolist(), (tc / tc.sum()).values)
-        # location | region (with stored centroid lat/lon)
         lc = sub["target_location"].fillna("Unknown").value_counts()
         coords = (
             sub.dropna(subset=["latitude", "longitude"])
@@ -74,11 +78,15 @@ def generate(
         coord_map = {idx: (float(r["latitude"]), float(r["longitude"])) for idx, r in coords.iterrows()}
         loc_by_region[region] = (lc.index.tolist(), (lc / lc.sum()).values, coord_map)
 
-    # ----- Temporal pattern: extend the real date range forward -----
-    real_min = df["attack_date"].min()
-    real_max = df["attack_date"].max()
-    horizon_end = real_max + timedelta(days=extend_days_forward)
-    span_days = (horizon_end - real_min).days
+    # ----- Temporal pattern: explicit range OR extend real range forward -----
+    if start_date and end_date:
+        real_min = pd.Timestamp(start_date)
+        horizon_end = pd.Timestamp(end_date)
+    else:
+        real_min = df["attack_date"].min()
+        real_max = df["attack_date"].max()
+        horizon_end = real_max + timedelta(days=extend_days_forward)
+    span_days = max((horizon_end - real_min).days, 1)
 
     # Per-month seasonality
     monthly = df["attack_date"].dt.month.value_counts(normalize=True).to_dict()
@@ -100,9 +108,8 @@ def generate(
         if rng.random() > keep_prob:
             continue
 
-        # bursts: occasionally schedule multiple incidents on the same day
         if rng.random() < burst_prob:
-            n_burst = int(rng.integers(2, 6))  # 2..5 inclusive
+            n_burst = int(rng.integers(2, 6))
         else:
             n_burst = 1
 
@@ -137,7 +144,10 @@ def generate(
             )
 
     out = pd.DataFrame(rows[:n])
-    log.info("Generated %d synthetic rows over %d days.", len(out), span_days)
+    log.info(
+        "Generated %d synthetic rows from %s to %s (%d days span).",
+        len(out), real_min.date(), horizon_end.date(), span_days,
+    )
     return out
 
 

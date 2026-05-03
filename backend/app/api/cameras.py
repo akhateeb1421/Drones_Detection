@@ -1,12 +1,12 @@
 """Camera CRUD (admin only for writes)."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.security import require_admin
-from app.models import Camera
+from app.models import Camera, Detection, Track
 from app.schemas.camera import CameraIn, CameraOut, CameraUpdate
 
 router = APIRouter(prefix="/cameras", tags=["cameras"])
@@ -57,5 +57,8 @@ def delete_camera(
     cam = db.get(Camera, camera_id)
     if cam is None:
         raise HTTPException(status_code=404, detail="Camera not found.")
+    # Cascade-delete dependent rows so the FK constraints don't reject the delete.
+    db.execute(delete(Detection).where(Detection.camera_id == camera_id))
+    db.execute(delete(Track).where(Track.camera_id == camera_id))
     db.delete(cam)
     db.commit()

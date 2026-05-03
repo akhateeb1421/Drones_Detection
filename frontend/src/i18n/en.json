@@ -55,7 +55,9 @@
     "nearest_area": "Nearest area",
     "eta": "ETA",
     "predicted_path": "Predicted path",
-    "pending_approvals": "Pending approvals"
+    "pending_approvals": "Pending approvals",
+    "toggle_areas": "Sensitive areas",
+    "toggle_cameras": "Cameras"
   },
   "history": {
     "title": "Historical Attacks Map",
@@ -104,7 +106,7 @@
     }
   },
   "alarm": {
-    "banner": "🚨 Alert! Hostile drone detected",
+    "banner": "Alert! Hostile drone detected",
     "score": "Threat score"
   }
 }

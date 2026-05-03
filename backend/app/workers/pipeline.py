@@ -28,7 +28,7 @@ from app.services.eta import load_areas, nearest
 from app.services.geo import CameraGeo
 from app.services.inference import TrackingPipeline, overlay
 from app.streaming.frame_bus import frame_bus
-from app.streaming.pi_client import read_local_video_as_mjpeg, stream_jpegs
+from app.streaming.pi_client import read_local_video_as_mjpeg, read_webcam_as_mjpeg, stream_jpegs
 
 log = logging.getLogger(__name__)
 
@@ -72,10 +72,17 @@ async def _run_camera(camera_id: int) -> None:
     pipeline = TrackingPipeline(geo, fps=25.0)
     log.info("Starting worker for camera %s (%s) @ %s", camera_id, cam_name, stream_url)
 
-    # Decide source — URL vs local file fallback.
+    # Decide source based on the stream_url scheme:
+    #   http://... or https://...   -> remote MJPEG stream (e.g. Pi)
+    #   webcam:N or just N          -> local webcam device index N
+    #   anything else               -> local video file (looped for demo)
     if stream_url.startswith(("http://", "https://")):
         source_iter = stream_jpegs(stream_url)
         is_remote = True
+    elif stream_url.startswith("webcam:") or stream_url.strip().isdigit():
+        device_index = int(stream_url.split(":", 1)[1] if ":" in stream_url else stream_url)
+        source_iter = read_webcam_as_mjpeg(device_index)
+        is_remote = False
     else:
         source_iter = read_local_video_as_mjpeg(stream_url)
         is_remote = False

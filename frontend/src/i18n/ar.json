@@ -55,7 +55,9 @@
     "nearest_area": "أقرب منطقة",
     "eta": "الوقت المتوقع للوصول",
     "predicted_path": "المسار المتوقع",
-    "pending_approvals": "كشوفات في انتظار المراجعة"
+    "pending_approvals": "كشوفات في انتظار المراجعة",
+    "toggle_areas": "المناطق الحساسة",
+    "toggle_cameras": "الكاميرات"
   },
   "history": {
     "title": "خريطة الهجمات التاريخية",

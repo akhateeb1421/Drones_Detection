@@ -2,12 +2,10 @@
 
 Run after `seed/load_history_csv.py`.
 
-By default produces ~3000 synthetic rows tagged source='synthetic'. You can
-override the row count with --n. Idempotent: re-running deletes the previous
-synthetic rows before inserting fresh ones (so re-runs don't accumulate
-duplicates).
+Default date range is 2025-05-20 to 2026-05-20 (one year of synthetic history).
+Override with --start / --end (ISO format, e.g. 2024-01-01).
 
-Run: `python -m seed.generate_synthetic [--n 3000] [--seed 42]`
+Run: `python -m seed.generate_synthetic [--n 3000] [--seed 42] [--start ...] [--end ...]`
 """
 
 from __future__ import annotations
@@ -35,13 +33,15 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", type=int, default=3000)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--start", default="2025-05-20", help="ISO start date (inclusive). Default: 2025-05-20")
+    parser.add_argument("--end", default="2026-05-20", help="ISO end date (inclusive). Default: 2026-05-20")
     args = parser.parse_args()
 
     if not CSV_PATH.exists():
         raise SystemExit(f"CSV not found at {CSV_PATH}")
 
     real_df = pd.read_csv(CSV_PATH)
-    synth = generate(real_df, n=args.n, seed=args.seed)
+    synth = generate(real_df, n=args.n, seed=args.seed, start_date=args.start, end_date=args.end)
 
     SYNTHETIC_OUT.parent.mkdir(parents=True, exist_ok=True)
     synth.to_csv(SYNTHETIC_OUT, index=False)
