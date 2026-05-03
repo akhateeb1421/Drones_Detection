@@ -1,4 +1,4 @@
-"""Aggregated analytics endpoints (powers the Analysis tab)."""
+"""Aggregated analytics endpoints (powers the Analysis tab + Overview totals)."""
 
 from datetime import datetime
 
@@ -13,8 +13,31 @@ from app.schemas.prediction import RegionStat, TimelinePoint, TypeStat
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 
+@router.get("/total")
+def total(db: Session = Depends(get_db)) -> dict[str, int]:
+    """Number of distinct attack events."""
+    rows = db.execute(
+        select(Attack.source, Attack.occurred_at).distinct()
+    ).all()
+    distinct_events = len(rows)
+    total_rows = db.execute(select(func.count(Attack.id))).scalar_one()
+    by_source = dict(
+        db.execute(
+            select(Attack.source, func.count(Attack.id)).group_by(Attack.source)
+        ).all()
+    )
+    return {
+        "events": int(distinct_events),
+        "rows": int(total_rows or 0),
+        "rows_historical": int(by_source.get("historical", 0)),
+        "rows_synthetic": int(by_source.get("synthetic", 0)),
+        "rows_live": int(by_source.get("live", 0)),
+    }
+
+
 @router.get("/by-region", response_model=list[RegionStat])
 def by_region(db: Session = Depends(get_db)) -> list[RegionStat]:
+    """All regions with their row count."""
     rows = db.execute(
         select(Attack.region, func.count(Attack.id))
         .where(Attack.region.is_not(None))
@@ -22,6 +45,58 @@ def by_region(db: Session = Depends(get_db)) -> list[RegionStat]:
         .order_by(func.count(Attack.id).desc())
     ).all()
     return [RegionStat(region=r or "Unknown", count=int(c)) for r, c in rows]
+
+
+@router.get("/by-region-pure", response_model=list[RegionStat])
+def by_region_pure(db: Session = Depends(get_db)) -> list[RegionStat]:
+    """Same as /by-region but filters out any region label that contains '+'.
+
+    After we split combined attacks at seed time the `region` column should
+    never contain '+', so this is just a defensive filter — and it makes the
+    Overview pie chart immune to bad data.
+    """
+    rows = db.execute(
+        select(Attack.region, func.count(Attack.id))
+        .where(Attack.region.is_not(None))
+        .where(~Attack.region.contains("+"))
+        .group_by(Attack.region)
+        .order_by(func.count(Attack.id).desc())
+    ).all()
+    return [RegionStat(region=r or "Unknown", count=int(c)) for r, c in rows]
+
+
+@router.get("/combined")
+def combined(db: Session = Depends(get_db)) -> list[dict]:
+    """List unique multi-location attack patterns and how many incidents had them.
+
+    A "combined attack" is one whose original incident produced more than one
+    row in the attacks table (rows sharing the same source + occurred_at).
+    The label is the deduplicated, sorted, '+'-joined list of regions that
+    were hit in that incident.
+    """
+    grouped = db.execute(
+        select(
+            Attack.source,
+            Attack.occurred_at,
+            func.array_agg(func.distinct(Attack.region)).label("regions"),
+            func.count(Attack.id).label("n"),
+        )
+        .where(Attack.region.is_not(None))
+        .group_by(Attack.source, Attack.occurred_at)
+        .having(func.count(func.distinct(Attack.region)) > 1)
+    ).all()
+
+    pattern_counts: dict[str, int] = {}
+    for _src, _ts, regions, _n in grouped:
+        clean = sorted({r for r in regions if r})
+        if len(clean) < 2:
+            continue
+        label = " + ".join(clean)
+        pattern_counts[label] = pattern_counts.get(label, 0) + 1
+
+    items = [{"label": k, "count": v} for k, v in pattern_counts.items()]
+    items.sort(key=lambda x: x["count"], reverse=True)
+    return items
 
 
 @router.get("/by-type", response_model=list[TypeStat])

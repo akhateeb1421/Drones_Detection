@@ -124,8 +124,21 @@ export const Areas = {
   remove: (id: number) => api.delete(`/areas/${id}`).then((r) => r.data),
 };
 
+export type TotalCounts = {
+  events: number;
+  rows: number;
+  rows_historical: number;
+  rows_synthetic: number;
+  rows_live: number;
+};
+
+export type CombinedAttack = { label: string; count: number };
+
 export const Analysis = {
+  total: () => api.get<TotalCounts>("/analysis/total").then((r) => r.data),
   byRegion: () => api.get<RegionStat[]>("/analysis/by-region").then((r) => r.data),
+  byRegionPure: () => api.get<RegionStat[]>("/analysis/by-region-pure").then((r) => r.data),
+  combined: () => api.get<CombinedAttack[]>("/analysis/combined").then((r) => r.data),
   byType: () => api.get<TypeStat[]>("/analysis/by-type").then((r) => r.data),
   timeline: (params: Record<string, string | undefined> = {}) =>
     api.get<TimelinePoint[]>("/analysis/timeline", { params }).then((r) => r.data),

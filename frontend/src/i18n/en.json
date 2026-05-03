@@ -38,6 +38,7 @@
     "regions": "Regions Affected",
     "by_region": "Distribution by Region",
     "by_type": "Attacks by Type",
+    "combined": "Combined Attacks",
     "recent_threats": "Recent Threats"
   },
   "live": {

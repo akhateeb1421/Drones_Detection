@@ -20,12 +20,30 @@ from sqlalchemy import delete
 from app.core.db import SessionLocal
 from app.core.logging import configure_logging
 from app.models import Attack
-from app.services.synthetic import generate
+from app.services.synthetic import generate, normalize_real_for_db
+from seed.load_history_csv import EXTRA_HISTORICAL_ROWS
 
 CSV_PATH = Path(__file__).resolve().parents[2] / "data" / "raw" / "final_processed_history.csv"
 SYNTHETIC_OUT = Path(__file__).resolve().parents[2] / "data" / "synthetic" / "synthetic_attacks.csv"
 
 log = logging.getLogger(__name__)
+
+
+def _build_training_frame() -> pd.DataFrame:
+    """Return a SPLIT, jittered version of the real data for the synthetic generator.
+
+    We do this so synthetic rows never inherit combined-attack target_locations
+    like "Riyadh + Eastern Region" — every synthetic point should land on a
+    single city.
+    """
+    real_df = pd.read_csv(CSV_PATH)
+    if EXTRA_HISTORICAL_ROWS:
+        real_df = pd.concat([real_df, pd.DataFrame(EXTRA_HISTORICAL_ROWS)], ignore_index=True)
+
+    norm = normalize_real_for_db(real_df)
+    # generate() expects an `attack_date` column; normalize_real_for_db emits `occurred_at`.
+    norm = norm.rename(columns={"occurred_at": "attack_date"})
+    return norm
 
 
 def main() -> None:
@@ -40,8 +58,8 @@ def main() -> None:
     if not CSV_PATH.exists():
         raise SystemExit(f"CSV not found at {CSV_PATH}")
 
-    real_df = pd.read_csv(CSV_PATH)
-    synth = generate(real_df, n=args.n, seed=args.seed, start_date=args.start, end_date=args.end)
+    train_df = _build_training_frame()
+    synth = generate(train_df, n=args.n, seed=args.seed, start_date=args.start, end_date=args.end)
 
     SYNTHETIC_OUT.parent.mkdir(parents=True, exist_ok=True)
     synth.to_csv(SYNTHETIC_OUT, index=False)

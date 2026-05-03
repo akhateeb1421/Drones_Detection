@@ -1,10 +1,4 @@
-"""Synthetic-data generator.
-
-Bootstraps from real Saudi attack records to emit ~N synthetic incidents that
-preserve the joint distribution of region x attack_type x target_location and
-a Poisson-with-seasonality temporal pattern. Every synthetic row is tagged
-source='synthetic' so ML evaluation can hold out real data.
-"""
+"""Synthetic-data generator + historical CSV normalizer."""
 
 from __future__ import annotations
 
@@ -13,6 +7,8 @@ from datetime import timedelta, timezone
 
 import numpy as np
 import pandas as pd
+
+from app.services import places
 
 log = logging.getLogger(__name__)
 
@@ -43,22 +39,13 @@ def generate(
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> pd.DataFrame:
-    """Return a synthetic DataFrame matching the schema of attacks rows.
-
-    Expected columns in `real_df`: attack_date, attack_type, target_location,
-    region, latitude, longitude.
-
-    If `start_date` and `end_date` (ISO strings, e.g. '2025-05-20') are
-    provided, sampled timestamps are constrained to that explicit range.
-    Otherwise the range defaults to [real_min, real_max + extend_days_forward].
-    """
+    """Return a synthetic DataFrame matching the schema of attacks rows."""
     rng = np.random.default_rng(seed)
 
     df = real_df.copy()
     df["attack_date"] = pd.to_datetime(df["attack_date"])
     df["attack_type_canonical"] = df["attack_type"].astype(str).map(normalize_type)
 
-    # ----- Learn distributions -----
     region_counts = df["region"].fillna("Unknown").value_counts()
     regions = region_counts.index.tolist()
     region_probs = (region_counts / region_counts.sum()).values
@@ -78,7 +65,6 @@ def generate(
         coord_map = {idx: (float(r["latitude"]), float(r["longitude"])) for idx, r in coords.iterrows()}
         loc_by_region[region] = (lc.index.tolist(), (lc / lc.sum()).values, coord_map)
 
-    # ----- Temporal pattern: explicit range OR extend real range forward -----
     if start_date and end_date:
         real_min = pd.Timestamp(start_date)
         horizon_end = pd.Timestamp(end_date)
@@ -88,12 +74,10 @@ def generate(
         horizon_end = real_max + timedelta(days=extend_days_forward)
     span_days = max((horizon_end - real_min).days, 1)
 
-    # Per-month seasonality
     monthly = df["attack_date"].dt.month.value_counts(normalize=True).to_dict()
     mean_monthly = 1 / 12.0
     month_weight = {m: monthly.get(m, mean_monthly) / mean_monthly for m in range(1, 13)}
 
-    # Per-weekday seasonality
     weekly = df["attack_date"].dt.dayofweek.value_counts(normalize=True).to_dict()
     mean_weekly = 1 / 7.0
     week_weight = {d: weekly.get(d, mean_weekly) / mean_weekly for d in range(7)}
@@ -151,20 +135,147 @@ def generate(
     return out
 
 
-def normalize_real_for_db(real_df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize the real CSV into the unified attacks-table shape."""
+# -----------------------------------------------------------------------------
+# Historical normalizer with location splitting + jitter
+# -----------------------------------------------------------------------------
+
+_JITTER_DEG = 0.02  # ~2 km Gaussian jitter so points dont stack
+
+_REGION_OF_PLACE = {
+    "riyadh": "Riyadh",
+    "embassy district": "Riyadh",
+    "embassy district – riyadh": "Riyadh",
+    "embassy district - riyadh": "Riyadh",
+    "riyadh airport": "Riyadh",
+    "king khalid international airport": "Riyadh",
+    "riyadh region": "Riyadh",
+    "prince sultan air base": "Al-Kharj",
+    "kharj": "Al-Kharj",
+    "al-kharj": "Al-Kharj",
+    "al kharj": "Al-Kharj",
+    "east of kharj city": "Al-Kharj",
+    "east of kharj governorate": "Al-Kharj",
+    "eastern region": "Eastern Region",
+    "dammam": "Eastern Region",
+    "khobar": "Eastern Region",
+    "ras tanura oil refinery": "Eastern Region",
+    "ras tanura": "Eastern Region",
+    "shaybah field": "Eastern Region",
+    "shaybah": "Eastern Region",
+    "empty quarter": "Eastern Region",
+    "abqaiq": "Eastern Region",
+    "jubail": "Eastern Region",
+    "qatif": "Eastern Region",
+    "hofuf": "Eastern Region",
+    "al-jouf": "Al-Jouf",
+    "al jouf": "Al-Jouf",
+    "jouf": "Al-Jouf",
+    "east of al-jouf region": "Al-Jouf",
+    "hafr al-batin": "Hafr Al-Batin",
+    "hafr al batin": "Hafr Al-Batin",
+    "yanbu": "Yanbu",
+    "yanbu port": "Yanbu",
+    "yanbu industrial city": "Yanbu",
+    "yanbu refinery": "Yanbu",
+    "yanbu petroleum facility": "Yanbu",
+    "area-a": "Riyadh",
+    "area-b": "Riyadh",
+    "area-c": "Riyadh",
+    "area-d": "Riyadh",
+    "area-e": "Riyadh",
+    "jeddah": "Makkah",
+    "mecca": "Makkah",
+    "makkah": "Makkah",
+    "medina": "Madinah",
+    "madinah": "Madinah",
+    "tabuk": "Tabuk",
+    "abha": "Asir",
+    "khamis mushait": "Asir",
+    "buraidah": "Qassim",
+    "qassim": "Qassim",
+    "hail": "Hail",
+    "najran": "Najran",
+}
+
+
+def _region_for(place: str, fallback: str | None) -> str | None:
+    n = places._normalize(place)
+    if n in _REGION_OF_PLACE:
+        return _REGION_OF_PLACE[n]
+    # Also try to canonicalize the fallback itself — handles rows where
+    # `region` literally says "Area-A" / "Area-B" etc. but target_location
+    # is something we don't recognize.
+    if fallback:
+        fn = places._normalize(fallback)
+        if fn in _REGION_OF_PLACE:
+            return _REGION_OF_PLACE[fn]
+    return fallback
+
+
+def _jitter(rng: np.random.Generator) -> tuple[float, float]:
+    return float(rng.normal(0.0, _JITTER_DEG)), float(rng.normal(0.0, _JITTER_DEG))
+
+
+def normalize_real_for_db(real_df: pd.DataFrame, seed: int = 1234) -> pd.DataFrame:
+    """Normalize the real CSV into one row per (incident, location).
+
+    A CSV row is split when EITHER target_location OR region contains '+'.
+    Some rows put the split in `region` while target_location is a generic
+    "Multiple Locations" or "Oil / Gas / Petrochemical Facilities (multiple)".
+    """
+    rng = np.random.default_rng(seed)
     df = real_df.copy()
     df["attack_date"] = pd.to_datetime(df["attack_date"], utc=True)
-    df["attack_type_canonical"] = df["attack_type"].astype(str).map(normalize_type)
 
-    return pd.DataFrame(
-        {
-            "occurred_at": df["attack_date"],
-            "attack_type": df["attack_type_canonical"],
-            "target_location": df["target_location"],
-            "region": df["region"],
-            "latitude": df["latitude"].astype(float).round(7),
-            "longitude": df["longitude"].astype(float).round(7),
-            "source": "historical",
-        }
+    out_rows: list[dict] = []
+    split_count = 0
+    for _, row in df.iterrows():
+        attack_type = normalize_type(str(row.get("attack_type", "")))
+        target_location = str(row.get("target_location", "") or "")
+        region_raw = row.get("region")
+        region_str = str(region_raw) if region_raw is not None and pd.notna(region_raw) else ""
+        base_lat = float(row["latitude"]) if pd.notna(row.get("latitude")) else 24.7136
+        base_lon = float(row["longitude"]) if pd.notna(row.get("longitude")) else 46.6753
+
+        target_parts = places.split_locations(target_location)
+        region_parts = places.split_locations(region_str)
+
+        if len(target_parts) > 1:
+            parts = target_parts
+        elif len(region_parts) > 1:
+            parts = region_parts
+        elif target_parts:
+            parts = target_parts
+        elif region_parts:
+            parts = region_parts
+        else:
+            parts = [target_location or region_str or "Unknown"]
+
+        if len(parts) > 1:
+            split_count += 1
+
+        for place in parts:
+            coords = places.lookup(place)
+            if coords is None:
+                lat, lon = base_lat, base_lon
+            else:
+                lat, lon = coords
+            d_lat, d_lon = _jitter(rng)
+            out_rows.append(
+                {
+                    "occurred_at": row["attack_date"],
+                    "attack_type": attack_type,
+                    "target_location": place.strip(),
+                    "region": _region_for(place, region_str or None),
+                    "latitude": round(lat + d_lat, 6),
+                    "longitude": round(lon + d_lon, 6),
+                    "source": "historical",
+                }
+            )
+
+    out = pd.DataFrame(out_rows)
+    log.info(
+        "Normalized %d CSV rows (of which %d were combined) into %d location rows (jitter=%.3f deg).",
+        len(df), split_count, len(out), _JITTER_DEG,
     )
+    return out
