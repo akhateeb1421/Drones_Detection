@@ -14,7 +14,14 @@ class ThreatEval:
     reasons: list[str]
 
 
-HOSTILE_CLASSES = {"shahed", "orlan-10", "orlan10", "orlan_10"}
+# Any drone-shaped object should be treated as hostile by default.
+# (Bird / airplane / helicopter remain non-hostile.)
+HOSTILE_CLASSES = {"shahed", "orlan-10", "orlan10", "orlan_10", "dji", "drone"}
+
+# Demo-priority classes get the maximum hostile boost so they fire the alarm
+# even at low confidence and without ETA/speed signals — useful for a live
+# demo where DJI is the target we want to react to instantly.
+DEMO_PRIORITY_CLASSES = {"dji"}
 
 
 def evaluate(
@@ -29,7 +36,12 @@ def evaluate(
     score = 0
     reasons: list[str] = []
 
-    if drone_class.lower() in HOSTILE_CLASSES:
+    cls_l = drone_class.lower()
+    if cls_l in DEMO_PRIORITY_CLASSES:
+        # Auto-clears the 60 threshold by itself; any DJI sighting alarms.
+        score += 70
+        reasons.append("demo_priority")
+    elif cls_l in HOSTILE_CLASSES:
         score += 40
         reasons.append("hostile_class")
     if confidence >= s.threat_conf_threshold:

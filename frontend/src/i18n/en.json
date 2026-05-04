@@ -11,7 +11,8 @@
     "chatbot": "Chatbot",
     "admin": "Admin",
     "cameras": "Cameras",
-    "areas": "Sensitive Areas"
+    "areas": "Sensitive Areas",
+    "placement": "Camera Placement"
   },
   "common": {
     "language": "Language",
@@ -109,5 +110,20 @@
   "alarm": {
     "banner": "Alert! Hostile drone detected",
     "score": "Threat score"
+  },
+  "placement": {
+    "title": "Suggested camera placements & headings",
+    "radius": "Radius",
+    "fov": "FOV",
+    "range": "Assumed range",
+    "recompute": "Recompute",
+    "map": "Map",
+    "suggestions": "Suggestions",
+    "name": "Name",
+    "heading": "Heading",
+    "attacks": "Attacks",
+    "details": "Details",
+    "clusters": "Hotspots",
+    "forward": "Forward offset"
   }
 }

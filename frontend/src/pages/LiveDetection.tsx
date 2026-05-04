@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Cameras, Camera, Detections, Track, Areas, Area } from "../services/api";
 import { useLiveStream } from "../hooks/useLiveStream";
+import { useAlarms } from "../hooks/useAlarms";
 import { DroneMap } from "../components/DroneMap";
 
 function projectPath(lat: number, lon: number, speed: number, angleDeg: number, seconds = 60): [number, number] {
@@ -49,6 +50,29 @@ export function LiveDetection() {
   }, []);
 
   const { imageUrl, meta, connected } = useLiveStream(selected);
+  const alarms = useAlarms();
+
+  // Track recently-alarmed camera IDs so we can paint them red on the map.
+  // Each entry resets after 30 s with no new threat for that camera.
+  const [threatCamMap, setThreatCamMap] = useState<Map<number, number>>(new Map());
+  useEffect(() => {
+    if (!alarms.latest) return;
+    const camId = alarms.latest.camera_id;
+    setThreatCamMap((prev) => new Map(prev).set(camId, Date.now()));
+  }, [alarms.latest]);
+  useEffect(() => {
+    const i = setInterval(() => {
+      setThreatCamMap((prev) => {
+        const cutoff = Date.now() - 30_000;
+        const next = new Map<number, number>();
+        prev.forEach((ts, id) => {
+          if (ts >= cutoff) next.set(id, ts);
+        });
+        return next.size === prev.size ? prev : next;
+      });
+    }, 1000);
+    return () => clearInterval(i);
+  }, []);
 
   const [tracks, setTracks] = useState<Map<number, Snapshot>>(new Map());
   const [showAreas, setShowAreas] = useState(true);
@@ -247,6 +271,7 @@ export function LiveDetection() {
                         heading_deg: c.heading_deg,
                         fov_h_deg: c.fov_h_deg,
                         distance_m: c.assumed_target_distance_m,
+                        threatActive: threatCamMap.has(c.id),
                       }))
                     : []
                 }

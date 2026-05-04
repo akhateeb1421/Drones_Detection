@@ -30,6 +30,7 @@ export type CameraMarker = {
   heading_deg: number;
   fov_h_deg: number;
   distance_m: number;
+  threatActive?: boolean;
 };
 
 interface Props {
@@ -87,14 +88,15 @@ export function DroneMap({
       {cameras.flatMap((cam) => {
         const cone = fovCone(cam);
         const tip = offset(cam.lat, cam.lon, cam.heading_deg, cam.distance_m);
+        const camColor = cam.threatActive ? "#e94560" : "#22c55e"; // red while a threat is active, green otherwise
         return [
           <Polygon
             key={`cam-cone-${cam.id}`}
             positions={cone}
             pathOptions={{
-              color: "#22c55e",
-              fillColor: "#22c55e",
-              fillOpacity: 0.12,
+              color: camColor,
+              fillColor: camColor,
+              fillOpacity: cam.threatActive ? 0.2 : 0.12,
               weight: 1.5,
               dashArray: "4 6",
             }}
@@ -102,16 +104,16 @@ export function DroneMap({
           <Polyline
             key={`cam-axis-${cam.id}`}
             positions={[[cam.lat, cam.lon], tip]}
-            pathOptions={{ color: "#22c55e", weight: 2 }}
+            pathOptions={{ color: camColor, weight: 2 }}
           />,
           <CircleMarker
             key={`cam-pin-${cam.id}`}
             center={[cam.lat, cam.lon]}
-            radius={7}
-            pathOptions={{ color: "#22c55e", fillColor: "#0a0f1e", fillOpacity: 1, weight: 2 }}
+            radius={cam.threatActive ? 9 : 7}
+            pathOptions={{ color: camColor, fillColor: "#0a0f1e", fillOpacity: 1, weight: 2 }}
           >
             <Popup>
-              <strong>{cam.name}</strong>
+              <strong>{cam.name}</strong>{cam.threatActive ? " — THREAT" : ""}
               <br />
               heading: {cam.heading_deg}°<br />
               FOV: {cam.fov_h_deg}°<br />

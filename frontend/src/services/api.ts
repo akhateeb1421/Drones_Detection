@@ -144,15 +144,41 @@ export const Analysis = {
     api.get<TimelinePoint[]>("/analysis/timeline", { params }).then((r) => r.data),
 };
 
+export type CameraPlacement = {
+  kind: "area" | "forward";
+  name: string;
+  for_area: string;
+  lat: number;
+  lon: number;
+  heading_deg: number;
+  heading_label: string;
+  fov_h_deg: number;
+  assumed_target_distance_m: number;
+  covers_attacks: number;
+  spread_deg: number;
+  top_threat_region: string;
+  top_threat_region_count: number;
+  scope: string;
+  rationale: string;
+};
+
 export const Predictions = {
   risk: (config?: AxiosRequestConfig) => api.get<RegionRisk[]>("/predict/risk", config).then((r) => r.data),
   forecast: (params: Record<string, string | undefined> = {}) =>
     api.get<ForecastPoint[]>("/predict/forecast", { params }).then((r) => r.data),
+  cameraPlacements: (params: Record<string, string | undefined> = {}) =>
+    api.get<CameraPlacement[]>("/predict/camera-placements", { params }).then((r) => r.data),
 };
+
+const CHAT_TIMEOUT_MS = 5 * 60 * 1000;
 
 export const Chat = {
   ask: (message: string, history: { role: string; content: string }[], language: string) =>
     api
-      .post<{ answer: string; model: string }>("/chat", { message, history, language })
+      .post<{ answer: string; model: string }>(
+        "/chat",
+        { message, history, language },
+        { timeout: CHAT_TIMEOUT_MS },
+      )
       .then((r) => r.data),
 };

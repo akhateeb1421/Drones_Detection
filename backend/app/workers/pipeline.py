@@ -110,7 +110,14 @@ async def _run_camera(camera_id: int) -> None:
                 enriched: list[dict] = []
                 threats: list[dict] = []
                 for det in output.detections:
-                    near = nearest(det["lat"], det["lon"], det["speed_mps"], det["confidence"], areas)
+                    near = nearest(
+                        det["lat"],
+                        det["lon"],
+                        det["speed_mps"],
+                        det["confidence"],
+                        areas,
+                        angle_deg=det.get("angle_deg"),
+                    )
                     det = dict(det)
                     det["nearest_area"] = near.name
                     det["dist_m"] = near.distance_m if near.distance_m != float("inf") else None

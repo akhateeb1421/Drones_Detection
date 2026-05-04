@@ -8,6 +8,7 @@ import { LiveDetection } from "./pages/LiveDetection";
 import { HistoryMap } from "./pages/HistoryMap";
 import { Analysis } from "./pages/Analysis";
 import { Chatbot } from "./pages/Chatbot";
+import { CameraPlacementPage } from "./pages/CameraPlacement";
 import { CamerasAdmin } from "./pages/admin/Cameras";
 import { AreasAdmin } from "./pages/admin/Areas";
 
@@ -39,6 +40,7 @@ export default function App() {
           <NavLink to="/live" className={navClass}>{t("nav.live")}</NavLink>
           <NavLink to="/history" className={navClass}>{t("nav.history")}</NavLink>
           <NavLink to="/analysis" className={navClass}>{t("nav.analysis")}</NavLink>
+          <NavLink to="/placement" className={navClass}>{t("nav.placement")}</NavLink>
           <NavLink to="/chatbot" className={navClass}>{t("nav.chatbot")}</NavLink>
           <div className="mt-4 px-3 text-xs uppercase text-slate-500">{t("nav.admin")}</div>
           <NavLink to="/admin/cameras" className={navClass}>{t("nav.cameras")}</NavLink>
@@ -50,6 +52,7 @@ export default function App() {
             <Route path="/live" element={<LiveDetection />} />
             <Route path="/history" element={<HistoryMap />} />
             <Route path="/analysis" element={<Analysis />} />
+            <Route path="/placement" element={<CameraPlacementPage />} />
             <Route path="/chatbot" element={<Chatbot />} />
             <Route path="/admin/cameras" element={<CamerasAdmin />} />
             <Route path="/admin/areas" element={<AreasAdmin />} />

@@ -70,6 +70,11 @@ class TrackingPipeline:
         self.cam = cam
         self.fps = fps
         self._history: dict[int, deque[tuple[int, int]]] = defaultdict(lambda: deque(maxlen=self.HISTORY_LEN))
+        # World-frame lat/lon trajectory per track. Used to compute the
+        # actual compass heading of the drone (independent of camera orientation).
+        self._world_history: dict[int, deque[tuple[float, float]]] = defaultdict(
+            lambda: deque(maxlen=self.HISTORY_LEN)
+        )
         self._class_votes: dict[int, deque[int]] = defaultdict(lambda: deque(maxlen=self.CLASS_VOTE_LEN))
         self._id_remap: dict[int, int] = {}
         self._next_id = 1
@@ -127,13 +132,31 @@ class TrackingPipeline:
                 frames_span = max(len(recent) - 1, 1)
                 speed_px = math.hypot(dx, dy) / frames_span
                 speed_mps = pixel_speed_to_mps(speed_px, self.fps, self.cam)
-                # Image y grows downward; flip dy so up = north-ish in camera frame
-                angle_deg = math.degrees(math.atan2(-dy, dx)) % 360.0
             else:
                 speed_mps = 0.0
+
+            # World-frame position + heading.
+            lat, lon = pixel_to_world(cx, cy, frame_w, frame_h, self.cam)
+            world_hist = self._world_history[raw_tid]
+            world_hist.append((lat, lon))
+
+            # Compass heading derived from the actual lat/lon trajectory:
+            # 0 = North, 90 = East, etc. Independent of camera orientation.
+            if len(world_hist) >= 2:
+                w_recent = list(world_hist)[-min(self.SMOOTHING_LEN, len(world_hist)) :]
+                lat0, lon0 = w_recent[0]
+                lat1, lon1 = w_recent[-1]
+                # equirectangular approximation is fine over the few-meter span
+                # we observe between frames.
+                dN = (lat1 - lat0) * 111_320.0
+                dE = (lon1 - lon0) * 111_320.0 * math.cos(math.radians(lat0))
+                if abs(dN) < 1e-6 and abs(dE) < 1e-6:
+                    angle_deg = 0.0  # not enough movement to infer direction
+                else:
+                    angle_deg = (math.degrees(math.atan2(dE, dN)) + 360.0) % 360.0
+            else:
                 angle_deg = 0.0
 
-            lat, lon = pixel_to_world(cx, cy, frame_w, frame_h, self.cam)
             direction = angle_to_compass(angle_deg)
             clean_tid = self._clean_id(int(raw_tid))
 
