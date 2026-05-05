@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class CameraIn(BaseModel):
     name: str
+    name_ar: str | None = None
     stream_url: str
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
@@ -21,6 +22,7 @@ class CameraIn(BaseModel):
 
 class CameraUpdate(BaseModel):
     name: str | None = None
+    name_ar: str | None = None
     stream_url: str | None = None
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
@@ -38,6 +40,7 @@ class CameraOut(BaseModel):
 
     id: int
     name: str
+    name_ar: str | None = None
     stream_url: str
     latitude: float
     longitude: float
@@ -45,7 +48,4 @@ class CameraOut(BaseModel):
     altitude_m: float
     fov_h_deg: float
     fov_v_deg: float
-    sensor_w_px: int
-    assumed_target_distance_m: float
-    enabled: bool
-    created_at: datetime
+    sens

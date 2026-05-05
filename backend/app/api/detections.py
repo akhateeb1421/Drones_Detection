@@ -1,11 +1,14 @@
 """Live detections + admin approve/reject endpoints."""
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.security import require_admin
 from app.models import Attack, Detection, Track
@@ -13,6 +16,19 @@ from app.schemas.detection import ApprovalOut, DetectionOut, TrackOut
 from app.services.synthetic import _region_for  # canonicalize "Area-A" -> "Riyadh"
 
 router = APIRouter(prefix="/detections", tags=["detections"])
+
+
+@router.get("/tracks/{track_id}/thumb")
+def track_thumbnail(track_id: int, db: Session = Depends(get_db)):
+    """Serve the JPEG thumbnail for a track."""
+    track = db.get(Track, track_id)
+    if track is None or not track.thumbnail_path:
+        raise HTTPException(status_code=404, detail="No thumbnail.")
+    base = Path(get_settings().thumbnail_dir).resolve()
+    full = base / track.thumbnail_path
+    if not full.exists():
+        raise HTTPException(status_code=404, detail="Thumbnail file missing.")
+    return FileResponse(str(full), media_type="image/jpeg")
 
 
 @router.get("", response_model=list[DetectionOut])

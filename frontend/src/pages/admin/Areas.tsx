@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Areas, Area } from "../../services/api";
+import { useBilingualName } from "../../i18n/places";
 
 const blank: Omit<Area, "id" | "created_at"> = {
   name: "",
+  name_ar: "",
   latitude: 24.7136,
   longitude: 46.6753,
   priority: 1,
@@ -11,6 +13,7 @@ const blank: Omit<Area, "id" | "created_at"> = {
 
 export function AreasAdmin() {
   const { t } = useTranslation();
+  const bilingualName = useBilingualName();
   const [items, setItems] = useState<Area[]>([]);
   const [draft, setDraft] = useState({ ...blank });
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +24,8 @@ export function AreasAdmin() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await Areas.create(draft);
+      const payload = { ...draft, name_ar: draft.name_ar || null };
+      await Areas.create(payload as Omit<Area, "id" | "created_at">);
       setDraft({ ...blank });
       load();
     } catch (e: unknown) {
@@ -30,7 +34,7 @@ export function AreasAdmin() {
   };
 
   const remove = async (id: number) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm(t("common.delete_confirm"))) return;
     try {
       await Areas.remove(id);
       load();
@@ -46,8 +50,12 @@ export function AreasAdmin() {
 
       <form onSubmit={submit} className="card grid grid-cols-1 gap-3 md:grid-cols-4">
         <div>
-          <div className="label">{t("admin.fields.name")}</div>
-          <input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
+          <div className="label">{t("admin.fields.name_en")}</div>
+          <input className="input" lang="en" dir="ltr" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
+        </div>
+        <div>
+          <div className="label">{t("admin.fields.name_ar")}</div>
+          <input className="input" lang="ar" dir="rtl" value={draft.name_ar ?? ""} onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })} />
         </div>
         <div>
           <div className="label">{t("admin.fields.lat")}</div>
@@ -68,23 +76,23 @@ export function AreasAdmin() {
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-slate-400">
+          <thead className="text-xs uppercase text-slate-400">
             <tr>
-              <th className="py-2">#</th>
-              <th>Name</th>
-              <th>Lat / Lon</th>
-              <th>Priority</th>
-              <th></th>
+              <th className="py-2 text-start">#</th>
+              <th className="text-start">{t("admin.table.name")}</th>
+              <th className="text-start">{t("admin.table.lat_lon")}</th>
+              <th className="text-start">{t("admin.table.priority")}</th>
+              <th className="text-end"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
             {items.map((a) => (
               <tr key={a.id}>
-                <td className="py-2">{a.id}</td>
-                <td>{a.name}</td>
-                <td>{a.latitude.toFixed(4)}, {a.longitude.toFixed(4)}</td>
-                <td>{a.priority}</td>
-                <td><button onClick={() => remove(a.id)} className="btn-danger">{t("common.delete")}</button></td>
+                <td className="py-2 text-start"><span dir="ltr">{a.id}</span></td>
+                <td className="text-start">{bilingualName(a)}</td>
+                <td className="text-start"><span dir="ltr">{a.latitude.toFixed(4)}, {a.longitude.toFixed(4)}</span></td>
+                <td className="text-start"><span dir="ltr">{a.priority}</span></td>
+                <td className="text-end"><button onClick={() => remove(a.id)} className="btn-danger">{t("common.delete")}</button></td>
               </tr>
             ))}
           </tbody>

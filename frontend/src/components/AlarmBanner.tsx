@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { AlarmEvent } from "../services/ws";
+import { usePlaceLabel, useClassLabel } from "../i18n/places";
 
 interface Props {
   event: AlarmEvent | null;
@@ -8,6 +9,8 @@ interface Props {
 
 export function AlarmBanner({ event, onDismiss }: Props) {
   const { t } = useTranslation();
+  const placeLabel = usePlaceLabel();
+  const classLabel = useClassLabel();
   if (!event) return null;
   const eta = event.eta_s !== null ? `${event.eta_s.toFixed(1)}s` : "—";
   return (
@@ -16,7 +19,7 @@ export function AlarmBanner({ event, onDismiss }: Props) {
         <div>
           <div className="text-sm font-semibold">{t("alarm.banner")}</div>
           <div className="text-xs opacity-90">
-            {event.drone_class} → {event.nearest_area ?? "?"} · ETA {eta} ·{" "}
+            {classLabel(event.drone_class)} → {event.nearest_area ? placeLabel(event.nearest_area) : "?"} · ETA {eta} ·{" "}
             {t("alarm.score")} {event.score}
           </div>
         </div>

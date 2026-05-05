@@ -78,6 +78,7 @@ def camera_placements(
     assumed_target_distance_m: float = Query(default=5000.0, ge=100.0, le=50000.0),
     n_clusters: int = Query(default=4, ge=1, le=10, description="Number of attack hotspots to detect"),
     forward_offset: float = Query(default=0.30, ge=0.0, le=0.9, description="0..1 — how far from the area toward the hotspot to place the forward camera"),
+    early_warning_km: float = Query(default=15.0, ge=0.0, le=200.0, description="Distance to push the per-area camera FORWARD along the threat axis. 0 = at the area itself."),
 ) -> list[dict]:
     """Suggest camera placements per sensitive area + cluster-based forward cameras.
 
@@ -129,12 +130,26 @@ def camera_placements(
         top_region, top_count = Counter([n[2] for n in nearby]).most_common(1)[0]
         compass_label = _label(threat_bearing)
 
+        # Push the camera FORWARD along the threat axis so it can detect a
+        # drone before it reaches the sensitive area. Distance is the user
+        # control `early_warning_km` (0 = stay at the area).
+        bearing_rad = math.radians(threat_bearing)
+        d_m = early_warning_km * 1000.0
+        d_north = d_m * math.cos(bearing_rad)
+        d_east = d_m * math.sin(bearing_rad)
+        cam_lat = a_lat + d_north / 111_320.0
+        cam_lon = a_lon + d_east / (111_320.0 * math.cos(math.radians(a_lat)))
+
+        # Reaction-time hint: how long does it take a typical drone to
+        # cover early_warning_km? Use 30 m/s as a rough Shahed cruise.
+        warn_seconds = (d_m / 30.0) if d_m > 0 else 0
+
         suggestions.append({
             "kind": "area",
             "name": f"CAM-{area.name}",
             "for_area": area.name,
-            "lat": round(a_lat, 6),
-            "lon": round(a_lon, 6),
+            "lat": round(cam_lat, 6),
+            "lon": round(cam_lon, 6),
             "heading_deg": round(threat_bearing, 1),
             "heading_label": compass_label,
             "fov_h_deg": round(fov_h_deg, 1),
@@ -145,9 +160,11 @@ def camera_placements(
             "top_threat_region_count": int(top_count),
             "scope": scope,
             "rationale": (
-                f"Place at {area.name}. {len(nearby)} historical attacks within {scope}; "
-                f"mean threat axis bears {threat_bearing:.0f}° ({compass_label}). "
-                f"Top contributor: {top_region} ({top_count}). Spread: {spread_deg:.0f}°."
+                f"Early-warning camera ahead of {area.name}, pushed "
+                f"{early_warning_km:.0f} km along the threat axis ({threat_bearing:.0f}° {compass_label}). "
+                f"Buys ~{warn_seconds:.0f}s reaction time at 30 m/s. "
+                f"{len(nearby)} historical attacks within {scope}; "
+                f"top contributor: {top_region} ({top_count}). Spread: {spread_deg:.0f}°."
             ),
         })
 
@@ -203,23 +220,4 @@ def camera_placements(
                 "name": f"FWD-{best_area.name}-{cid + 1}",
                 "for_area": best_area.name,
                 "lat": round(float(cam_lat), 6),
-                "lon": round(float(cam_lon), 6),
-                "heading_deg": round(heading, 1),
-                "heading_label": label,
-                "fov_h_deg": round(fov_h_deg, 1),
-                "assumed_target_distance_m": round(assumed_target_distance_m, 0),
-                "covers_attacks": len(members_idx),
-                "spread_deg": round(cluster_size_km, 1),  # repurpose as cluster radius (km)
-                "top_threat_region": top_region,
-                "top_threat_region_count": int(top_count),
-                "scope": "cluster",
-                "rationale": (
-                    f"Forward observation camera ahead of {best_area.name}. "
-                    f"Placed {forward_distance_m / 1000:.0f} km toward an attack hotspot "
-                    f"at ({c_lat:.3f}, {c_lon:.3f}) with {len(members_idx)} attacks "
-                    f"(mostly {top_region}, {top_count}). "
-                    f"Heading {heading:.0f}° ({label}); cluster radius ~{cluster_size_km:.0f} km."
-                ),
-            })
-
-    return suggestions
+                "lon": r

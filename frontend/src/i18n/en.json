@@ -20,8 +20,10 @@
     "error": "Something went wrong",
     "retry": "Retry",
     "save": "Save",
+    "saved": "Saved",
     "cancel": "Cancel",
     "delete": "Delete",
+    "delete_confirm": "Delete?",
     "edit": "Edit",
     "add": "Add",
     "approve": "Approve",
@@ -40,7 +42,9 @@
     "by_region": "Distribution by Region",
     "by_type": "Attacks by Type",
     "combined": "Combined Attacks",
-    "recent_threats": "Recent Threats"
+    "recent_threats": "Recent Threats",
+    "hover_hint": "Hover a slice for details",
+    "points_events": "{{rows}} location points across {{events}} events"
   },
   "live": {
     "title": "Live Detection",
@@ -59,7 +63,18 @@
     "predicted_path": "Predicted path",
     "pending_approvals": "Pending approvals",
     "toggle_areas": "Sensitive areas",
-    "toggle_cameras": "Cameras"
+    "toggle_cameras": "Cameras",
+    "thumb": "Frame",
+    "threat_level": "Threat",
+    "online": "● live",
+    "offline": "● offline",
+    "out_of_frame": "Out of frame — predicted from last seen {{secs}}s ago",
+    "marker_seen": "#{{id}} {{cls}} {{pct}}% — last seen {{secs}}s ago",
+    "marker_predicted": "#{{id}} predicted at +{{secs}}s ({{speed}} m/s {{dir}})",
+    "cam_heading": "heading",
+    "cam_fov": "FOV",
+    "cam_range": "range",
+    "cam_threat": "THREAT"
   },
   "history": {
     "title": "Historical Attacks Map",
@@ -78,7 +93,8 @@
     "by_type": "By type",
     "risk": "Risk assessment",
     "forecast": "Attack forecast",
-    "horizon": "Horizon (days)"
+    "horizon": "Horizon (days)",
+    "forecast_help": "Predicts daily attack count per region for the next {{days}} days."
   },
   "chatbot": {
     "title": "AI Assistant",
@@ -104,6 +120,20 @@
       "sensor_w": "Sensor width (px)",
       "assumed_distance": "Assumed target distance (m)",
       "enabled": "Enabled",
+      "priority": "Priority",
+      "pick_on_map": "Pick on map",
+      "show_map": "Show map",
+      "hide_map": "Hide map",
+      "pick_hint": "Click or drag the marker to set latitude/longitude.",
+      "name_en": "Name (English)",
+      "name_ar": "Name (Arabic)"
+    },
+    "table": {
+      "name": "Name",
+      "stream": "Stream",
+      "lat_lon": "Lat / Lon",
+      "head": "Head",
+      "enabled": "Enabled",
       "priority": "Priority"
     }
   },
@@ -124,6 +154,91 @@
     "attacks": "Attacks",
     "details": "Details",
     "clusters": "Hotspots",
-    "forward": "Forward offset"
+    "forward": "Forward offset",
+    "early_warning": "Early warning",
+    "summary_counts": "{{area}} area · {{forward}} forward",
+    "kind_area": "area",
+    "kind_forward": "forward",
+    "scope_global": "global",
+    "scope_cluster": "cluster",
+    "scope_radius": "{{km}}km",
+    "rationale_area": "Early-warning camera ahead of {{area}}, pushed {{km}} km along the threat axis ({{deg}}° {{dir}}). Buys ~{{secs}}s reaction time at 30 m/s. {{count}} historical attacks within {{scope}}; top contributor: {{top}} ({{topCount}}). Spread: {{spread}}°.",
+    "rationale_forward": "Forward observation camera ahead of {{area}}. Placed {{km}} km toward an attack hotspot at ({{lat}}, {{lon}}) with {{count}} attacks (mostly {{top}}, {{topCount}}). Heading {{deg}}° ({{dir}}); cluster radius ~{{spread}} km.",
+    "spread_cluster": "~{{km}} km cluster",
+    "spread_deg": "±{{deg}}° spread"
+  },
+  "places": {
+    "Riyadh": "Riyadh",
+    "Eastern Region": "Eastern Region",
+    "Al-Kharj": "Al-Kharj",
+    "Al-Jouf": "Al-Jouf",
+    "Hafr Al-Batin": "Hafr Al-Batin",
+    "Yanbu": "Yanbu",
+    "Unknown": "Unknown",
+    "Other": "Other",
+    "Area-A": "Area-A",
+    "Area-B": "Area-B",
+    "Area-C": "Area-C",
+    "Area-D": "Area-D",
+    "Area-E": "Area-E",
+    "King Khalid International Airport": "King Khalid International Airport",
+    "Diplomatic Quarter (Riyadh)": "Diplomatic Quarter (Riyadh)",
+    "Ras Tanura Oil Refinery": "Ras Tanura Oil Refinery",
+    "Abqaiq Processing Plant": "Abqaiq Processing Plant",
+    "Prince Sultan Air Base": "Prince Sultan Air Base",
+    "Al-Kharj Power Station": "Al-Kharj Power Station",
+    "Sakaka Solar Plant": "Sakaka Solar Plant",
+    "Al-Jouf Regional Airport": "Al-Jouf Regional Airport",
+    "King Khalid Military City": "King Khalid Military City",
+    "Hafr Al-Batin Airport": "Hafr Al-Batin Airport",
+    "Yanbu Oil Refinery": "Yanbu Oil Refinery",
+    "Yanbu Industrial Port": "Yanbu Industrial Port",
+    "Yanbu Port": "Yanbu Port",
+    "Yanbu Refinery": "Yanbu Refinery",
+    "Yanbu Petroleum Facility": "Yanbu Petroleum Facility",
+    "Yanbu Industrial City": "Yanbu Industrial City"
+  },
+  "types": {
+    "drone": "Drone",
+    "drones": "Drones",
+    "ballistic_missile": "Ballistic missile",
+    "ballistic missile": "Ballistic missile",
+    "cruise_missile": "Cruise missile",
+    "cruise missile": "Cruise missile",
+    "mixed": "Mixed attack",
+    "Drone": "Drone",
+    "Drones": "Drones",
+    "Ballistic Missile": "Ballistic missile",
+    "Ballistic Missiles": "Ballistic missiles",
+    "Cruise Missile": "Cruise missile",
+    "Cruise Missiles": "Cruise missiles"
+  },
+  "drone_class": {
+    "shahed": "Shahed",
+    "orlan-10": "Orlan-10",
+    "orlan10": "Orlan-10",
+    "orlan_10": "Orlan-10",
+    "dji": "DJI",
+    "drone": "Drone",
+    "airplane": "Airplane",
+    "bird": "Bird",
+    "helicopter": "Helicopter",
+    "unknown": "Unknown"
+  },
+  "compass": {
+    "N": "N",
+    "NE": "NE",
+    "E": "E",
+    "SE": "SE",
+    "S": "S",
+    "SW": "SW",
+    "W": "W",
+    "NW": "NW"
+  },
+  "threat": {
+    "CRITICAL": "CRITICAL",
+    "HIGH": "HIGH",
+    "MEDIUM": "MEDIUM",
+    "LOW": "LOW"
   }
 }

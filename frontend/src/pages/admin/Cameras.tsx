@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Cameras, Camera } from "../../services/api";
+import { LocationPicker } from "../../components/LocationPicker";
+import { useBilingualName } from "../../i18n/places";
 
 const blank: Omit<Camera, "id" | "created_at"> = {
   name: "",
+  name_ar: "",
   stream_url: "",
   latitude: 24.7136,
   longitude: 46.6753,
@@ -18,10 +21,12 @@ const blank: Omit<Camera, "id" | "created_at"> = {
 
 export function CamerasAdmin() {
   const { t } = useTranslation();
+  const bilingualName = useBilingualName();
   const [items, setItems] = useState<Camera[]>([]);
   const [draft, setDraft] = useState({ ...blank });
   const [token, setToken] = useState(localStorage.getItem("admin_token") ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(true);
 
   const load = () => Cameras.list().then(setItems).catch((e) => setError(String(e)));
   useEffect(() => { load(); }, []);
@@ -33,7 +38,9 @@ export function CamerasAdmin() {
     e.preventDefault();
     setError(null);
     try {
-      await Cameras.create(draft);
+      // The backend accepts name_ar as nullable, so empty string -> null.
+      const payload = { ...draft, name_ar: draft.name_ar || null };
+      await Cameras.create(payload as Omit<Camera, "id" | "created_at">);
       setDraft({ ...blank });
       load();
     } catch (e: unknown) {
@@ -42,7 +49,7 @@ export function CamerasAdmin() {
   };
 
   const remove = async (id: number) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm(t("common.delete_confirm"))) return;
     try {
       await Cameras.remove(id);
       load();
@@ -53,7 +60,7 @@ export function CamerasAdmin() {
 
   const saveToken = () => {
     localStorage.setItem("admin_token", token);
-    alert("Saved");
+    alert(t("common.saved"));
   };
 
   return (
@@ -73,12 +80,16 @@ export function CamerasAdmin() {
 
       <form onSubmit={submit} className="card grid grid-cols-1 gap-3 md:grid-cols-3">
         <div>
-          <div className="label">{t("admin.fields.name")}</div>
-          <input className="input" value={draft.name} onChange={(e) => setField("name", e.target.value)} required />
+          <div className="label">{t("admin.fields.name_en")}</div>
+          <input className="input" lang="en" dir="ltr" value={draft.name} onChange={(e) => setField("name", e.target.value)} required />
         </div>
-        <div className="md:col-span-2">
+        <div>
+          <div className="label">{t("admin.fields.name_ar")}</div>
+          <input className="input" lang="ar" dir="rtl" value={draft.name_ar ?? ""} onChange={(e) => setField("name_ar", e.target.value)} />
+        </div>
+        <div>
           <div className="label">{t("admin.fields.stream_url")}</div>
-          <input className="input" value={draft.stream_url} onChange={(e) => setField("stream_url", e.target.value)} placeholder="http://pi.local:8081/stream" required />
+          <input className="input" dir="ltr" value={draft.stream_url} onChange={(e) => setField("stream_url", e.target.value)} placeholder="http://pi.local:8081/stream" required />
         </div>
         <div>
           <div className="label">{t("admin.fields.lat")}</div>
@@ -87,6 +98,33 @@ export function CamerasAdmin() {
         <div>
           <div className="label">{t("admin.fields.lon")}</div>
           <input type="number" step="0.0000001" className="input" value={draft.longitude} onChange={(e) => setField("longitude", Number(e.target.value))} />
+        </div>
+        <div className="md:col-span-3">
+          <div className="flex items-center justify-between">
+            <div className="label">{t("admin.fields.pick_on_map")}</div>
+            <button
+              type="button"
+              onClick={() => setShowMap((v) => !v)}
+              className="btn-ghost text-xs"
+            >
+              {showMap ? t("admin.fields.hide_map") : t("admin.fields.show_map")}
+            </button>
+          </div>
+          {showMap && (
+            <>
+              <LocationPicker
+                lat={draft.latitude}
+                lon={draft.longitude}
+                onChange={(lat, lon) => {
+                  setField("latitude", Number(lat.toFixed(7)));
+                  setField("longitude", Number(lon.toFixed(7)));
+                }}
+              />
+              <div className="mt-1 text-xs text-muted">
+                {t("admin.fields.pick_hint")}
+              </div>
+            </>
+          )}
         </div>
         <div>
           <div className="label">{t("admin.fields.heading")}</div>
@@ -123,27 +161,27 @@ export function CamerasAdmin() {
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-slate-400">
+          <thead className="text-xs uppercase text-slate-400">
             <tr>
-              <th className="py-2">#</th>
-              <th>Name</th>
-              <th>Stream</th>
-              <th>Lat / Lon</th>
-              <th>Head</th>
-              <th>Enabled</th>
-              <th></th>
+              <th className="py-2 text-start">#</th>
+              <th className="text-start">{t("admin.table.name")}</th>
+              <th className="text-start">{t("admin.table.stream")}</th>
+              <th className="text-start">{t("admin.table.lat_lon")}</th>
+              <th className="text-start">{t("admin.table.head")}</th>
+              <th className="text-start">{t("admin.table.enabled")}</th>
+              <th className="text-end"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
             {items.map((c) => (
               <tr key={c.id}>
-                <td className="py-2">{c.id}</td>
-                <td>{c.name}</td>
-                <td className="max-w-xs truncate" title={c.stream_url}>{c.stream_url}</td>
-                <td>{c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}</td>
-                <td>{c.heading_deg}°</td>
-                <td>{c.enabled ? "✓" : "—"}</td>
-                <td><button onClick={() => remove(c.id)} className="btn-danger">{t("common.delete")}</button></td>
+                <td className="py-2 text-start"><span dir="ltr">{c.id}</span></td>
+                <td className="text-start">{bilingualName(c)}</td>
+                <td className="max-w-xs truncate text-start" title={c.stream_url}><span dir="ltr">{c.stream_url}</span></td>
+                <td className="text-start"><span dir="ltr">{c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}</span></td>
+                <td className="text-start"><span dir="ltr">{c.heading_deg}°</span></td>
+                <td className="text-start">{c.enabled ? "✓" : "—"}</td>
+                <td className="text-end"><button onClick={() => remove(c.id)} className="btn-danger">{t("common.delete")}</button></td>
               </tr>
             ))}
           </tbody>

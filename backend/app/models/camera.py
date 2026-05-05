@@ -15,6 +15,7 @@ class Camera(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    name_ar: Mapped[str | None] = mapped_column(String(64), nullable=True)
     stream_url: Mapped[str] = mapped_column(String(255), nullable=False)
 
     latitude: Mapped[Decimal] = mapped_column(DECIMAL(10, 7), nullable=False)
@@ -28,5 +29,4 @@ class Camera(Base):
 
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+      

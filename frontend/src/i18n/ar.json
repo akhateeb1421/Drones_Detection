@@ -20,8 +20,10 @@
     "error": "حدث خطأ",
     "retry": "إعادة المحاولة",
     "save": "حفظ",
+    "saved": "تم الحفظ",
     "cancel": "إلغاء",
     "delete": "حذف",
+    "delete_confirm": "هل تريد الحذف؟",
     "edit": "تعديل",
     "add": "إضافة",
     "approve": "اعتماد",
@@ -40,7 +42,9 @@
     "by_region": "التوزيع الجغرافي",
     "by_type": "أنواع الهجمات",
     "combined": "هجمات في نفس اليوم",
-    "recent_threats": "التهديدات الأخيرة"
+    "recent_threats": "التهديدات الأخيرة",
+    "hover_hint": "مرّر فوق الشريحة لعرض التفاصيل",
+    "points_events": "{{rows}} نقطة موقع ضمن {{events}} حادثة"
   },
   "live": {
     "title": "الكشف المباشر",
@@ -59,7 +63,18 @@
     "predicted_path": "المسار المتوقع",
     "pending_approvals": "كشوفات في انتظار المراجعة",
     "toggle_areas": "المناطق الحساسة",
-    "toggle_cameras": "الكاميرات"
+    "toggle_cameras": "الكاميرات",
+    "thumb": "صورة",
+    "threat_level": "مستوى التهديد",
+    "online": "● مباشر",
+    "offline": "● غير متصل",
+    "out_of_frame": "خارج الإطار — متوقَّع منذ آخر رؤية قبل {{secs}} ث",
+    "marker_seen": "#{{id}} {{cls}} {{pct}}٪ — آخر رؤية قبل {{secs}} ث",
+    "marker_predicted": "#{{id}} متوقَّع عند +{{secs}} ث ({{speed}} م/ث {{dir}})",
+    "cam_heading": "الاتجاه",
+    "cam_fov": "زاوية الرؤية",
+    "cam_range": "المدى",
+    "cam_threat": "تهديد نشط"
   },
   "history": {
     "title": "خريطة الهجمات التاريخية",
@@ -78,7 +93,8 @@
     "by_type": "حسب النوع",
     "risk": "تقييم المخاطر",
     "forecast": "توقعات الهجمات",
-    "horizon": "الأفق الزمني (أيام)"
+    "horizon": "الأفق الزمني (أيام)",
+    "forecast_help": "تتنبأ بعدد الهجمات اليومية لكل منطقة خلال {{days}} يومًا القادمة."
   },
   "chatbot": {
     "title": "المساعد الذكي",
@@ -104,6 +120,20 @@
       "sensor_w": "عرض المستشعر بالبكسل",
       "assumed_distance": "المسافة المفترضة (متر)",
       "enabled": "مفعّل",
+      "priority": "الأولوية",
+      "pick_on_map": "اختر الموقع على الخريطة",
+      "show_map": "إظهار الخريطة",
+      "hide_map": "إخفاء الخريطة",
+      "pick_hint": "انقر أو اسحب علامة الموقع لضبط خطّي العرض والطول.",
+      "name_en": "الاسم (إنجليزي)",
+      "name_ar": "الاسم (عربي)"
+    },
+    "table": {
+      "name": "الاسم",
+      "stream": "البث",
+      "lat_lon": "العرض / الطول",
+      "head": "الاتجاه",
+      "enabled": "مفعّل",
       "priority": "الأولوية"
     }
   },
@@ -124,6 +154,91 @@
     "attacks": "الهجمات",
     "details": "التفاصيل",
     "clusters": "عدد البؤر",
-    "forward": "موقع المراقبة الأمامية"
+    "forward": "موقع المراقبة الأمامية",
+    "early_warning": "إنذار مبكر",
+    "summary_counts": "{{area}} منطقة · {{forward}} أمامية",
+    "kind_area": "منطقة",
+    "kind_forward": "أمامية",
+    "scope_global": "شامل",
+    "scope_cluster": "بؤرة",
+    "scope_radius": "{{km}} كم",
+    "rationale_area": "كاميرا إنذار مبكر أمام {{area}}، دُفعت {{km}} كم على محور التهديد ({{deg}}° {{dir}}). تتيح ~{{secs}} ث للاستجابة بسرعة 30 م/ث. {{count}} هجمة تاريخية ضمن {{scope}}؛ المساهم الأكبر: {{top}} ({{topCount}}). الانتشار: {{spread}}°.",
+    "rationale_forward": "كاميرا مراقبة أمامية أمام {{area}}. وُضعت على بُعد {{km}} كم باتجاه بؤرة هجمات عند ({{lat}}, {{lon}}) تضم {{count}} هجمة (أغلبها {{top}}، {{topCount}}). الاتجاه {{deg}}° ({{dir}})؛ نصف قطر البؤرة ~{{spread}} كم.",
+    "spread_cluster": "~{{km}} كم بؤرة",
+    "spread_deg": "±{{deg}}° انتشار"
+  },
+  "places": {
+    "Riyadh": "الرياض",
+    "Eastern Region": "المنطقة الشرقية",
+    "Al-Kharj": "الخرج",
+    "Al-Jouf": "الجوف",
+    "Hafr Al-Batin": "حفر الباطن",
+    "Yanbu": "ينبع",
+    "Unknown": "غير معروف",
+    "Other": "أخرى",
+    "Area-A": "المنطقة أ",
+    "Area-B": "المنطقة ب",
+    "Area-C": "المنطقة ج",
+    "Area-D": "المنطقة د",
+    "Area-E": "المنطقة هـ",
+    "King Khalid International Airport": "مطار الملك خالد الدولي",
+    "Diplomatic Quarter (Riyadh)": "الحي الدبلوماسي (الرياض)",
+    "Ras Tanura Oil Refinery": "مصفاة رأس تنورة",
+    "Abqaiq Processing Plant": "معامل بقيق",
+    "Prince Sultan Air Base": "قاعدة الأمير سلطان الجوية",
+    "Al-Kharj Power Station": "محطة كهرباء الخرج",
+    "Sakaka Solar Plant": "محطة سكاكا للطاقة الشمسية",
+    "Al-Jouf Regional Airport": "مطار الجوف الإقليمي",
+    "King Khalid Military City": "مدينة الملك خالد العسكرية",
+    "Hafr Al-Batin Airport": "مطار حفر الباطن",
+    "Yanbu Oil Refinery": "مصفاة ينبع",
+    "Yanbu Industrial Port": "ميناء ينبع الصناعي",
+    "Yanbu Port": "ميناء ينبع",
+    "Yanbu Refinery": "مصفاة ينبع",
+    "Yanbu Petroleum Facility": "منشأة ينبع البترولية",
+    "Yanbu Industrial City": "مدينة ينبع الصناعية"
+  },
+  "types": {
+    "drone": "طائرة مسيرة",
+    "drones": "طائرات مسيرة",
+    "ballistic_missile": "صاروخ باليستي",
+    "ballistic missile": "صاروخ باليستي",
+    "cruise_missile": "صاروخ كروز",
+    "cruise missile": "صاروخ كروز",
+    "mixed": "هجوم مشترك",
+    "Drone": "طائرة مسيرة",
+    "Drones": "طائرات مسيرة",
+    "Ballistic Missile": "صاروخ باليستي",
+    "Ballistic Missiles": "صواريخ باليستية",
+    "Cruise Missile": "صاروخ كروز",
+    "Cruise Missiles": "صواريخ كروز"
+  },
+  "drone_class": {
+    "shahed": "شاهد",
+    "orlan-10": "أورلان-10",
+    "orlan10": "أورلان-10",
+    "orlan_10": "أورلان-10",
+    "dji": "DJI",
+    "drone": "طائرة مسيرة",
+    "airplane": "طائرة",
+    "bird": "طائر",
+    "helicopter": "مروحية",
+    "unknown": "غير معروف"
+  },
+  "compass": {
+    "N": "شمال",
+    "NE": "شمال شرق",
+    "E": "شرق",
+    "SE": "جنوب شرق",
+    "S": "جنوب",
+    "SW": "جنوب غرب",
+    "W": "غرب",
+    "NW": "شمال غرب"
+  },
+  "threat": {
+    "CRITICAL": "حرج",
+    "HIGH": "مرتفع",
+    "MEDIUM": "متوسط",
+    "LOW": "منخفض"
   }
 }

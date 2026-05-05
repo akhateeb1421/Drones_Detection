@@ -23,6 +23,7 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.models import Camera, Detection, Track
+from app.services import cross_camera
 from app.services import alarms as alarms_svc
 from app.services.eta import load_areas, nearest
 from app.services.geo import CameraGeo
@@ -122,6 +123,20 @@ async def _run_camera(camera_id: int) -> None:
                     det["nearest_area"] = near.name
                     det["dist_m"] = near.distance_m if near.distance_m != float("inf") else None
                     det["eta_s"] = near.eta_s
+
+                    # Crop the bbox out of the current frame for the
+                    # pending-approvals thumbnail. JPEG-encode in memory;
+                    # _persist decides whether to actually save to disk
+                    # (only when this is the best frame for the track).
+                    x1, y1, x2, y2 = det["bbox"]
+                    pad = 12
+                    fh, fw = frame.shape[:2]
+                    cx1, cy1 = max(0, x1 - pad), max(0, y1 - pad)
+                    cx2, cy2 = min(fw, x2 + pad), min(fh, y2 + pad)
+                    if cx2 > cx1 and cy2 > cy1:
+                        crop = frame[cy1:cy2, cx1:cx2]
+                        ok_t, buf_t = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                        det["_thumb_bytes"] = bytes(buf_t) if ok_t else None
                     enriched.append(det)
 
                     threat = alarms_svc.evaluate(
@@ -131,6 +146,10 @@ async def _run_camera(camera_id: int) -> None:
                         det["nearest_area"],
                         det["speed_mps"],
                     )
+                    # Tagged on the detection so _persist can stamp the track
+                    # row's alarm_fired_at and the dashboard can reconcile
+                    # CRITICAL badges with real alarms.
+                    det["_threat_fired"] = bool(threat.is_threat)
                     if threat.is_threat:
                         threats.append(
                             {
@@ -183,7 +202,24 @@ def _serialize_det(d: dict) -> dict:
         out["eta_s"] = None
     if out.get("dist_m") in (float("inf"), float("-inf")):
         out["dist_m"] = None
+    # Don't ship raw JPEG bytes over the WebSocket JSON — only metadata.
+    out.pop("_thumb_bytes", None)
     return out
+
+
+def _save_thumbnail(camera_id: int, track_id: int, jpeg_bytes: bytes) -> str | None:
+    """Write a track's thumbnail JPEG to disk; return the relative path."""
+    try:
+        from app.core.config import get_settings
+        thumb_dir = Path(get_settings().thumbnail_dir).resolve()
+        thumb_dir.mkdir(parents=True, exist_ok=True)
+        rel = f"cam_{camera_id}_track_{track_id}.jpg"
+        full = thumb_dir / rel
+        full.write_bytes(jpeg_bytes)
+        return rel
+    except Exception:  # noqa: BLE001
+        log.exception("Failed to save thumbnail for cam=%s track=%s", camera_id, track_id)
+        return None
 
 
 def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None:
@@ -216,6 +252,16 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
             select(Track).where(Track.camera_id == camera_id, Track.track_id == det["track_id"])
         ).scalar_one_or_none()
         if track is None:
+            # First time we see this track on this camera. Try to link it to a
+            # recent track from another camera (cross-camera handoff) so the
+            # frontend can keep treating it as the same drone.
+            link = cross_camera.find_link(db, camera_id, float(det["lat"]), float(det["lon"]), now)
+            link_id = link.id if link is not None else None
+
+            thumb_rel = None
+            if det.get("_thumb_bytes"):
+                thumb_rel = _save_thumbnail(camera_id, det["track_id"], det["_thumb_bytes"])
+
             track = Track(
                 camera_id=camera_id,
                 track_id=det["track_id"],
@@ -228,40 +274,9 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
                 nearest_area=det["nearest_area"],
                 last_lat=float(det["lat"]),
                 last_lon=float(det["lon"]),
+                last_heading_deg=float(det["angle_deg"]),
+                linked_track_id=link_id,
+                thumbnail_path=thumb_rel,
                 status="pending",
-            )
-            db.add(track)
-        else:
-            track.last_seen_at = now
-            track.voted_class = det["drone_class"]
-            if track.max_confidence is None or det["confidence"] > track.max_confidence:
-                track.max_confidence = float(det["confidence"])
-            if track.max_speed_mps is None or det["speed_mps"] > track.max_speed_mps:
-                track.max_speed_mps = float(det["speed_mps"])
-            if det["eta_s"] is not None and (track.min_eta_s is None or det["eta_s"] < track.min_eta_s):
-                track.min_eta_s = float(det["eta_s"])
-            track.nearest_area = det["nearest_area"]
-            track.last_lat = float(det["lat"])
-            track.last_lon = float(det["lon"])
-    db.commit()
-
-
-async def startup_pipeline() -> None:
-    """Spawn one worker task per enabled camera at app startup."""
-    with SessionLocal() as db:
-        cams = list(db.execute(select(Camera).where(Camera.enabled.is_(True))).scalars().all())
-    for cam in cams:
-        if cam.id in _tasks:
-            continue
-        _tasks[cam.id] = asyncio.create_task(_run_camera(cam.id), name=f"cam-{cam.id}")
-    log.info("Started pipeline workers: %s", list(_tasks.keys()))
-
-
-async def shutdown_pipeline() -> None:
-    for tid, task in list(_tasks.items()):
-        task.cancel()
-        try:
-            await task
-        except (asyncio.CancelledError, Exception):  # noqa: BLE001
-            pass
-        del _tasks[tid]
+                alarm_fired_at=now if det.get("_threat_fired") else None,
+ 

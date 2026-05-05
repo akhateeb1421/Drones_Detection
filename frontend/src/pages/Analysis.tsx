@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { Analysis as AnalysisAPI, Predictions, ForecastPoint, TimelinePoint } from "../services/api";
+import { usePlaceLabel } from "../i18n/places";
 
 const LTR_STYLE: React.CSSProperties = { direction: "ltr" };
 
@@ -43,6 +44,7 @@ function isoDay(s: string): string {
 
 export function Analysis() {
   const { t } = useTranslation();
+  const placeLabel = usePlaceLabel();
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
   const [horizon, setHorizon] = useState(30);
@@ -132,7 +134,7 @@ export function Analysis() {
         <div className="flex items-center justify-between">
           <div className="label">{t("analysis.forecast")}</div>
           <div className="text-xs text-muted">
-            Predicts daily attack count per region for the next {horizon} days.
+            {t("analysis.forecast_help", { days: horizon })}
           </div>
         </div>
         <div className="h-96 w-full" style={LTR_STYLE}>
@@ -175,7 +177,7 @@ export function Analysis() {
                     key={region}
                     type="monotone"
                     dataKey={region}
-                    name={region}
+                    name={placeLabel(region)}
                     stroke={REGION_COLORS[i % REGION_COLORS.length]}
                     strokeWidth={2}
                     dot={false}

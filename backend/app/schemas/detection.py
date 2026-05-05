@@ -41,9 +41,10 @@ class TrackOut(BaseModel):
     last_lon: float | None
     status: str
     reviewed_at: datetime | None
+    thumbnail_path: str | None = None
+    alarm_fired_at: datetime | None = None
 
 
 class ApprovalOut(BaseModel):
     track_id: int
-    status: str
-    attack_id: int | None = None
+    st

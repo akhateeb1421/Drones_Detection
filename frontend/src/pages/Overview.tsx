@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import { Analysis, CombinedAttack, RegionStat, TotalCounts, TypeStat } from "../services/api";
+import { usePlaceLabel, useTypeLabel } from "../i18n/places";
 
 const COLORS = [
   "#0369a1",
@@ -65,6 +66,8 @@ function filterMinPercent<T extends { count: number }>(
 
 export function Overview() {
   const { t } = useTranslation();
+  const placeLabel = usePlaceLabel();
+  const typeLabel = useTypeLabel();
   const [regions, setRegions] = useState<RegionStat[]>([]);
   const [types, setTypes] = useState<TypeStat[]>([]);
   const [totals, setTotals] = useState<TotalCounts | null>(null);
@@ -107,11 +110,40 @@ export function Overview() {
     [combined, combinedTotal],
   );
 
+  // Localized copies — keep the originals for percentage math but feed the
+  // charts the translated label.
+  const regionsTrimDisp = useMemo(
+    () => regionsTrim.map((r) => ({ ...r, region: placeLabel(r.region) })),
+    [regionsTrim, placeLabel],
+  );
+  const typesTrimDisp = useMemo(
+    () =>
+      typesTrim.map((tt) => ({
+        ...tt,
+        attack_type:
+          tt.attack_type === "Other" ? placeLabel("Other") : typeLabel(tt.attack_type),
+      })),
+    [typesTrim, typeLabel, placeLabel],
+  );
+  // Combined attacks ship as "Region1 + Region2 + ..." — split, localize each,
+  // and join with the same separator.
+  const combinedTrimDisp = useMemo(
+    () =>
+      combinedTrim.map((c) => ({
+        ...c,
+        label:
+          c.label === "Other"
+            ? placeLabel("Other")
+            : c.label
+                .split(/\s*\+\s*/)
+                .map((part) => placeLabel(part))
+                .join(" + "),
+      })),
+    [combinedTrim, placeLabel],
+  );
+
   if (error) return <div className="card text-danger">{error}</div>;
 
-  // Hovered slice grows outward by 6 px; we DON'T draw any text inside the
-  // active slice or in the donut hole — the active label is rendered above
-  // the chart by the parent component, so it can never be covered.
   const renderActiveShape = (props: any) => {
     const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
     return (
@@ -141,8 +173,6 @@ export function Overview() {
     );
   };
 
-  // Inactive slice labels — flat solid text inside the ring. No stroke
-  // outline, just clean white. Slices smaller than 4% drop their label.
   const renderPct = (props: any) => {
     const { cx, cy, midAngle, innerRadius, outerRadius, percent, index } = props;
     if (!percent || percent < 0.04) return null;
@@ -166,6 +196,7 @@ export function Overview() {
   };
 
   const activeRegion = activeIndex >= 0 ? regionsTrim[activeIndex] : null;
+  const activeRegionDisp = activeRegion ? placeLabel(activeRegion.region) : null;
   const activePct = activeRegion && totalRows ? (activeRegion.count / totalRows) * 100 : 0;
 
   return (
@@ -177,7 +208,7 @@ export function Overview() {
           <div className="text-3xl font-bold">{total}</div>
           {totals && total !== totalRows && (
             <div className="mt-1 text-xs text-muted">
-              {totalRows} location points across {total} events
+              {t("overview.points_events", { rows: totalRows, events: total })}
             </div>
           )}
         </div>
@@ -193,13 +224,13 @@ export function Overview() {
             <div className="text-sm font-medium" style={{ minHeight: "1.25rem" }}>
               {activeRegion ? (
                 <>
-                  <span className="text-slate-200">{activeRegion.region}</span>
+                  <span className="text-slate-200">{activeRegionDisp}</span>
                   <span className="text-accent ml-2 font-semibold">
                     {activeRegion.count} ({activePct.toFixed(1)}%)
                   </span>
                 </>
               ) : (
-                <span className="text-muted text-xs">Hover a slice for details</span>
+                <span className="text-muted text-xs">{t("overview.hover_hint")}</span>
               )}
             </div>
           </div>
@@ -207,7 +238,7 @@ export function Overview() {
             <ResponsiveContainer>
               <PieChart margin={{ top: 16, right: 16, bottom: 8, left: 16 }}>
                 <Pie
-                  data={regionsTrim}
+                  data={regionsTrimDisp}
                   dataKey="count"
                   nameKey="region"
                   cx="50%"
@@ -223,7 +254,7 @@ export function Overview() {
                   onMouseEnter={(_d, i) => setActiveIndex(i)}
                   onMouseLeave={() => setActiveIndex(-1)}
                 >
-                  {regionsTrim.map((_, i) => (
+                  {regionsTrimDisp.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#0a0f1e" strokeWidth={1.5} />
                   ))}
                 </Pie>
@@ -250,7 +281,7 @@ export function Overview() {
           <div className="label">{t("overview.by_type")}</div>
           <div className="h-80 w-full" style={LTR_STYLE}>
             <ResponsiveContainer>
-              <BarChart data={typesTrim} margin={{ top: 24, right: 24, bottom: 8, left: 24 }}>
+              <BarChart data={typesTrimDisp} margin={{ top: 24, right: 24, bottom: 8, left: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis
                   dataKey="attack_type"
@@ -283,13 +314,13 @@ export function Overview() {
       </div>
       <div className="card">
         <div className="label">{t("overview.combined")}</div>
-        {combinedTrim.length === 0 ? (
+        {combinedTrimDisp.length === 0 ? (
           <div className="text-sm text-muted py-6 text-center">{t("common.no_data")}</div>
         ) : (
           <div className="h-80 w-full" style={LTR_STYLE}>
             <ResponsiveContainer>
               <BarChart
-                data={combinedTrim}
+                data={combinedTrimDisp}
                 layout="vertical"
                 margin={{ top: 16, right: 56, bottom: 8, left: 200 }}
               >

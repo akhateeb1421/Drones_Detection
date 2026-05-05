@@ -47,11 +47,18 @@ export type Track = {
   last_lon: number | null;
   status: string;
   reviewed_at: string | null;
+  thumbnail_path: string | null;
+  alarm_fired_at: string | null;
 };
+
+export function trackThumbUrl(trackDbId: number): string {
+  return `${baseURL}/detections/tracks/${trackDbId}/thumb`;
+}
 
 export type Camera = {
   id: number;
   name: string;
+  name_ar?: string | null;
   stream_url: string;
   latitude: number;
   longitude: number;
@@ -68,6 +75,7 @@ export type Camera = {
 export type Area = {
   id: number;
   name: string;
+  name_ar?: string | null;
   latitude: number;
   longitude: number;
   priority: number;

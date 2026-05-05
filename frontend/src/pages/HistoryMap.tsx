@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Attacks, Attack } from "../services/api";
 import { DroneMap } from "../components/DroneMap";
+import { usePlaceLabel, useTypeLabel } from "../i18n/places";
 
 export function HistoryMap() {
   const { t } = useTranslation();
+  const placeLabel = usePlaceLabel();
+  const typeLabel = useTypeLabel();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [region, setRegion] = useState("");
@@ -43,7 +46,7 @@ export function HistoryMap() {
     lat: a.latitude,
     lon: a.longitude,
     color: a.attack_type.includes("missile") ? "#e94560" : "#0369a1",
-    label: `${a.attack_type} · ${a.region ?? ""} · ${a.occurred_at.slice(0, 10)}`,
+    label: `${typeLabel(a.attack_type)} · ${a.region ? placeLabel(a.region) : ""} · ${a.occurred_at.slice(0, 10)}`,
     radius: 5,
   }));
 
@@ -53,24 +56,24 @@ export function HistoryMap() {
       <div className="card grid grid-cols-1 gap-3 md:grid-cols-5">
         <div>
           <div className="label">{t("history.date_from")}</div>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="input" />
+          <input type="date" lang="en" dir="ltr" value={from} onChange={(e) => setFrom(e.target.value)} className="input" />
         </div>
         <div>
           <div className="label">{t("history.date_to")}</div>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
+          <input type="date" lang="en" dir="ltr" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
         </div>
         <div>
           <div className="label">{t("history.region")}</div>
           <select value={region} onChange={(e) => setRegion(e.target.value)} className="input">
             <option value="">{t("common.all")}</option>
-            {regions.map((r) => <option key={r} value={r}>{r}</option>)}
+            {regions.map((r) => <option key={r} value={r}>{placeLabel(r)}</option>)}
           </select>
         </div>
         <div>
           <div className="label">{t("history.attack_type")}</div>
           <select value={attackType} onChange={(e) => setAttackType(e.target.value)} className="input">
             <option value="">{t("common.all")}</option>
-            {types.map((tt) => <option key={tt} value={tt}>{tt}</option>)}
+            {types.map((tt) => <option key={tt} value={tt}>{typeLabel(tt)}</option>)}
           </select>
         </div>
         <div className="flex items-end">

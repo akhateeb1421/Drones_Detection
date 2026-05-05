@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # Demo fallback
     fallback_video: str = "../data/raw/shahed.mp4"
 
+    # Where to store per-track thumbnail JPEGs.
+    thumbnail_dir: str = "../data/thumbnails"
+
     @property
     def database_url(self) -> str:
         # URL-encode user + password so passwords containing reserved characters

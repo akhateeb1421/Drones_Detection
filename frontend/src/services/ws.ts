@@ -19,6 +19,8 @@ export type DetectionMeta = {
     nearest_area: string | null;
     dist_m: number | null;
     eta_s: number | null;
+    linked_track_id?: number | null;
+    link_root_camera_id?: number | null;
   }[];
 };
 

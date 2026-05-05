@@ -1,5 +1,6 @@
 import { CircleMarker, MapContainer, Marker, Polygon, Polyline, Popup, TileLayer } from "react-leaflet";
 import { Icon, LatLngExpression } from "leaflet";
+import { useTranslation } from "react-i18next";
 
 const sensitiveIcon = new Icon({
   iconUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -70,6 +71,7 @@ export function DroneMap({
   cameras = [],
   predictedPath = null,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="h-full w-full rounded-md">
       <TileLayer
@@ -88,7 +90,7 @@ export function DroneMap({
       {cameras.flatMap((cam) => {
         const cone = fovCone(cam);
         const tip = offset(cam.lat, cam.lon, cam.heading_deg, cam.distance_m);
-        const camColor = cam.threatActive ? "#e94560" : "#22c55e"; // red while a threat is active, green otherwise
+        const camColor = cam.threatActive ? "#e94560" : "#22c55e";
         return [
           <Polygon
             key={`cam-cone-${cam.id}`}
@@ -113,11 +115,11 @@ export function DroneMap({
             pathOptions={{ color: camColor, fillColor: "#0a0f1e", fillOpacity: 1, weight: 2 }}
           >
             <Popup>
-              <strong>{cam.name}</strong>{cam.threatActive ? " — THREAT" : ""}
+              <strong>{cam.name}</strong>{cam.threatActive ? ` — ${t("live.cam_threat")}` : ""}
               <br />
-              heading: {cam.heading_deg}°<br />
-              FOV: {cam.fov_h_deg}°<br />
-              range: {cam.distance_m} m
+              {t("live.cam_heading")}: <span dir="ltr">{cam.heading_deg}°</span><br />
+              {t("live.cam_fov")}: <span dir="ltr">{cam.fov_h_deg}°</span><br />
+              {t("live.cam_range")}: <span dir="ltr">{cam.distance_m} m</span>
             </Popup>
           </CircleMarker>,
         ];
