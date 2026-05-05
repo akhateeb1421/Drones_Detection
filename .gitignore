@@ -49,14 +49,8 @@ Thumbs.db
 backend/.env
 frontend/.env
 
-# Data + model artifacts (large or sensitive)
-models/*.pt
-models/*.pth
-ml/artifacts/*.joblib
-ml/artifacts/*.pkl
-ml/artifacts/*.json
-data/synthetic/*.csv
-data/processed/*.csv
+# Per-track JPEG thumbnails (auto-generated from live detections, can grow large)
+data/thumbnails/
 
 # But keep the README/placeholder
 !ml/artifacts/.gitkeep
