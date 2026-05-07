@@ -43,8 +43,17 @@ class TrackOut(BaseModel):
     reviewed_at: datetime | None
     thumbnail_path: str | None = None
     alarm_fired_at: datetime | None = None
+    outcome: str | None = None
+
+
+class ApproveIn(BaseModel):
+    """Body for the approve endpoint - operator picks an engagement outcome."""
+
+    outcome: str  # "countered" | "hit"
 
 
 class ApprovalOut(BaseModel):
     track_id: int
-    st
+    status: str
+    outcome: str | None = None
+    attack_id: int | None = None

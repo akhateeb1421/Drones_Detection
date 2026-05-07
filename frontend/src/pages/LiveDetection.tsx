@@ -5,6 +5,7 @@ import { useLiveStream } from "../hooks/useLiveStream";
 import { useAlarmsContext } from "../contexts/AlarmsContext";
 import { DroneMap } from "../components/DroneMap";
 import { usePlaceLabel, useClassLabel, useBilingualName } from "../i18n/places";
+import { SAUDI_POPULATED_AREAS } from "../data/saudiPopulatedAreas";
 
 function projectPath(lat: number, lon: number, speed: number, angleDeg: number, seconds = 60): [number, number] {
   const distance = Math.max(speed, 0) * seconds;
@@ -16,8 +17,6 @@ function projectPath(lat: number, lon: number, speed: number, angleDeg: number, 
 
 const PREDICT_HORIZON_S = 60;
 
-// Mirror of backend HOSTILE_CLASSES (alarms.py). Threat tier and alarm system
-// must agree: CRITICAL/HIGH only escalates for hostile classes.
 const HOSTILE_CLASSES = new Set([
   "shahed",
   "orlan-10",
@@ -26,6 +25,12 @@ const HOSTILE_CLASSES = new Set([
   "dji",
   "drone",
 ]);
+
+function distM(latA: number, lonA: number, latB: number, lonB: number): number {
+  const dN = (latB - latA) * 111320;
+  const dE = (lonB - lonA) * 111320 * Math.cos((latA * Math.PI) / 180);
+  return Math.sqrt(dN * dN + dE * dE);
+}
 
 type Snapshot = {
   trackId: number;
@@ -90,6 +95,7 @@ export function LiveDetection() {
   const [tracks, setTracks] = useState<Map<number, Snapshot>>(new Map());
   const [showAreas, setShowAreas] = useState(true);
   const [showCams, setShowCams] = useState(false);
+  const [showIntercept, setShowIntercept] = useState(true);
 
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -152,6 +158,58 @@ export function LiveDetection() {
     return [[focused.lat, focused.lon] as [number, number], end];
   }, [focused]);
 
+  // --- Intercept point computation ---
+  // Sample the predicted trajectory at fixed lookahead steps (5..30 s).
+  // For each candidate compute the minimum clearance from:
+  //  (a) operator-marked sensitive areas (point hazards)
+  //  (b) baseline Saudi populated areas (city discs - we measure to the
+  //      *edge* of each disc, not the centre, so the urban sprawl is
+  //      treated as off-limits even if the centre is far)
+  // Pick the EARLIEST candidate whose clearance >= threshold AND that
+  // fires at least SAFETY_BUFFER_S before impact.
+  const SAFETY_THRESHOLD_M = 800;
+  const SAFETY_BUFFER_S = 5;
+  const interceptPoint = useMemo(() => {
+    if (!focused || focused.speedMps < 0.5) return null;
+    const samples = [5, 8, 12, 16, 22, 30];
+    const etaCap = focused.etaS != null ? focused.etaS - SAFETY_BUFFER_S : Infinity;
+
+    type Candidate = { lat: number; lon: number; t: number; clearance: number };
+    let best: Candidate | null = null;
+
+    for (const tSec of samples) {
+      if (tSec > etaCap) break;
+      const [lat, lon] = projectPath(focused.lat, focused.lon, focused.speedMps, focused.angleDeg, tSec);
+      let clearance = Infinity;
+      for (const a of areas) {
+        const d = distM(lat, lon, a.latitude, a.longitude);
+        if (d < clearance) clearance = d;
+      }
+      for (const p of SAUDI_POPULATED_AREAS) {
+        const d = distM(lat, lon, p.lat, p.lon) - p.radius_km * 1000;
+        const eff = Math.max(0, d);
+        if (eff < clearance) clearance = eff;
+      }
+      if (clearance >= SAFETY_THRESHOLD_M) {
+        best = { lat, lon, t: tSec, clearance };
+        break;
+      }
+      if (best == null || clearance > best.clearance) {
+        best = { lat, lon, t: tSec, clearance };
+      }
+    }
+
+    if (!best) return null;
+    const safe = best.clearance >= SAFETY_THRESHOLD_M;
+    return {
+      lat: best.lat,
+      lon: best.lon,
+      t: best.t,
+      km: best.clearance / 1000,
+      safe,
+    };
+  }, [focused, areas]);
+
   const localizeAreaName = (name: string | null): string => {
     if (!name) return "—";
     const row = areas.find((a) => a.name === name);
@@ -207,8 +265,8 @@ export function LiveDetection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks, tick]);
 
-  const handleApprove = async (track: Track) => {
-    await Detections.approve(track.camera_id, track.track_id);
+  const handleApprove = async (track: Track, outcome: "countered" | "hit") => {
+    await Detections.approve(track.camera_id, track.track_id, outcome);
     setPending((cur) => cur.filter((p) => p.id !== track.id));
   };
   const handleReject = async (track: Track) => {
@@ -250,18 +308,12 @@ export function LiveDetection() {
     return Math.sqrt(dN * dN + dE * dE);
   }
 
-  // Reconciliation: when the pending-approvals list contains a CRITICAL row
-  // and (a) the backend has already stamped alarm_fired_at on the track but
-  // (b) this browser session hasn't been notified yet, synthesize an alarm
-  // event so the banner+sound fire — closing the gap between the persisted
-  // CRITICAL badge and the ephemeral WS event.
   const notifiedRef = useRef<Set<number>>(new Set());
   useEffect(() => {
     for (const p of pending) {
       const tier = threatTier(p.min_eta_s, distToNearest(p), p.voted_class);
       if (tier.label !== "CRITICAL" && tier.label !== "HIGH") continue;
       if (notifiedRef.current.has(p.id)) continue;
-      // Only re-fire when the backend agrees the alarm was warranted.
       if (!p.alarm_fired_at) continue;
       notifiedRef.current.add(p.id);
       alarms.push({
@@ -328,6 +380,16 @@ export function LiveDetection() {
                   <div><span className="label inline">{t("live.direction")}</span> {focused.direction}</div>
                   <div><span className="label inline">{t("live.nearest_area")}</span> {localizeAreaName(focused.nearestArea)}</div>
                   <div className="col-span-2"><span className="label inline">{t("live.eta")}</span> {focused.etaS !== null ? `${focused.etaS.toFixed(1)}s` : "—"}</div>
+                  {interceptPoint && interceptPoint.safe && (
+                    <div className="col-span-2 mt-1 rounded bg-success/20 px-2 py-1 text-xs text-success">
+                      {t("live.intercept_label", { secs: interceptPoint.t, km: interceptPoint.km.toFixed(1) })}
+                    </div>
+                  )}
+                  {interceptPoint && !interceptPoint.safe && (
+                    <div className="col-span-2 mt-1 rounded bg-danger/20 px-2 py-1 text-xs text-danger">
+                      {t("live.intercept_unsafe")}
+                    </div>
+                  )}
                   {stale && (
                     <div className="col-span-2 mt-1 rounded bg-warning/20 px-2 py-1 text-xs text-warning">
                       {t("live.out_of_frame", { secs: elapsedS.toFixed(1) })}
@@ -340,18 +402,15 @@ export function LiveDetection() {
           <div className="card flex flex-col">
             <div className="flex items-center justify-between mb-2">
               <div className="label">{t("live.predicted_path")}</div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowAreas((v) => !v)}
-                  className={showAreas ? "btn-primary" : "btn-ghost"}
-                >
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setShowAreas((v) => !v)} className={showAreas ? "btn-primary" : "btn-ghost"}>
                   {showAreas ? "● " : "○ "}{t("live.toggle_areas")}
                 </button>
-                <button
-                  onClick={() => setShowCams((v) => !v)}
-                  className={showCams ? "btn-primary" : "btn-ghost"}
-                >
+                <button onClick={() => setShowCams((v) => !v)} className={showCams ? "btn-primary" : "btn-ghost"}>
                   {showCams ? "● " : "○ "}{t("live.toggle_cameras")}
+                </button>
+                <button onClick={() => setShowIntercept((v) => !v)} className={showIntercept ? "btn-primary" : "btn-ghost"}>
+                  {showIntercept ? "● " : "○ "}{t("live.toggle_intercept")}
                 </button>
               </div>
             </div>
@@ -376,6 +435,18 @@ export function LiveDetection() {
                     : []
                 }
                 predictedPath={predictedPath}
+                interceptPoint={
+                  showIntercept && interceptPoint
+                    ? {
+                        lat: interceptPoint.lat,
+                        lon: interceptPoint.lon,
+                        label: t("live.intercept_label", {
+                          secs: interceptPoint.t,
+                          km: interceptPoint.km.toFixed(1),
+                        }),
+                      }
+                    : null
+                }
               />
             </div>
           </div>
@@ -396,7 +467,7 @@ export function LiveDetection() {
                 <th className="text-start">{t("live.nearest_area")}</th>
                 <th className="text-start">{t("live.eta")}</th>
                 <th className="text-start">{t("live.threat_level")}</th>
-                <th className="text-end"></th>
+                <th className="text-end">{t("live.outcome")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -436,9 +507,18 @@ export function LiveDetection() {
                       );
                     })()}
                   </td>
-                  <td className="space-x-2 text-end">
-                    <button onClick={() => handleApprove(p)} className="btn-primary">{t("common.approve")}</button>
-                    <button onClick={() => handleReject(p)} className="btn-danger">{t("common.reject")}</button>
+                  <td className="text-end">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      <button onClick={() => handleApprove(p, "countered")} className="btn-primary text-xs">
+                        {t("live.btn_countered")}
+                      </button>
+                      <button onClick={() => handleApprove(p, "hit")} className="btn-warning text-xs">
+                        {t("live.btn_hit")}
+                      </button>
+                      <button onClick={() => handleReject(p)} className="btn-danger text-xs">
+                        {t("common.reject")}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

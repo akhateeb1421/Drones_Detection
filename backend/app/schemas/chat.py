@@ -12,6 +12,7 @@ class ChatIn(BaseModel):
     message: str
     history: list[ChatTurn] = []
     language: str = "ar"  # 'ar' | 'en'
+    role: str = "viewer"  # 'admin' | 'viewer'
 
 
 class ChatOut(BaseModel):

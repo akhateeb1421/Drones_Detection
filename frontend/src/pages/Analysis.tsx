@@ -25,17 +25,16 @@ const TOOLTIP_LABEL_STYLE = { color: "#38bdf8", fontWeight: 600 } as const;
 const TOOLTIP_ITEM_STYLE = { color: "#e2e8f0" } as const;
 
 const REGION_COLORS = [
-  "#38bdf8", // cyan
-  "#e94560", // red
-  "#f5a623", // amber
-  "#22c55e", // green
-  "#a855f7", // purple
-  "#ec4899", // pink
-  "#1abc9c", // teal
-  "#84cc16", // lime
+  "#38bdf8",
+  "#e94560",
+  "#f5a623",
+  "#22c55e",
+  "#a855f7",
+  "#ec4899",
+  "#1abc9c",
+  "#84cc16",
 ];
 
-// "2025-07-01T00:00:00+03:00" -> "2025-07-01"
 function isoDay(s: string): string {
   if (!s) return "";
   const i = s.indexOf("T");
@@ -57,9 +56,6 @@ export function Analysis() {
     Predictions.forecast({ days: String(horizon) }).then(setForecast);
   }, [horizon]);
 
-  // Pivot the long-format forecast (one row per region/date) into wide format
-  // (one row per date, one column per region) so Recharts can draw one Line
-  // per region on the same axes.
   const forecastWide = useMemo(() => {
     const byDate: Record<string, Record<string, number>> = {};
     const regionSet = new Set<string>();
@@ -77,7 +73,7 @@ export function Analysis() {
   }, [forecast]);
 
   const timelineFmt = useMemo(
-    () => timeline.map((t) => ({ ...t, period: isoDay(t.period) })),
+    () => timeline.map((tp) => ({ ...tp, period: isoDay(tp.period) })),
     [timeline]
   );
 
@@ -124,7 +120,18 @@ export function Analysis() {
                 labelStyle={TOOLTIP_LABEL_STYLE}
                 itemStyle={TOOLTIP_ITEM_STYLE}
               />
-              <Line type="monotone" dataKey="count" stroke="#38bdf8" strokeWidth={2} dot={false} />
+              <Legend
+                wrapperStyle={{ fontSize: 12, color: "#e2e8f0" }}
+                formatter={(value: string) => <span style={{ color: "#e2e8f0" }}>{value}</span>}
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                name={t("analysis.count")}
+                stroke="#38bdf8"
+                strokeWidth={2}
+                dot={false}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>

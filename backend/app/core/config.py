@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # PostgreSQL
     db_host: str = "localhost"
-    db_port: int = 5433
+    db_port: int = 5432
     db_name: str = "history"
     db_user: str = "postgres"
     db_password: str = "change_me"
@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     # Ollama
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b"
+    # Read-timeout (seconds) for Ollama replies. Bigger models take longer,
+    # and the very first call after a model switch must wait for Ollama to
+    # load the weights into memory — that alone can be 30-120s on CPU.
+    ollama_timeout_s: float = 600.0
+    # How long Ollama keeps the model resident after a request. "30m" matches
+    # Ollama's default; raise to e.g. "12h" to avoid cold reloads.
+    ollama_keep_alive: str = "30m"
 
     # Demo fallback
     fallback_video: str = "../data/raw/shahed.mp4"

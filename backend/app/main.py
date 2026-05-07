@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import analysis, areas, attacks, cameras, chatbot, detections, predictions, stream
+from app.api import admin, analysis, areas, attacks, cameras, chatbot, detections, predictions, stream
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.workers.pipeline import shutdown_pipeline, startup_pipeline
@@ -48,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(predictions.router)
     app.include_router(chatbot.router)
     app.include_router(stream.router)
+    app.include_router(admin.router)
 
     return app
 

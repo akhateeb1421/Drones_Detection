@@ -29,4 +29,5 @@ class Camera(Base):
 
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
-      
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

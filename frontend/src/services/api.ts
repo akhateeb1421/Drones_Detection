@@ -49,6 +49,7 @@ export type Track = {
   reviewed_at: string | null;
   thumbnail_path: string | null;
   alarm_fired_at: string | null;
+  outcome: "countered" | "hit" | null;
 };
 
 export function trackThumbUrl(trackDbId: number): string {
@@ -109,8 +110,10 @@ export const Attacks = {
 export const Detections = {
   pendingTracks: () =>
     api.get<Track[]>("/detections/tracks", { params: { status: "pending" } }).then((r) => r.data),
-  approve: (cameraId: number, trackId: number) =>
-    api.post(`/detections/${cameraId}/${trackId}/approve`).then((r) => r.data),
+  approve: (cameraId: number, trackId: number, outcome: "countered" | "hit") =>
+    api
+      .post(`/detections/${cameraId}/${trackId}/approve`, { outcome })
+      .then((r) => r.data),
   reject: (cameraId: number, trackId: number) =>
     api.post(`/detections/${cameraId}/${trackId}/reject`).then((r) => r.data),
 };
@@ -130,6 +133,20 @@ export const Areas = {
   update: (id: number, body: Partial<Area>) =>
     api.patch<Area>(`/areas/${id}`, body).then((r) => r.data),
   remove: (id: number) => api.delete(`/areas/${id}`).then((r) => r.data),
+};
+
+export const Admin = {
+  /** Validate a candidate admin token. Resolves true on 200, false otherwise. */
+  check: async (token: string): Promise<boolean> => {
+    try {
+      await api.get("/admin/check", {
+        headers: { "X-Admin-Token": token },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
 };
 
 export type TotalCounts = {
@@ -181,11 +198,16 @@ export const Predictions = {
 const CHAT_TIMEOUT_MS = 5 * 60 * 1000;
 
 export const Chat = {
-  ask: (message: string, history: { role: string; content: string }[], language: string) =>
+  ask: (
+    message: string,
+    history: { role: string; content: string }[],
+    language: string,
+    role: "admin" | "viewer" = "viewer",
+  ) =>
     api
       .post<{ answer: string; model: string }>(
         "/chat",
-        { message, history, language },
+        { message, history, language, role },
         { timeout: CHAT_TIMEOUT_MS },
       )
       .then((r) => r.data),

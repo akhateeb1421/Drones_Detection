@@ -20,4 +20,5 @@ class SensitiveArea(Base):
     longitude: Mapped[Decimal] = mapped_column(DECIMAL(11, 7), nullable=False)
     priority: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
-      
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

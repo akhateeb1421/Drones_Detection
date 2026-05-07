@@ -1,4 +1,4 @@
-"""Per-track summary — one row per (camera_id, track_id), updated as frames stream in."""
+"""Per-track summary - one row per (camera_id, track_id), updated as frames stream in."""
 
 from datetime import datetime
 
@@ -31,17 +31,20 @@ class Track(Base):
     last_lon: Mapped[float | None] = mapped_column(REAL, nullable=True)
     last_heading_deg: Mapped[float | None] = mapped_column(REAL, nullable=True)
 
-    # If this track is the continuation of a track first seen on another
-    # camera, points at the original Track.id. NULL otherwise.
     linked_track_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-
-    # Path (relative to the data thumbnail dir) to a JPEG crop of the
-    # highest-confidence frame seen for this track. Used by the dashboard
-    # pending-approvals UI.
     thumbnail_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", index=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Stamped the first time an alarm fires for any detection on this track.
-    # Lets the dashboard show that CRITICAL pending ro
+    alarm_fired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Engagement outcome chosen by the operator at approval time:
+    #   "countered" - drone was intercepted before reaching the target
+    #   "hit"       - drone impacted (defense failed)
+    # Null while pending or when rejected (rejection means "not a real drone").
+    outcome: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

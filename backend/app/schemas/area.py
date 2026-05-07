@@ -26,4 +26,8 @@ class AreaOut(BaseModel):
 
     id: int
     name: str
-    name_ar: str | Non
+    name_ar: str | None = None
+    latitude: float
+    longitude: float
+    priority: int
+    created_at: datetime

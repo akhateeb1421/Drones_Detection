@@ -107,4 +107,31 @@ def main() -> None:
         df = pd.concat([df, extra_df], ignore_index=True)
         log.info("Appended %d extra hand-curated rows.", len(extra_df))
 
-    norm = normal
+    norm = normalize_real_for_db(df)
+    log.info("After splitting combined attacks: %d location rows", len(norm))
+
+    with SessionLocal() as db:
+        seed_areas(db)
+        deleted = db.execute(delete(Attack).where(Attack.source == "historical")).rowcount
+        db.commit()
+        log.info("Deleted %s old historical rows.", deleted)
+
+        for _, row in norm.iterrows():
+            db.add(
+                Attack(
+                    occurred_at=row["occurred_at"].to_pydatetime() if hasattr(row["occurred_at"], "to_pydatetime") else row["occurred_at"],
+                    attack_type=row["attack_type"],
+                    target_location=row["target_location"],
+                    region=row["region"],
+                    latitude=row["latitude"],
+                    longitude=row["longitude"],
+                    source=row["source"],
+                )
+            )
+        db.commit()
+
+    log.info("Inserted %d historical rows.", len(norm))
+
+
+if __name__ == "__main__":
+    main()

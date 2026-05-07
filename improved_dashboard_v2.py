@@ -1,6 +1,6 @@
 """
 =============================================================================
-Dashboard شامل بدون استيراد خارجي - نظام الدفاع ضد الطائرات المسيرة
+Dashboard شامل بدون استيراد خارجي - رقيب
 Self-contained Dashboard - No External Imports Required
 =============================================================================
 
@@ -27,7 +27,7 @@ warnings.filterwarnings('ignore')
 
 # إعداد الصفحة
 st.set_page_config(
-    page_title="🛡️ نظام الدفاع ضد الطائرات المسيرة",
+    page_title="🛡️ رقيب",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"

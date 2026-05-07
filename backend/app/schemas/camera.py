@@ -48,4 +48,7 @@ class CameraOut(BaseModel):
     altitude_m: float
     fov_h_deg: float
     fov_v_deg: float
-    sens
+    sensor_w_px: int
+    assumed_target_distance_m: float
+    enabled: bool
+    created_at: datetime

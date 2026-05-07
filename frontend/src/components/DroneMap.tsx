@@ -34,6 +34,12 @@ export type CameraMarker = {
   threatActive?: boolean;
 };
 
+export type InterceptMarker = {
+  lat: number;
+  lon: number;
+  label: string;
+};
+
 interface Props {
   center?: LatLngExpression;
   zoom?: number;
@@ -41,6 +47,7 @@ interface Props {
   sensitiveAreas?: SensitiveMarker[];
   cameras?: CameraMarker[];
   predictedPath?: LatLngExpression[] | null;
+  interceptPoint?: InterceptMarker | null;
 }
 
 function offset(lat: number, lon: number, bearing_deg: number, distance_m: number): [number, number] {
@@ -70,6 +77,7 @@ export function DroneMap({
   sensitiveAreas = [],
   cameras = [],
   predictedPath = null,
+  interceptPoint = null,
 }: Props) {
   const { t } = useTranslation();
   return (
@@ -138,6 +146,27 @@ export function DroneMap({
 
       {predictedPath && predictedPath.length >= 2 && (
         <Polyline positions={predictedPath} pathOptions={{ color: "#f5a623", dashArray: "6 8", weight: 3 }} />
+      )}
+
+      {interceptPoint && (
+        <>
+          <CircleMarker
+            center={[interceptPoint.lat, interceptPoint.lon]}
+            radius={11}
+            pathOptions={{ color: "#22c55e", fillColor: "#22c55e", fillOpacity: 0.25, weight: 2 }}
+          >
+            <Popup>
+              <strong>{t("live.intercept_point")}</strong>
+              <br />
+              {interceptPoint.label}
+            </Popup>
+          </CircleMarker>
+          <CircleMarker
+            center={[interceptPoint.lat, interceptPoint.lon]}
+            radius={3}
+            pathOptions={{ color: "#22c55e", fillColor: "#22c55e", fillOpacity: 1, weight: 1 }}
+          />
+        </>
       )}
     </MapContainer>
   );

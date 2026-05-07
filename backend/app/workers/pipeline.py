@@ -279,4 +279,59 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
                 thumbnail_path=thumb_rel,
                 status="pending",
                 alarm_fired_at=now if det.get("_threat_fired") else None,
- 
+            )
+            db.add(track)
+            # Make the link visible on the WebSocket payload so the frontend
+            # can merge tracks across cameras into one drone.
+            det["linked_track_id"] = link.track_id if link is not None else None
+            det["link_root_camera_id"] = link.camera_id if link is not None else None
+        else:
+            track.last_seen_at = now
+            track.voted_class = det["drone_class"]
+            # New high-water confidence -> overwrite the saved thumbnail.
+            if track.max_confidence is None or det["confidence"] > track.max_confidence:
+                track.max_confidence = float(det["confidence"])
+                if det.get("_thumb_bytes"):
+                    new_thumb = _save_thumbnail(camera_id, det["track_id"], det["_thumb_bytes"])
+                    if new_thumb:
+                        track.thumbnail_path = new_thumb
+            if track.max_speed_mps is None or det["speed_mps"] > track.max_speed_mps:
+                track.max_speed_mps = float(det["speed_mps"])
+            if det["eta_s"] is not None and (track.min_eta_s is None or det["eta_s"] < track.min_eta_s):
+                track.min_eta_s = float(det["eta_s"])
+            track.nearest_area = det["nearest_area"]
+            track.last_lat = float(det["lat"])
+            track.last_lon = float(det["lon"])
+            track.last_heading_deg = float(det["angle_deg"])
+            # Stamp the first time an alarm fires for this track. Subsequent
+            # alarms keep the original timestamp so the field reads as "alarm
+            # has been raised at least once" rather than "most recent alarm".
+            if det.get("_threat_fired") and track.alarm_fired_at is None:
+                track.alarm_fired_at = now
+            if track.linked_track_id is not None:
+                parent = db.get(Track, track.linked_track_id)
+                if parent is not None:
+                    det["linked_track_id"] = parent.track_id
+                    det["link_root_camera_id"] = parent.camera_id
+    db.commit()
+
+
+async def startup_pipeline() -> None:
+    """Spawn one worker task per enabled camera at app startup."""
+    with SessionLocal() as db:
+        cams = list(db.execute(select(Camera).where(Camera.enabled.is_(True))).scalars().all())
+    for cam in cams:
+        if cam.id in _tasks:
+            continue
+        _tasks[cam.id] = asyncio.create_task(_run_camera(cam.id), name=f"cam-{cam.id}")
+    log.info("Started pipeline workers: %s", list(_tasks.keys()))
+
+
+async def shutdown_pipeline() -> None:
+    for tid, task in list(_tasks.items()):
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
+        del _tasks[tid]

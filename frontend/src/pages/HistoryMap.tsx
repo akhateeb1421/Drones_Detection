@@ -56,11 +56,29 @@ export function HistoryMap() {
       <div className="card grid grid-cols-1 gap-3 md:grid-cols-5">
         <div>
           <div className="label">{t("history.date_from")}</div>
-          <input type="date" lang="en" dir="ltr" value={from} onChange={(e) => setFrom(e.target.value)} className="input" />
+          <input
+            type="text"
+            inputMode="numeric"
+            dir="ltr"
+            placeholder="YYYY-MM-DD"
+            pattern="\d{4}-\d{2}-\d{2}"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="input"
+          />
         </div>
         <div>
           <div className="label">{t("history.date_to")}</div>
-          <input type="date" lang="en" dir="ltr" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
+          <input
+            type="text"
+            inputMode="numeric"
+            dir="ltr"
+            placeholder="YYYY-MM-DD"
+            pattern="\d{4}-\d{2}-\d{2}"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="input"
+          />
         </div>
         <div>
           <div className="label">{t("history.region")}</div>

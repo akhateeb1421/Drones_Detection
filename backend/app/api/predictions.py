@@ -220,4 +220,23 @@ def camera_placements(
                 "name": f"FWD-{best_area.name}-{cid + 1}",
                 "for_area": best_area.name,
                 "lat": round(float(cam_lat), 6),
-                "lon": r
+                "lon": round(float(cam_lon), 6),
+                "heading_deg": round(heading, 1),
+                "heading_label": label,
+                "fov_h_deg": round(fov_h_deg, 1),
+                "assumed_target_distance_m": round(assumed_target_distance_m, 0),
+                "covers_attacks": len(members_idx),
+                "spread_deg": round(cluster_size_km, 1),  # repurpose as cluster radius (km)
+                "top_threat_region": top_region,
+                "top_threat_region_count": int(top_count),
+                "scope": "cluster",
+                "rationale": (
+                    f"Forward observation camera ahead of {best_area.name}. "
+                    f"Placed {forward_distance_m / 1000:.0f} km toward an attack hotspot "
+                    f"at ({c_lat:.3f}, {c_lon:.3f}) with {len(members_idx)} attacks "
+                    f"(mostly {top_region}, {top_count}). "
+                    f"Heading {heading:.0f}° ({label}); cluster radius ~{cluster_size_km:.0f} km."
+                ),
+            })
+
+    return suggestions

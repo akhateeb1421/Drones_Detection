@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 تشغيل نظام الدفاع ضد الطائرات المسيرة
+🚀 تشغيل رقيب
 Main execution file for Drone Defense AI System
 """
 

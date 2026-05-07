@@ -74,7 +74,16 @@
     "cam_heading": "heading",
     "cam_fov": "FOV",
     "cam_range": "range",
-    "cam_threat": "THREAT"
+    "cam_threat": "THREAT",
+    "intercept_point": "Suggested intercept point",
+    "intercept_label": "intercept @ +{{secs}}s · {{km}} km clear of populated areas",
+    "intercept_unsafe": "No safe intercept window before impact",
+    "toggle_intercept": "Intercept point",
+    "outcome": "Engagement outcome",
+    "btn_countered": "Countered",
+    "btn_hit": "Hit target",
+    "outcome_countered": "Countered",
+    "outcome_hit": "Hit target"
   },
   "history": {
     "title": "Historical Attacks Map",
@@ -94,7 +103,8 @@
     "risk": "Risk assessment",
     "forecast": "Attack forecast",
     "horizon": "Horizon (days)",
-    "forecast_help": "Predicts daily attack count per region for the next {{days}} days."
+    "forecast_help": "Predicts daily attack count per region for the next {{days}} days.",
+    "count": "Attacks"
   },
   "chatbot": {
     "title": "AI Assistant",
@@ -240,5 +250,15 @@
     "HIGH": "HIGH",
     "MEDIUM": "MEDIUM",
     "LOW": "LOW"
+  },
+  "auth": {
+    "role_admin": "Admin",
+    "role_viewer": "Operator",
+    "sign_in_admin": "Sign in as admin",
+    "sign_in": "Sign in",
+    "sign_out": "Sign out",
+    "token_required": "Token is required",
+    "admin_only": "This page is admin-only.",
+    "invalid_token": "Invalid token"
   }
 }
