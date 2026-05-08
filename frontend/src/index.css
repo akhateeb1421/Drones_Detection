@@ -59,3 +59,147 @@ body {
   background: #1e293b;
   border-radius: 3px;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Light theme overrides. The dashboard ships dark by default; toggling   */
+/* the ThemeContext adds `html.light` and these rules take over. We patch */
+/* surfaces, text, borders, and the leaflet basemap. Tailwind utility     */
+/* classes are overridden via `!important` because the dark values come   */
+/* from compiled atomic classes that already won the cascade.             */
+/* ---------------------------------------------------------------------- */
+html.light, html.light body, html.light #root {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+html.light .leaflet-container {
+  background: #e2e8f0;
+}
+
+/* surfaces */
+html.light .bg-bg          { background-color: #f1f5f9 !important; }
+html.light .bg-panel       { background-color: #ffffff !important; }
+html.light .bg-slate-900   { background-color: #f8fafc !important; }
+html.light .bg-slate-800   { background-color: #e2e8f0 !important; }
+html.light .bg-slate-700   { background-color: #cbd5e1 !important; color: #0f172a !important; }
+
+/* hover variants — Tailwind compiles these as `.hover\:bg-slate-800:hover`,
+ * which the plain `.bg-slate-800` override above can't reach. Without these
+ * the sidebar nav links flash a dark navy on hover in light mode. */
+html.light .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; color: #0f172a !important; }
+html.light .hover\:bg-slate-700:hover { background-color: #cbd5e1 !important; color: #0f172a !important; }
+html.light .hover\:bg-slate-900:hover { background-color: #f8fafc !important; color: #0f172a !important; }
+
+/* dividers + borders */
+html.light .border-slate-800 { border-color: #cbd5e1 !important; }
+html.light .border-slate-700 { border-color: #94a3b8 !important; }
+html.light .divide-slate-800 > * + * { border-color: #e2e8f0 !important; }
+
+/* text */
+html.light .text-slate-100 { color: #0f172a !important; }
+html.light .text-slate-200 { color: #1e293b !important; }
+html.light .text-slate-300 { color: #334155 !important; }
+html.light .text-slate-400 { color: #475569 !important; }
+html.light .text-slate-500 { color: #64748b !important; }
+html.light .text-muted     { color: #475569 !important; }
+
+/* card / input / label / ghost button */
+html.light .card  { background-color: #ffffff !important; border-color: #cbd5e1 !important; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+html.light .input { background-color: #ffffff !important; border-color: #94a3b8 !important; color: #0f172a !important; }
+html.light .input::placeholder { color: #94a3b8 !important; }
+html.light .label { color: #475569 !important; }
+html.light .btn-ghost { background-color: #ffffff; border-color: #cbd5e1; color: #1e293b; }
+html.light .btn-ghost:hover { background-color: #f1f5f9; }
+
+/* scrollbar */
+html.light .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+/* keep status pills readable on white */
+html.light .bg-success\/20  { background-color: rgba(34, 197, 94, 0.18) !important; }
+html.light .bg-warning\/20  { background-color: rgba(245, 166, 35, 0.20) !important; }
+html.light .bg-danger\/20   { background-color: rgba(233, 69, 96, 0.18) !important; }
+
+/* ---------------------------------------------------------------------- */
+/* Recharts overrides in light mode. Recharts paints axes/legend/tooltip  */
+/* via inline SVG attributes and inline styles, so we need !important to  */
+/* beat them. Targets are stable Recharts class names.                    */
+/* ---------------------------------------------------------------------- */
+html.light .recharts-cartesian-axis-tick text { fill: #334155 !important; }
+html.light .recharts-cartesian-axis-line,
+html.light .recharts-cartesian-axis-tick-line { stroke: #94a3b8 !important; }
+html.light .recharts-cartesian-grid-horizontal line,
+html.light .recharts-cartesian-grid-vertical line { stroke: #cbd5e1 !important; }
+html.light .recharts-legend-item-text { color: #334155 !important; }
+
+/* Tooltip popup */
+html.light .recharts-default-tooltip {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12) !important;
+}
+html.light .recharts-tooltip-label { color: #0369a1 !important; }
+html.light .recharts-tooltip-item { color: #0f172a !important; }
+html.light .recharts-tooltip-item-name,
+html.light .recharts-tooltip-item-separator,
+html.light .recharts-tooltip-item-value,
+html.light .recharts-tooltip-item-unit { color: #0f172a !important; }
+
+/* In-slice percentage labels stay white-on-color for contrast against the
+ * pie segments — explicit so theme override doesn't accidentally invert. */
+html.light .recharts-pie-label-text { fill: #ffffff !important; }
+
+/* The active region readout above the donut needs a dark text color */
+html.light .text-slate-200 { color: #1e293b !important; }
+
+/* The Legend formatter and Tooltip contentStyle in our chart components
+ * inline style="color: #e2e8f0" / similar light tokens onto child spans.
+ * Inline styles only get beaten by author CSS marked !important, AND the
+ * targeted element must match. The Legend wrapper's children carry the
+ * inline style, so we have to descend into them. */
+html.light .recharts-legend-item-text,
+html.light .recharts-legend-item-text * {
+  color: #334155 !important;
+}
+
+html.light .recharts-default-tooltip,
+html.light .recharts-default-tooltip * {
+  color: #0f172a !important;
+}
+html.light .recharts-default-tooltip {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+html.light .recharts-default-tooltip .recharts-tooltip-label {
+  color: #0369a1 !important;
+}
+
+/* Cell stroke between pie slices: was #0a0f1e (dark navy), too jarring on
+ * a white panel. Force it to match the panel background so slices read as
+ * separated by thin white gaps. */
+html.light .recharts-pie .recharts-sector {
+  stroke: #ffffff !important;
+}
+
+/* Bar chart numeric labels on top/right of bars: <LabelList fill="#e2e8f0">
+ * inlines the SVG fill attribute. Override via the recharts-label-list
+ * descendant text elements with !important. */
+html.light .recharts-bar-rectangle text,
+html.light .recharts-bar-labels text,
+html.light .recharts-label-list text {
+  fill: #334155 !important;
+}
+
+/* Switch the hover tooltip to white-on-dark in BOTH themes — easier to
+ * read on top of any chart fill, and matches the user request. */
+html.light .recharts-default-tooltip {
+  background: #0a0f1e !important;
+  border-color: #1e3a5f !important;
+}
+html.light .recharts-default-tooltip,
+html.light .recharts-default-tooltip * {
+  color: #e2e8f0 !important;
+}
+html.light .recharts-default-tooltip .recharts-tooltip-label {
+  color: #38bdf8 !important;
+}

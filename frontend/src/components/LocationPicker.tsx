@@ -1,6 +1,7 @@
 import { MapContainer, Marker, TileLayer, useMapEvents, useMap } from "react-leaflet";
 import { Icon, LatLng } from "leaflet";
 import { useEffect } from "react";
+import { useTheme } from "../contexts/ThemeContext";
 
 const pinIcon = new Icon({
   iconUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -37,6 +38,13 @@ function Recenter({ lat, lon }: { lat: number; lon: number }) {
 }
 
 export function LocationPicker({ lat, lon, onChange, height = "320px", zoom = 11 }: Props) {
+  const { theme } = useTheme();
+  // Match the main DroneMap basemap so the admin picker doesn't stay dark
+  // when the rest of the dashboard flips to light mode.
+  const tileUrl =
+    theme === "light"
+      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
   return (
     <div style={{ height }} className="rounded-md overflow-hidden border border-slate-700">
       <MapContainer
@@ -47,7 +55,7 @@ export function LocationPicker({ lat, lon, onChange, height = "320px", zoom = 11
       >
         <TileLayer
           attribution='&copy; OpenStreetMap'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url={tileUrl}
         />
         <Marker
           position={[lat, lon]}

@@ -3,14 +3,17 @@ import { useTranslation } from "react-i18next";
 import { LanguageToggle } from "./components/LanguageToggle";
 import { AlarmBanner } from "./components/AlarmBanner";
 import { RoleToggle } from "./components/RoleToggle";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { AlarmsProvider, useAlarmsContext } from "./contexts/AlarmsContext";
 import { RoleProvider, useRole } from "./contexts/RoleContext";
 import { ChatbotProvider } from "./contexts/ChatbotContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { Overview } from "./pages/Overview";
 import { LiveDetection } from "./pages/LiveDetection";
 import { HistoryMap } from "./pages/HistoryMap";
 import { Analysis } from "./pages/Analysis";
 import { Chatbot } from "./pages/Chatbot";
+import { Drones } from "./pages/Drones";
 import { CameraPlacementPage } from "./pages/CameraPlacement";
 import { CamerasAdmin } from "./pages/admin/Cameras";
 import { AreasAdmin } from "./pages/admin/Areas";
@@ -54,6 +57,7 @@ function Shell() {
           </div>
           <div className="flex items-center gap-3">
             <RoleToggle />
+            <ThemeToggle />
             <LanguageToggle />
           </div>
         </div>
@@ -64,6 +68,7 @@ function Shell() {
           <NavLink to="/live" className={navClass}>{t("nav.live")}</NavLink>
           <NavLink to="/history" className={navClass}>{t("nav.history")}</NavLink>
           <NavLink to="/analysis" className={navClass}>{t("nav.analysis")}</NavLink>
+          <NavLink to="/drones" className={navClass}>{t("nav.drones")}</NavLink>
           {isAdmin && (
             <NavLink to="/placement" className={navClass}>{t("nav.placement")}</NavLink>
           )}
@@ -82,6 +87,7 @@ function Shell() {
             <Route path="/live" element={<LiveDetection />} />
             <Route path="/history" element={<HistoryMap />} />
             <Route path="/analysis" element={<Analysis />} />
+            <Route path="/drones" element={<Drones />} />
             <Route path="/placement" element={<AdminOnly><CameraPlacementPage /></AdminOnly>} />
             <Route path="/chatbot" element={<Chatbot />} />
             <Route path="/admin/cameras" element={<AdminOnly><CamerasAdmin /></AdminOnly>} />
@@ -96,12 +102,14 @@ function Shell() {
 
 export default function App() {
   return (
-    <RoleProvider>
-      <AlarmsProvider>
-        <ChatbotProvider>
-          <Shell />
-        </ChatbotProvider>
-      </AlarmsProvider>
-    </RoleProvider>
+    <ThemeProvider>
+      <RoleProvider>
+        <AlarmsProvider>
+          <ChatbotProvider>
+            <Shell />
+          </ChatbotProvider>
+        </AlarmsProvider>
+      </RoleProvider>
+    </ThemeProvider>
   );
 }

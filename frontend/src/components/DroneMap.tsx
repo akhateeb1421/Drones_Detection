@@ -1,6 +1,7 @@
 import { CircleMarker, MapContainer, Marker, Polygon, Polyline, Popup, TileLayer } from "react-leaflet";
 import { Icon, LatLngExpression } from "leaflet";
 import { useTranslation } from "react-i18next";
+import { useTheme } from "../contexts/ThemeContext";
 
 const sensitiveIcon = new Icon({
   iconUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -80,11 +81,22 @@ export function DroneMap({
   interceptPoint = null,
 }: Props) {
   const { t } = useTranslation();
+  const { theme } = useTheme();
+  // CartoDB ships matched dark/light/voyager basemaps from the same CDN, so
+  // swapping URLs is just a tile-cache miss on first toggle. Subsequent
+  // toggles serve instantly from the browser cache.
+  const tileUrl =
+    theme === "light"
+      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+  // Camera dot fill matches the surface of the panel so the marker reads as
+  // a hollow ring in either theme.
+  const camPinFill = theme === "light" ? "#ffffff" : "#0a0f1e";
   return (
     <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="h-full w-full rounded-md">
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        url={tileUrl}
       />
 
       {sensitiveAreas.map((a) => (
@@ -120,7 +132,7 @@ export function DroneMap({
             key={`cam-pin-${cam.id}`}
             center={[cam.lat, cam.lon]}
             radius={cam.threatActive ? 9 : 7}
-            pathOptions={{ color: camColor, fillColor: "#0a0f1e", fillOpacity: 1, weight: 2 }}
+            pathOptions={{ color: camColor, fillColor: camPinFill, fillOpacity: 1, weight: 2 }}
           >
             <Popup>
               <strong>{cam.name}</strong>{cam.threatActive ? ` — ${t("live.cam_threat")}` : ""}

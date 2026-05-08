@@ -12,7 +12,8 @@
     "admin": "Admin",
     "cameras": "Cameras",
     "areas": "Sensitive Areas",
-    "placement": "Camera Placement"
+    "placement": "Camera Placement",
+    "drones": "Drones"
   },
   "common": {
     "language": "Language",
@@ -260,5 +261,55 @@
     "token_required": "Token is required",
     "admin_only": "This page is admin-only.",
     "invalid_token": "Invalid token"
+  },
+  "theme": {
+    "switch_to_light": "Switch to light mode",
+    "switch_to_dark": "Switch to dark mode"
+  },
+  "drones": {
+    "title": "Drone Reference Library",
+    "specs": "Specifications",
+    "viewer_hint": "drag to rotate · scroll to zoom",
+    "placeholder_hint": "3D model not loaded — drop the .glb in /public/models/",
+    "spec": {
+      "role": "Role",
+      "origin": "Country of origin",
+      "first_used": "First combat use",
+      "speed": "Cruise speed",
+      "range": "Range",
+      "wingspan": "Wingspan",
+      "payload": "Warhead / payload",
+      "counter": "Counter-attack methods"
+    },
+    "shahed": {
+      "name": "Shahed-136",
+      "tagline": "Iranian-designed loitering munition (Geran-2 in Russian service)",
+      "summary": "Delta-wing one-way attack drone with a pusher propeller. Mass-produced and launched in salvos to saturate air defenses. Engine noise gives it the 'moped' nickname; effective against fixed targets at long range.",
+      "values": {
+        "role": "One-way attack / loitering munition",
+        "origin": "Iran (HESA / Shahed Aviation)",
+        "first_used": "2021 (Yemen) · 2022 large-scale use in Ukraine",
+        "speed": "~180 km/h (≈100 kn)",
+        "range": "~1,500–2,500 km",
+        "wingspan": "~2.5 m",
+        "payload": "30–50 kg HE warhead",
+        "counter": "MANPADS, Gepard / Shilka AAA, Pantsir-S1, EW jamming, VSHORAD radars + small-arms fire"
+      }
+    },
+    "orlan": {
+      "name": "Orlan-10",
+      "tagline": "Russian medium-range reconnaissance UAV",
+      "summary": "Catapult-launched, parachute-recovered ISR drone. Carries EO/IR cameras for artillery spotting and signals collection; widely used as the eyes of Russian artillery. Built around commercial off-the-shelf components.",
+      "values": {
+        "role": "Reconnaissance & artillery spotting",
+        "origin": "Russia (Special Technology Center, St. Petersburg)",
+        "first_used": "2010 (entered service) · combat-used from 2014",
+        "speed": "90–150 km/h",
+        "range": "~120 km radio link · 600 km autonomous",
+        "wingspan": "3.1 m",
+        "payload": "EO/IR camera, SIGINT, up to 5 kg",
+        "counter": "EW jamming (control + GNSS), MANPADS, mobile AAA, anti-UAV nets, cyber takeover via spoofed GPS"
+      }
+    }
   }
 }
