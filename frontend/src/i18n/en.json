@@ -173,8 +173,8 @@
     "scope_global": "global",
     "scope_cluster": "cluster",
     "scope_radius": "{{km}}km",
-    "rationale_area": "Early-warning camera ahead of {{area}}, pushed {{km}} km along the threat axis ({{deg}}° {{dir}}). Buys ~{{secs}}s reaction time at 30 m/s. {{count}} historical attacks within {{scope}}; top contributor: {{top}} ({{topCount}}). Spread: {{spread}}°.",
-    "rationale_forward": "Forward observation camera ahead of {{area}}. Placed {{km}} km toward an attack hotspot at ({{lat}}, {{lon}}) with {{count}} attacks (mostly {{top}}, {{topCount}}). Heading {{deg}}° ({{dir}}); cluster radius ~{{spread}} km.",
+    "rationale_area": "Early-warning camera ahead of {{area}}, pushed {{km}} km along the threat axis ({{deg}}° {{dir}}). Buys ~{{secs}}s reaction time at 30 m/s. Top contributor: {{top}}. Spread: {{spread}}°.",
+    "rationale_forward": "Forward observation camera ahead of {{area}}. Placed {{km}} km toward an attack hotspot at ({{lat}}, {{lon}}). Top contributor: {{top}}. Heading {{deg}}° ({{dir}}).",
     "spread_cluster": "~{{km}} km cluster",
     "spread_deg": "±{{deg}}° spread"
   },

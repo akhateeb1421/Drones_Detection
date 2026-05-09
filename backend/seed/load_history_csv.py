@@ -1,11 +1,7 @@
-"""Load the real Saudi attack history CSV into the unified attacks table.
+"""Load the 75-row real Saudi attack history CSV into the unified attacks table.
 
-Splits combined attacks (target_location with '+') into one row per location,
-looking up coordinates from app.services.places. Adds small jitter so points
-on the same city don't render as a single overlapping dot.
-
-Not idempotent on coordinates (jitter is random), so this script wipes
-existing rows tagged source='historical' before inserting a fresh set.
+Idempotent: skips rows whose (occurred_at, latitude, longitude, attack_type)
+already exist as source='historical'.
 
 Run: `python -m seed.load_history_csv`
 """
@@ -16,7 +12,7 @@ import logging
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import delete, select
+from sqlalchemy import select
 
 from app.core.db import SessionLocal
 from app.core.logging import configure_logging
@@ -25,6 +21,7 @@ from app.services.synthetic import normalize_real_for_db
 
 CSV_PATH = Path(__file__).resolve().parents[2] / "data" / "raw" / "final_processed_history.csv"
 
+# The 5 sensitive areas you currently hardcode in the notebook.
 DEFAULT_AREAS = [
     # Legacy generic areas (kept for backward-compat with old approvals).
     {"name": "Area-A", "name_ar": "المنطقة أ", "latitude": 24.7136, "longitude": 46.6753, "priority": 1},
@@ -54,8 +51,9 @@ DEFAULT_AREAS = [
     {"name": "Yanbu Industrial Port",             "name_ar": "ميناء ينبع الصناعي", "latitude": 24.0883, "longitude": 38.0617, "priority": 1},
 ]
 
-# Extra historical rows appended to the CSV before normalization. Yanbu
-# appears only once in the original file, so these augment it.
+# Extra historical rows appended to the CSV so under-represented places
+# (notably Yanbu, which appears only once in the original file) have enough
+# data points for the analytics charts and the ML model to be meaningful.
 EXTRA_HISTORICAL_ROWS = [
     {"incident_id": 1001, "attack_date": "2026-03-09", "attack_type": "Drones",
      "target_location": "Yanbu Port", "region": "Yanbu",
@@ -108,15 +106,24 @@ def main() -> None:
         log.info("Appended %d extra hand-curated rows.", len(extra_df))
 
     norm = normalize_real_for_db(df)
-    log.info("After splitting combined attacks: %d location rows", len(norm))
 
+    inserted = 0
+    skipped = 0
     with SessionLocal() as db:
         seed_areas(db)
-        deleted = db.execute(delete(Attack).where(Attack.source == "historical")).rowcount
-        db.commit()
-        log.info("Deleted %s old historical rows.", deleted)
-
         for _, row in norm.iterrows():
+            exists = db.execute(
+                select(Attack.id).where(
+                    Attack.occurred_at == row["occurred_at"],
+                    Attack.latitude == row["latitude"],
+                    Attack.longitude == row["longitude"],
+                    Attack.attack_type == row["attack_type"],
+                    Attack.source == "historical",
+                )
+            ).first()
+            if exists:
+                skipped += 1
+                continue
             db.add(
                 Attack(
                     occurred_at=row["occurred_at"].to_pydatetime() if hasattr(row["occurred_at"], "to_pydatetime") else row["occurred_at"],
@@ -128,9 +135,10 @@ def main() -> None:
                     source=row["source"],
                 )
             )
+            inserted += 1
         db.commit()
 
-    log.info("Inserted %d historical rows.", len(norm))
+    log.info("Inserted %d historical rows; skipped %d duplicates.", inserted, skipped)
 
 
 if __name__ == "__main__":

@@ -3,31 +3,14 @@ import { useTranslation } from "react-i18next";
 import { DroneViewer } from "../components/DroneViewer";
 
 type DroneId = "shahed" | "orlan";
-
-interface DroneSpec {
-  id: DroneId;
-  // Provide either modelUrl (local GLB) or embedUrl (Sketchfab iframe).
-  // Embed wins if both are set.
-  modelUrl?: string;
-  embedUrl?: string;
-  keyBase: string;
-}
+interface DroneSpec { id: DroneId; modelUrl?: string; embedUrl?: string; keyBase: string; }
 
 const DRONES: DroneSpec[] = [
-  {
-    id: "shahed",
-    embedUrl: "https://sketchfab.com/models/3f4f8742fe044c4cb1bf20ca4caf56ef/embed",
-    keyBase: "drones.shahed",
-  },
-  {
-    id: "orlan",
-    // Same Sketchfab embed pattern for the Orlan model the user picked.
-    embedUrl: "https://sketchfab.com/models/f0f9e877c22443abad0126da0aefd080/embed",
-    keyBase: "drones.orlan",
-  },
+  { id: "shahed", embedUrl: "https://sketchfab.com/models/3f4f8742fe044c4cb1bf20ca4caf56ef/embed", keyBase: "drones.shahed" },
+  { id: "orlan",  embedUrl: "https://sketchfab.com/models/f0f9e877c22443abad0126da0aefd080/embed", keyBase: "drones.orlan" },
 ];
 
-const SPEC_ROWS: { key: string; labelKey: string }[] = [
+const SPEC_ROWS = [
   { key: "role", labelKey: "drones.spec.role" },
   { key: "origin", labelKey: "drones.spec.origin" },
   { key: "first_used", labelKey: "drones.spec.first_used" },
@@ -51,16 +34,8 @@ export function Drones() {
           {DRONES.map((d) => {
             const isActive = d.id === active;
             return (
-              <button
-                key={d.id}
-                onClick={() => setActive(d.id)}
-                className={[
-                  "px-4 py-2 text-sm transition-colors",
-                  isActive
-                    ? "bg-accent text-black font-semibold"
-                    : "text-slate-300 hover:bg-slate-800",
-                ].join(" ")}
-              >
+              <button key={d.id} onClick={() => setActive(d.id)}
+                className={["px-4 py-2 text-sm transition-colors", isActive ? "bg-accent text-black font-semibold" : "text-slate-300 hover:bg-slate-800"].join(" ")}>
                 {t(`${d.keyBase}.name`)}
               </button>
             );
@@ -77,11 +52,7 @@ export function Drones() {
             </div>
             <div className="text-xs uppercase tracking-wide text-muted">{t("drones.viewer_hint")}</div>
           </div>
-          <DroneViewer
-            modelKey={drone.id}
-            modelUrl={drone.modelUrl}
-            embedUrl={drone.embedUrl}
-          />
+          <DroneViewer modelKey={drone.id} modelUrl={drone.modelUrl} embedUrl={drone.embedUrl} />
         </div>
 
         <div className="card md:col-span-2">
@@ -96,9 +67,6 @@ export function Drones() {
               </div>
             ))}
           </dl>
-          {/* Use bg-slate-800 (which the light-mode override paints to a
-              visible #e2e8f0) rather than slate-900/40, which is unreadable
-              on white because the /40 opacity variant escapes the override. */}
           <div className="mt-3 rounded-md bg-slate-800 p-3 text-xs text-slate-200 leading-relaxed">
             {t(`${drone.keyBase}.summary`)}
           </div>

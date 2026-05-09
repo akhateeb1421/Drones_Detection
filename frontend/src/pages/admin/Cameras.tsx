@@ -175,11 +175,11 @@ export function CamerasAdmin() {
           <tbody className="divide-y divide-slate-800">
             {items.map((c) => (
               <tr key={c.id}>
-                <td className="py-2 text-start"><span dir="ltr">{c.id}</span></td>
+                <td className="py-2 text-start font-data" dir="ltr">{c.id}</td>
                 <td className="text-start">{bilingualName(c)}</td>
                 <td className="max-w-xs truncate text-start" title={c.stream_url}><span dir="ltr">{c.stream_url}</span></td>
-                <td className="text-start"><span dir="ltr">{c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}</span></td>
-                <td className="text-start"><span dir="ltr">{c.heading_deg}°</span></td>
+                <td className="text-start font-data whitespace-nowrap" dir="ltr">{c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}</td>
+                <td className="text-start font-data" dir="ltr">{c.heading_deg}°</td>
                 <td className="text-start">{c.enabled ? "✓" : "—"}</td>
                 <td className="text-end"><button onClick={() => remove(c.id)} className="btn-danger">{t("common.delete")}</button></td>
               </tr>

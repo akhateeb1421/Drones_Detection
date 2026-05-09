@@ -1,11 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" role="img" aria-label="Drone Defense System logo">
   <title>Drone Defense System</title>
-  <desc>An almond eye with a Shahed-136 silhouette cut into a crimson iris.</desc>
-  <rect x="0" y="0" width="140" height="140" rx="20" fill="#0a0f1e"/>
-  <path d="M14 70 Q70 14 126 70 Q70 126 14 70 Z" fill="#1a0810" stroke="#e94560" stroke-width="2.5" stroke-linejoin="round"/>
-  <circle cx="70" cy="70" r="30" fill="#e94560"/>
-  <circle cx="70" cy="70" r="30" fill="none" stroke="#7a1a20" stroke-width="1"/>
-  <g fill="#0a0f1e" stroke="#0a0f1e" stroke-linejoin="round" stroke-linecap="round">
+  <path d="M14 70 Q70 14 126 70 Q70 126 14 70 Z" fill="none" stroke="#c5443c" stroke-width="2.6" stroke-linejoin="round"/>
+  <circle cx="70" cy="70" r="30" fill="#c5443c"/>
+  <circle cx="70" cy="70" r="30" fill="none" stroke="#6b1f25" stroke-width="1"/>
+  <g fill="#1a0810" stroke="#1a0810" stroke-linejoin="round" stroke-linecap="round">
     <polygon points="70,55 86,82 70,79 54,82" stroke-width="0.6"/>
     <rect x="68.5" y="56" width="3" height="24" rx="0.8"/>
     <line x1="70" y1="80" x2="76" y2="86" stroke-width="2.2"/>

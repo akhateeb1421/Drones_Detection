@@ -52,6 +52,7 @@ export type Track = {
   outcome: "countered" | "hit" | null;
 };
 
+// Convenience helper: URL the frontend uses to load a track's thumbnail JPEG.
 export function trackThumbUrl(trackDbId: number): string {
   return `${baseURL}/detections/tracks/${trackDbId}/thumb`;
 }
@@ -195,6 +196,8 @@ export const Predictions = {
     api.get<CameraPlacement[]>("/predict/camera-placements", { params }).then((r) => r.data),
 };
 
+// LLM responses on CPU can take a couple of minutes for the first request
+// (cold model load), so override the default 30 s axios timeout.
 const CHAT_TIMEOUT_MS = 5 * 60 * 1000;
 
 export const Chat = {

@@ -19,6 +19,9 @@ export type DetectionMeta = {
     nearest_area: string | null;
     dist_m: number | null;
     eta_s: number | null;
+    // Set when this detection has been linked back to a prior track from
+    // another camera (cross-camera handoff). The frontend uses these to
+    // merge sightings into one logical drone.
     linked_track_id?: number | null;
     link_root_camera_id?: number | null;
   }[];

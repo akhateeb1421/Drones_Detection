@@ -3,43 +3,22 @@ import { Icon, LatLngExpression } from "leaflet";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../contexts/ThemeContext";
 
+const SENSITIVE_PIN = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
+    <path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 22 12.5 41 12.5 41S25 22 25 12.5C25 5.6 19.4 0 12.5 0Z" fill="#c89968" stroke="#1a0810" stroke-width="1.5"/>
+    <circle cx="12.5" cy="12.5" r="4.5" fill="#1a0810"/>
+  </svg>`,
+);
 const sensitiveIcon = new Icon({
-  iconUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconUrl: `data:image/svg+xml;utf8,${SENSITIVE_PIN}`,
   iconSize: [25, 41],
   iconAnchor: [12, 41],
 });
 
-export type DroneMapMarker = {
-  id: string | number;
-  lat: number;
-  lon: number;
-  color: string;
-  label: string;
-  radius?: number;
-};
-
-export type SensitiveMarker = {
-  name: string;
-  lat: number;
-  lon: number;
-};
-
-export type CameraMarker = {
-  id: number;
-  name: string;
-  lat: number;
-  lon: number;
-  heading_deg: number;
-  fov_h_deg: number;
-  distance_m: number;
-  threatActive?: boolean;
-};
-
-export type InterceptMarker = {
-  lat: number;
-  lon: number;
-  label: string;
-};
+export type DroneMapMarker = { id: string | number; lat: number; lon: number; color: string; label: string; radius?: number };
+export type SensitiveMarker = { name: string; lat: number; lon: number };
+export type CameraMarker = { id: number; name: string; lat: number; lon: number; heading_deg: number; fov_h_deg: number; distance_m: number; threatActive?: boolean };
+export type InterceptMarker = { lat: number; lon: number; label: string };
 
 interface Props {
   center?: LatLngExpression;
@@ -55,9 +34,7 @@ function offset(lat: number, lon: number, bearing_deg: number, distance_m: numbe
   const bearing = (bearing_deg * Math.PI) / 180;
   const dN = distance_m * Math.cos(bearing);
   const dE = distance_m * Math.sin(bearing);
-  const newLat = lat + dN / 111320;
-  const newLon = lon + dE / (111320 * Math.cos((lat * Math.PI) / 180));
-  return [newLat, newLon];
+  return [lat + dN / 111320, lon + dE / (111320 * Math.cos((lat * Math.PI) / 180))];
 }
 
 function fovCone(cam: CameraMarker, segments = 18): [number, number][] {
@@ -82,61 +59,31 @@ export function DroneMap({
 }: Props) {
   const { t } = useTranslation();
   const { theme } = useTheme();
-  // CartoDB ships matched dark/light/voyager basemaps from the same CDN, so
-  // swapping URLs is just a tile-cache miss on first toggle. Subsequent
-  // toggles serve instantly from the browser cache.
-  const tileUrl =
-    theme === "light"
-      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-  // Camera dot fill matches the surface of the panel so the marker reads as
-  // a hollow ring in either theme.
-  const camPinFill = theme === "light" ? "#ffffff" : "#0a0f1e";
+  const tileUrl = theme === "light"
+    ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+  const camPinFill = theme === "light" ? "#fbf6ec" : "#1a130d";
+  const camThreat = "#c5443c";
+  const camNormal = "#6ea892";
+  const interceptColor = "#6ea892";
   return (
     <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="h-full w-full rounded-md">
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        url={tileUrl}
-      />
-
+      <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' url={tileUrl} />
       {sensitiveAreas.map((a) => (
         <Marker key={a.name} position={[a.lat, a.lon]} icon={sensitiveIcon}>
-          <Popup>
-            <strong>{a.name}</strong>
-          </Popup>
+          <Popup><strong>{a.name}</strong></Popup>
         </Marker>
       ))}
-
       {cameras.flatMap((cam) => {
         const cone = fovCone(cam);
         const tip = offset(cam.lat, cam.lon, cam.heading_deg, cam.distance_m);
-        const camColor = cam.threatActive ? "#e94560" : "#22c55e";
+        const camColor = cam.threatActive ? camThreat : camNormal;
         return [
-          <Polygon
-            key={`cam-cone-${cam.id}`}
-            positions={cone}
-            pathOptions={{
-              color: camColor,
-              fillColor: camColor,
-              fillOpacity: cam.threatActive ? 0.2 : 0.12,
-              weight: 1.5,
-              dashArray: "4 6",
-            }}
-          />,
-          <Polyline
-            key={`cam-axis-${cam.id}`}
-            positions={[[cam.lat, cam.lon], tip]}
-            pathOptions={{ color: camColor, weight: 2 }}
-          />,
-          <CircleMarker
-            key={`cam-pin-${cam.id}`}
-            center={[cam.lat, cam.lon]}
-            radius={cam.threatActive ? 9 : 7}
-            pathOptions={{ color: camColor, fillColor: camPinFill, fillOpacity: 1, weight: 2 }}
-          >
+          <Polygon key={`cam-cone-${cam.id}`} positions={cone} pathOptions={{ color: camColor, fillColor: camColor, fillOpacity: cam.threatActive ? 0.22 : 0.12, weight: 1.5, dashArray: "4 6" }} />,
+          <Polyline key={`cam-axis-${cam.id}`} positions={[[cam.lat, cam.lon], tip]} pathOptions={{ color: camColor, weight: 2 }} />,
+          <CircleMarker key={`cam-pin-${cam.id}`} center={[cam.lat, cam.lon]} radius={cam.threatActive ? 9 : 7} pathOptions={{ color: camColor, fillColor: camPinFill, fillOpacity: 1, weight: 2 }}>
             <Popup>
-              <strong>{cam.name}</strong>{cam.threatActive ? ` — ${t("live.cam_threat")}` : ""}
-              <br />
+              <strong>{cam.name}</strong>{cam.threatActive ? ` — ${t("live.cam_threat")}` : ""}<br />
               {t("live.cam_heading")}: <span dir="ltr">{cam.heading_deg}°</span><br />
               {t("live.cam_fov")}: <span dir="ltr">{cam.fov_h_deg}°</span><br />
               {t("live.cam_range")}: <span dir="ltr">{cam.distance_m} m</span>
@@ -144,40 +91,20 @@ export function DroneMap({
           </CircleMarker>,
         ];
       })}
-
       {markers.map((m) => (
-        <CircleMarker
-          key={m.id}
-          center={[m.lat, m.lon]}
-          radius={m.radius ?? 6}
-          pathOptions={{ color: m.color, fillColor: m.color, fillOpacity: 0.6 }}
-        >
+        <CircleMarker key={m.id} center={[m.lat, m.lon]} radius={m.radius ?? 6} pathOptions={{ color: m.color, fillColor: m.color, fillOpacity: 0.6 }}>
           <Popup>{m.label}</Popup>
         </CircleMarker>
       ))}
-
       {predictedPath && predictedPath.length >= 2 && (
-        <Polyline positions={predictedPath} pathOptions={{ color: "#f5a623", dashArray: "6 8", weight: 3 }} />
+        <Polyline positions={predictedPath} pathOptions={{ color: "#d9a05c", dashArray: "6 8", weight: 3 }} />
       )}
-
       {interceptPoint && (
         <>
-          <CircleMarker
-            center={[interceptPoint.lat, interceptPoint.lon]}
-            radius={11}
-            pathOptions={{ color: "#22c55e", fillColor: "#22c55e", fillOpacity: 0.25, weight: 2 }}
-          >
-            <Popup>
-              <strong>{t("live.intercept_point")}</strong>
-              <br />
-              {interceptPoint.label}
-            </Popup>
+          <CircleMarker center={[interceptPoint.lat, interceptPoint.lon]} radius={11} pathOptions={{ color: interceptColor, fillColor: interceptColor, fillOpacity: 0.25, weight: 2 }}>
+            <Popup><strong>{t("live.intercept_point")}</strong><br />{interceptPoint.label}</Popup>
           </CircleMarker>
-          <CircleMarker
-            center={[interceptPoint.lat, interceptPoint.lon]}
-            radius={3}
-            pathOptions={{ color: "#22c55e", fillColor: "#22c55e", fillOpacity: 1, weight: 1 }}
-          />
+          <CircleMarker center={[interceptPoint.lat, interceptPoint.lon]} radius={3} pathOptions={{ color: interceptColor, fillColor: interceptColor, fillOpacity: 1, weight: 1 }} />
         </>
       )}
     </MapContainer>

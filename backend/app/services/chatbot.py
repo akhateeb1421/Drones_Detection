@@ -1,8 +1,9 @@
 """Chatbot service backed by a local Ollama LLM.
 
-Builds a dashboard-shaped context block — same analytics the React UI
-already shows the user — and sends it to Ollama as the system prompt.
-The LLM has read-only context, no tools, and cannot mutate the DB.
+Builds a structured context block from the unified attacks table + a small
+window of recent live detections, then sends it to Ollama as the system prompt.
+The LLM has read-only context — it has no tools, cannot mutate the database,
+and cannot fire alarms.
 """
 
 from __future__ import annotations
@@ -11,323 +12,287 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from sqlalchemy import func, select
+import pandas as pd
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api import analysis as analysis_api
-from app.api.predictions import camera_placements as camera_placements_api
 from app.core.config import get_settings
-from app.models import Attack, Camera, Detection, SensitiveArea, Track
+from app.models import Attack, Camera, Detection, SensitiveArea
 from app.schemas.chat import ChatTurn
-from app.services import classifier, forecaster
 
 log = logging.getLogger(__name__)
 
 
-COMMON_RULES_AR = """قواعد دائمة:
-- أجب بالعربية فقط، باختصار ودقة.
-- استخدم الأرقام والقيم كما هي مذكورة في كتلة "لوحة التحكم" أدناه.
-- لا تخترع أي رقم ولا تخمّن.
-- لا تخترع علاقات أو مرادفات بين أسماء المناطق (كل منطقة قائمة بذاتها).
-- لا تذكر أسماء الجداول أو الأعمدة أو معرّفات داخلية أو روابط البث.
-- إذا لم تكن المعلومة موجودة في كتلة لوحة التحكم، قل ذلك صراحة بدلاً من التخمين.
+SYSTEM_AR = """أنت مساعد ذكي متخصص في تحليل بيانات الدفاع ضد الطائرات المسيّرة.
+لديك إمكانية الوصول للقراءة فقط إلى البيانات أدناه، والتي تشمل:
+- إجمالي الصفوف ومصادرها (تاريخية، مُولّدة، حية)
+- النطاق الزمني للبيانات
+- توزيعات حسب المنطقة، نوع الهجوم، الموقع المستهدف
+- توزيعات حسب الشهر ويوم الأسبوع
+- عينة من 20 صفاً تاريخياً + 15 صفاً من أحدث الهجمات
+- ملخص الكشوفات المباشرة في آخر 24 ساعة + عينة منها
+
+تعليمات:
+- أجب بالعربية فقط
+- استخدم الأرقام والإحصائيات والصفوف الفعلية من البيانات أدناه
+- إذا طُلب منك "عرض جزء من البيانات" أو "عينة" أو "أمثلة"، اعرض الصفوف الموجودة في القسم العينة كجدول أو قائمة
+- إذا طُلب منك تحليل زمني (شهور، أيام، اتجاهات)، استخدم توزيع الشهور وأيام الأسبوع
+- كن دقيقاً وموجزاً
+- إذا سُئلت عن شيء غير موجود في البيانات أدناه، قل ذلك بوضوح
+- لا تخترع أرقاماً
 """
 
-COMMON_RULES_EN = """Persistent rules:
-- Reply in English only, concisely and precisely.
-- Use the numbers and values exactly as written in the DASHBOARD block below.
-- Never invent or guess a number.
-- Never invent aliases or equivalences between region names (every region is distinct).
-- Never mention table names, column names, internal IDs, or stream URLs.
-- If a fact is not in the dashboard block, say so plainly instead of guessing.
+SYSTEM_EN = """You are an AI analyst for a counter-drone defense system.
+You have read-only access to the data block below, which includes:
+- Total row counts by source (historical, synthetic, live)
+- Full date range
+- Distributions by region, attack_type, target_location
+- Counts by month (last 24) and weekday
+- A sample of 20 real historical rows + 15 most-recent rows
+- Live-detections summary for the last 24h plus a sample
+
+Rules:
+- Reply in English only.
+- Use the actual numbers and rows from the context below.
+- If the user asks for a 'sample', 'examples', or 'part of the data', display the listed rows as a table or list.
+- For temporal questions (months, weekdays, trends), use the per-month and per-weekday counts.
+- Be concise and precise.
+- If something is not in the data block below, say so plainly.
+- Never fabricate numbers.
+"""
+
+# Restricted prompts for the non-admin "viewer" role: the assistant only
+# answers high-level analytical questions. It must NOT reveal table or
+# column names, primary keys, internal IDs, stream URLs, file paths, raw
+# detection rows, or any other operational/structural information.
+VIEWER_SYSTEM_AR = """أنت مساعد تحليلي للجمهور العام لمنظومة الدفاع ضد الطائرات المسيّرة.
+يمكنك مشاركة الإحصائيات الإجمالية (الأرقام، الاتجاهات، التوزيعات الجغرافية والزمنية، عدد الكاميرات والمناطق الحساسة).
+
+كيف تجيب:
+1. اقرأ السؤال بعناية ثم ابحث عن الإجابة في كتلة البيانات أدناه.
+2. إذا وُجدت الإجابة (سواء صفر أم رقم آخر)، أعطها بشكل صريح ومختصر.
+3. إذا كانت الإجابة "صفر" بشكل واضح من الجدول (مثلاً منطقة وشهر غير مذكورين معاً)، قل ذلك صراحة: "لا توجد هجمات مسجّلة" — لا ترفض الإجابة.
+4. ارفض الإجابة فقط في الحالات التالية، باستخدام: "لا توجد بيانات متوفرة للإجابة على هذا السؤال في النطاق المتاح":
+   - السؤال عن تاريخ خارج النطاق الزمني المذكور
+   - السؤال عن معلومة لا تظهر إطلاقاً في كتلة البيانات
+5. ارفض الأسئلة الخاصة بالإدارة (روابط البث، رموز إدارية، اقتراحات مواقع الكاميرات الجديدة، شفرة برمجية، أسماء جداول/أعمدة) برسالة: "هذه المعلومات متاحة للمسؤولين فقط".
+
+ممنوع:
+- اختراع أو تخمين أي رقم
+- اختراع علاقات أو مرادفات بين أسماء المناطق (لا تقل "ينبع اسم آخر للرياض" مثلاً — كل منطقة قائمة بذاتها)
+- ذكر أسماء جداول أو أعمدة أو معرّفات داخلية أو روابط بث
+
+تعليمات:
+- أجب بالعربية فقط
+- كن مختصراً ودقيقاً
+- استخدم الأرقام الموجودة في كتلة البيانات أدناه كما هي
+"""
+
+VIEWER_SYSTEM_EN = """You are a public-facing analyst for the counter-drone defense system.
+You may share aggregate statistics — totals, trends, geographic/temporal distributions, total camera count, total sensitive-area count.
+
+How to answer:
+1. Read the question carefully, then look for the answer inside the data block below.
+2. If the answer is present (zero or any other number), state it plainly and concisely.
+3. If the answer is clearly zero from the table (e.g. a (region, month) pair not listed in the cross-tab), say "No attacks on record" — do NOT refuse.
+4. ONLY refuse, with the exact phrase "No data is available for that query in the covered range.", when:
+   - The question targets a date outside the stated date range, OR
+   - The information genuinely does not appear anywhere in the data block.
+5. Refuse admin questions (stream URLs, admin tokens, suggested new camera placements, code, table/column names) with: "That information is admin-only."
+
+Forbidden:
+- Inventing or guessing any number.
+- Inventing aliases or equivalences between regions (NEVER say "Yanbu is an alias of Riyadh" — every region is distinct).
+- Mentioning table names, column names, internal IDs, or stream URLs.
+
+Rules:
+- Reply in English only.
+- Be concise and precise.
+- Use the numbers in the data block exactly as written.
 """
 
 
-SYSTEM_AR = """أنت مساعد ذكي للوحة تحكم نظام الدفاع ضد الطائرات المسيّرة.
-دورك: الإجابة عن أسئلة المسؤول حول كل ما تظهره لوحة التحكم.
-
-ما تراه في كتلة "لوحة التحكم": أقسام تطابق علامات التبويب التي يراها المسؤول
-- نظرة عامة (الإجماليات، التوزيع حسب المنطقة، أنواع الهجمات، الهجمات المركّبة)
-- الكشف المباشر (الكاميرات، عدد كشوفات الانتظار)
-- خريطة الهجمات (نطاق التواريخ والملخص)
-- التحليلات (السلسلة الشهرية، تقييم المخاطر، التوقعات)
-- اقتراح مواقع الكاميرات
-- الكاميرات المُعدّة والمناطق الحساسة المُعدّة
-
-""" + COMMON_RULES_AR
-
-SYSTEM_EN = """You are an AI assistant for the counter-drone defense dashboard.
-Your role: answer the admin's questions about anything the dashboard shows.
-
-The DASHBOARD block below mirrors the admin sidebar tabs:
-- Overview (totals, by-region, attack types, combined attacks)
-- Live Detection (cameras, pending-approvals count)
-- History Map (date range and summary)
-- Analysis (monthly timeline, risk scores, forecast)
-- Camera Placement suggestions
-- Configured Cameras and Sensitive Areas
-
-""" + COMMON_RULES_EN
-
-
-VIEWER_SYSTEM_AR = """أنت مساعد تحليلي عام للوحة تحكم نظام الدفاع ضد الطائرات المسيّرة.
-دورك: الإجابة عن أسئلة المشغّل حول الأقسام العامة التي يراها على الشاشة.
-
-ما تراه في كتلة "لوحة التحكم": أقسام تطابق ما يظهر للمشغّل فقط
-- نظرة عامة (الإجماليات، التوزيع حسب المنطقة، أنواع الهجمات، الهجمات المركّبة)
-- الكشف المباشر (إجمالي الكاميرات والمناطق الحساسة، عدد كشوفات الانتظار)
-- خريطة الهجمات (نطاق التواريخ والملخص)
-- التحليلات (السلسلة الشهرية، التوقعات)
-
-ممنوع: مناقشة إعدادات الكاميرات (روابط البث، الإحداثيات الدقيقة)، اقتراحات مواقع الكاميرات الجديدة، أو أي معلومة لا تظهر في كتلة لوحة التحكم. ارفض الأسئلة الإدارية بـ: "هذه المعلومات متاحة للمسؤولين فقط".
-
-""" + COMMON_RULES_AR
-
-VIEWER_SYSTEM_EN = """You are a public-facing analyst for the counter-drone defense dashboard.
-Your role: answer the operator's questions about the public sections they see on screen.
-
-The DASHBOARD block below mirrors the operator's tabs only:
-- Overview (totals, by-region, attack types, combined attacks)
-- Live Detection (total cameras and sensitive areas, pending-approvals count)
-- History Map (date range and summary)
-- Analysis (monthly timeline, forecast)
-
-Forbidden: discussing camera configuration (stream URLs, exact coordinates), suggested NEW camera placements, or anything that doesn't appear in the dashboard block. Refuse admin questions with: "That information is admin-only."
-
-""" + COMMON_RULES_EN
-
-
-def _section_overview(db: Session) -> str:
-    totals = analysis_api.total(db)
-    by_region = analysis_api.by_region_pure(db)
-    by_type = analysis_api.by_type(db)
-    combined = analysis_api.combined(db)
-
-    out: list[str] = []
-    out.append("## OVERVIEW (the Overview page)")
-    out.append(
-        f"- Total attack events: {totals['events']} (rows={totals['rows']}, "
-        f"historical={totals['rows_historical']}, synthetic={totals['rows_synthetic']}, "
-        f"live={totals['rows_live']})"
-    )
-    out.append(f"- Regions affected: {len(by_region)}")
-    out.append("- Distribution by region (the pie chart):")
-    for r in by_region:
-        out.append(f"    * {r.region}: {r.count}")
-    out.append("- Attacks by type (the bar chart):")
-    for tp in by_type:
-        out.append(f"    * {tp.attack_type}: {tp.count}")
-    if combined:
-        out.append("- Combined attacks (rows hit on the same day):")
-        for c in combined[:20]:
-            out.append(f"    * {c['label']}: {c['count']}")
-    else:
-        out.append("- Combined attacks: none.")
-    return "\n".join(out)
-
-
-def _section_live(db: Session, *, admin: bool) -> str:
-    n_cameras = db.execute(select(func.count(Camera.id))).scalar_one() or 0
-    n_areas = db.execute(select(func.count(SensitiveArea.id))).scalar_one() or 0
-    n_pending = db.execute(
-        select(func.count(Track.id)).where(Track.status == "pending")
-    ).scalar_one() or 0
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
-    n_dets_24h = db.execute(
-        select(func.count(Detection.id)).where(Detection.captured_at >= cutoff)
-    ).scalar_one() or 0
-    n_alarms_24h = db.execute(
-        select(func.count(Track.id)).where(
-            Track.alarm_fired_at.is_not(None),
-            Track.alarm_fired_at >= cutoff,
-        )
-    ).scalar_one() or 0
-
-    out: list[str] = []
-    out.append("## LIVE DETECTION (the Live page)")
-    out.append(f"- Total cameras configured: {n_cameras}")
-    out.append(f"- Total sensitive areas configured: {n_areas}")
-    out.append(f"- Pending approvals (operator review queue): {n_pending}")
-    out.append(f"- Detections in the last 24 hours: {n_dets_24h}")
-    out.append(f"- Alarms fired in the last 24 hours: {n_alarms_24h}")
-    if admin:
-        out.append("")
-        out.append("Recent pending tracks (latest 10):")
-        rows = db.execute(
-            select(Track).where(Track.status == "pending")
-            .order_by(Track.last_seen_at.desc()).limit(10)
-        ).scalars().all()
-        if not rows:
-            out.append("- (none)")
-        for tr in rows:
-            eta = f"{tr.min_eta_s:.1f}s" if tr.min_eta_s is not None else "—"
-            out.append(
-                f"- track #{tr.track_id} | class={tr.voted_class or '?'} | "
-                f"nearest={tr.nearest_area or '?'} | min_eta={eta} | "
-                f"alarm_fired={'yes' if tr.alarm_fired_at else 'no'}"
-            )
-    return "\n".join(out)
-
-
-def _section_history(db: Session) -> str:
+def _attacks_df(db: Session) -> pd.DataFrame:
     rows = db.execute(
-        select(func.min(Attack.occurred_at), func.max(Attack.occurred_at), func.count(Attack.id))
-    ).one()
-    dmin, dmax, total = rows
-    out: list[str] = []
-    out.append("## HISTORY MAP (the History page)")
-    if not total:
-        out.append("- No historical attacks on file.")
-        return "\n".join(out)
-    out.append(f"- Available date range: {dmin.date()} to {dmax.date()} (inclusive).")
-    out.append(f"- Total mappable attack rows: {total}")
-    out.append(
-        "- Any date BEFORE the start or AFTER the end is out of range — refuse questions about those."
-    )
-    return "\n".join(out)
+        select(Attack.occurred_at, Attack.region, Attack.attack_type, Attack.target_location, Attack.source)
+    ).all()
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows, columns=["occurred_at", "region", "attack_type", "target_location", "source"])
+    df["occurred_at"] = pd.to_datetime(df["occurred_at"], utc=True)
+    return df
 
 
-def _section_analysis(db: Session, *, admin: bool) -> str:
-    out: list[str] = []
-    out.append("## ANALYSIS (the Analysis page)")
-
-    timeline = analysis_api.timeline(
-        db, granularity="month", region=None, date_from=None, date_to=None
-    )
-    if timeline:
-        out.append("- Monthly attack timeline (the timeline chart):")
-        for tp in timeline:
-            day = tp.period.split("T")[0] if tp.period else "?"
-            out.append(f"    * {day[:7]}: {tp.count}")
-
+def _live_df(db: Session, hours: int = 24) -> pd.DataFrame:
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     rows = db.execute(
         select(
-            func.to_char(Attack.occurred_at, "YYYY-MM").label("month"),
-            Attack.region,
-            func.count(Attack.id),
-        )
-        .where(Attack.region.is_not(None))
-        .where(~Attack.region.contains("+"))
-        .group_by("month", Attack.region)
-        .order_by("month", Attack.region)
+            Detection.captured_at,
+            Detection.drone_class,
+            Detection.confidence,
+            Detection.speed_mps,
+            Detection.direction,
+            Detection.nearest_area,
+            Detection.eta_s,
+        ).where(Detection.captured_at >= cutoff)
     ).all()
-    if rows:
-        out.append("")
-        out.append("- Per-region per-month attack counts (only non-zero pairs are listed):")
-        out.append("    region | month | attacks")
-        for month, region, n in rows:
-            out.append(f"    - {region} | {month} | {int(n)}")
-        out.append(
-            "- Any (region, month) pair NOT listed above (within the date range) "
-            "has zero attacks — answer 'no attacks on record', NOT a refusal."
-        )
-
-    try:
-        fc = forecaster.forecast(db, region=None, days=30)
-        if fc:
-            out.append("")
-            out.append("- 30-day attack forecast per region (the forecast chart):")
-            agg: dict[str, float] = {}
-            for f in fc:
-                agg[f.region] = agg.get(f.region, 0.0) + (f.expected_count or 0.0)
-            for region, total in sorted(agg.items(), key=lambda x: -x[1]):
-                out.append(f"    * {region}: ~{total:.1f} expected over the next 30 days")
-    except Exception as e:  # noqa: BLE001
-        log.exception("Forecast unavailable for chatbot context.")
-        out.append(f"- Forecast: unavailable ({e}).")
-
-    if admin:
-        try:
-            risk = classifier.predict_all_regions(db, horizon_days=30)
-            if risk:
-                out.append("")
-                out.append("- 30-day region-level risk scores (risk-assessment view):")
-                for r in risk:
-                    out.append(f"    * {r.region}: {r.risk_probability:.2f}")
-        except Exception as e:  # noqa: BLE001
-            log.exception("Risk model unavailable for chatbot context.")
-            out.append(f"- Risk model: unavailable ({e}).")
-
-    return "\n".join(out)
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(
+        rows,
+        columns=["captured_at", "drone_class", "confidence", "speed_mps", "direction", "nearest_area", "eta_s"],
+    )
 
 
-def _section_placement(db: Session) -> str:
-    try:
-        suggestions = camera_placements_api(
-            db,
-            radius_km=300.0,
-            fov_h_deg=82.6,
-            assumed_target_distance_m=5000.0,
-            n_clusters=4,
-            forward_offset=0.30,
-            early_warning_km=15.0,
-        )
-    except Exception as e:  # noqa: BLE001
-        log.exception("Camera-placement suggestions unavailable for chatbot.")
-        return f"## CAMERA PLACEMENT\n- unavailable ({e})."
-    out: list[str] = []
-    out.append("## CAMERA PLACEMENT (admin-only suggestions)")
-    if not suggestions:
-        out.append("- No suggestions yet (need attack history + sensitive areas).")
-        return "\n".join(out)
-    n_area = sum(1 for s in suggestions if s["kind"] == "area")
-    n_fwd = sum(1 for s in suggestions if s["kind"] == "forward")
-    out.append(f"- Suggestions: {n_area} per-area + {n_fwd} forward-observation.")
-    for s in suggestions[:20]:
-        out.append(
-            f"    * [{s['kind']}] {s['name']} for {s['for_area']} | "
-            f"heading {s['heading_deg']}° {s['heading_label']} | "
-            f"covers {s['covers_attacks']} historical attacks"
-        )
-    return "\n".join(out)
+def _build_context(db: Session, language: str) -> str:
+    attacks = _attacks_df(db)
+    live = _live_df(db)
 
+    lines: list[str] = []
+    lines.append("=== HISTORICAL + SYNTHETIC ATTACKS ===")
+    if attacks.empty:
+        lines.append("No attack records.")
+    else:
+        # Headline counts
+        lines.append(f"Total rows: {len(attacks)}")
+        lines.append(f"Sources: {attacks['source'].value_counts().to_dict()}")
+        lines.append(f"Date range: {attacks['occurred_at'].min().date()} to {attacks['occurred_at'].max().date()}")
 
-def _section_cameras(db: Session) -> str:
-    rows = db.execute(select(Camera).order_by(Camera.id)).scalars().all()
-    out: list[str] = []
-    out.append("## CONFIGURED CAMERAS (admin)")
-    out.append(f"- Total: {len(rows)}")
-    for c in rows[:20]:
-        out.append(
-            f"    * #{c.id} {c.name} | enabled={c.enabled} | "
-            f"heading={c.heading_deg}° | fov_h={c.fov_h_deg}°"
-        )
-    return "\n".join(out)
+        # Region / type / target breakdown
+        lines.append(f"Counts by region: {attacks['region'].value_counts().to_dict()}")
+        lines.append(f"Counts by attack_type: {attacks['attack_type'].value_counts().to_dict()}")
+        lines.append(f"Top 10 target locations: {attacks['target_location'].value_counts().head(10).to_dict()}")
 
+        # Temporal breakdowns so the chatbot can answer date questions
+        attacks_local = attacks.copy()
+        attacks_local["month"] = attacks_local["occurred_at"].dt.to_period("M").astype(str)
+        attacks_local["weekday"] = attacks_local["occurred_at"].dt.day_name()
+        lines.append(f"Counts by month (last 24): {dict(list(attacks_local['month'].value_counts().sort_index().items())[-24:])}")
+        lines.append(f"Counts by weekday: {attacks_local['weekday'].value_counts().to_dict()}")
 
-def _section_areas(db: Session) -> str:
-    rows = db.execute(select(SensitiveArea).order_by(SensitiveArea.id)).scalars().all()
-    out: list[str] = []
-    out.append("## CONFIGURED SENSITIVE AREAS (admin)")
-    out.append(f"- Total: {len(rows)}")
-    for a in rows[:30]:
-        out.append(f"    * #{a.id} {a.name} | priority={a.priority}")
-    return "\n".join(out)
+        # Sample real rows so the chatbot can show "parts of the data"
+        sample_real = attacks[attacks["source"] == "historical"].sort_values("occurred_at").head(20)
+        if not sample_real.empty:
+            lines.append("\nSample of 20 real historical rows (oldest first):")
+            for _, r in sample_real.iterrows():
+                lines.append(
+                    f"- {r['occurred_at'].date()} | {r['attack_type']:<18} | "
+                    f"{(r['region'] or '?'):<22} | {r['target_location'] or '?'}"
+                )
 
+        # Most recent rows across all sources (synthetic + historical + live)
+        recent = attacks.sort_values("occurred_at", ascending=False).head(15)
+        if not recent.empty:
+            lines.append("\nMost recent 15 rows across all sources:")
+            for _, r in recent.iterrows():
+                lines.append(
+                    f"- {r['occurred_at'].date()} | {r['attack_type']:<18} | "
+                    f"{(r['region'] or '?'):<22} | {r['source']}"
+                )
 
-def _build_admin_context(db: Session) -> str:
-    parts = [
-        "=== DASHBOARD (admin view) ===",
-        _section_overview(db),
-        _section_live(db, admin=True),
-        _section_history(db),
-        _section_analysis(db, admin=True),
-        _section_placement(db),
-        _section_cameras(db),
-        _section_areas(db),
-    ]
-    return "\n\n".join(parts)
+    lines.append("")
+    lines.append("=== LIVE DETECTIONS (last 24h) ===")
+    if live.empty:
+        lines.append("No recent live detections.")
+    else:
+        lines.append(f"Records: {len(live)}")
+        lines.append(f"Drone classes: {live['drone_class'].value_counts().to_dict()}")
+        if live["speed_mps"].notna().any():
+            lines.append(
+                f"Speed (m/s): mean={live['speed_mps'].mean():.2f} max={live['speed_mps'].max():.2f}"
+            )
+        lines.append(f"Directions: {live['direction'].value_counts().to_dict()}")
+        lines.append(f"Nearest areas: {live['nearest_area'].value_counts().to_dict()}")
+
+        # Sample of recent live detections
+        recent_live = live.sort_values("captured_at", ascending=False).head(10)
+        if not recent_live.empty:
+            lines.append("\nSample of 10 most recent live detections:")
+            for _, r in recent_live.iterrows():
+                eta = f"{r['eta_s']:.1f}s" if pd.notna(r["eta_s"]) else "—"
+                lines.append(
+                    f"- {r['captured_at']:%Y-%m-%d %H:%M} | {r['drone_class']:<10} | "
+                    f"conf={r['confidence']:.2f} | speed={r['speed_mps']:.1f}m/s | "
+                    f"dir={r['direction']} | near={r['nearest_area'] or '?'} | eta={eta}"
+                )
+
+    return "\n".join(lines)
 
 
 def _build_viewer_context(db: Session) -> str:
-    parts = [
-        "=== DASHBOARD (operator view) ===",
-        _section_overview(db),
-        _section_live(db, admin=False),
-        _section_history(db),
-        _section_analysis(db, admin=False),
-    ]
-    return "\n\n".join(parts)
+    """Aggregate-only context for non-admin users.
+
+    Strips per-row samples and operational data, but DOES include per-region
+    per-month counts so questions like "Yanbu in June 2026" can be grounded
+    or refused with confidence — never guessed.
+    """
+    attacks = _attacks_df(db)
+    live = _live_df(db)
+    n_cameras = db.execute(select(Camera)).scalars().unique().all()
+    n_areas = db.execute(select(SensitiveArea)).scalars().unique().all()
+
+    lines: list[str] = []
+    lines.append("=== SYSTEM TOTALS ===")
+    lines.append(f"Total cameras configured: {len(n_cameras)}")
+    lines.append(f"Total sensitive areas configured: {len(n_areas)}")
+    lines.append("")
+    lines.append("=== AGGREGATE STATISTICS ===")
+    if attacks.empty:
+        lines.append("No attack records on file.")
+        lines.append("Available date range: NONE — refuse any temporal question.")
+    else:
+        dmin = attacks["occurred_at"].min().date()
+        dmax = attacks["occurred_at"].max().date()
+        lines.append(f"Total attack records: {len(attacks)}")
+        lines.append(f"Available date range: {dmin} to {dmax} (inclusive).")
+        lines.append(
+            "Any date BEFORE the start or AFTER the end of that range is out of bounds; "
+            "for those, refuse. Dates INSIDE that range (or partial overlaps like 'in 2026') "
+            "ARE answerable from the per-(region, month) table further below."
+        )
+        lines.append(f"Counts by region: {attacks['region'].value_counts().to_dict()}")
+        lines.append(f"Counts by attack type: {attacks['attack_type'].value_counts().to_dict()}")
+
+        a2 = attacks.copy()
+        a2["month"] = a2["occurred_at"].dt.to_period("M").astype(str)
+        a2["weekday"] = a2["occurred_at"].dt.day_name()
+        lines.append(
+            "Counts by month (full range): "
+            f"{a2['month'].value_counts().sort_index().to_dict()}"
+        )
+        lines.append(f"Counts by weekday: {a2['weekday'].value_counts().to_dict()}")
+
+        # Per-(region, month) cross-tab so granular questions are grounded.
+        # Keep it compact: only non-zero cells, sorted by month then region.
+        region_month = (
+            a2.groupby(["region", "month"]).size().reset_index(name="count")
+            .sort_values(["month", "region"])
+        )
+        if not region_month.empty:
+            lines.append("")
+            lines.append("Per-region per-month attack counts (only non-zero):")
+            lines.append("region | month | attacks")
+            for _, r in region_month.iterrows():
+                lines.append(f"- {r['region']} | {r['month']} | {int(r['count'])}")
+            lines.append(
+                "Any (region, month) pair NOT listed above (within the date range) "
+                "has zero attacks — answer 'no attacks on record', NOT a refusal."
+            )
+
+    lines.append("")
+    lines.append("=== LIVE ACTIVITY (last 24h) ===")
+    if live.empty:
+        lines.append("No live drone activity in the last 24 hours.")
+    else:
+        lines.append(f"Detections in the last 24h: {len(live)}")
+        lines.append(f"Drone class breakdown: {live['drone_class'].value_counts().to_dict()}")
+        if live["speed_mps"].notna().any():
+            lines.append(
+                f"Average speed (m/s): {live['speed_mps'].mean():.2f}; "
+                f"max: {live['speed_mps'].max():.2f}"
+            )
+
+    return "\n".join(lines)
 
 
 async def ask(
@@ -341,7 +306,7 @@ async def ask(
     settings = get_settings()
     if role == "admin":
         system_prompt = SYSTEM_AR if language == "ar" else SYSTEM_EN
-        context = _build_admin_context(db)
+        context = _build_context(db, language)
     else:
         system_prompt = VIEWER_SYSTEM_AR if language == "ar" else VIEWER_SYSTEM_EN
         context = _build_viewer_context(db)
@@ -357,17 +322,11 @@ async def ask(
         "model": settings.ollama_model,
         "messages": messages,
         "stream": False,
-        # keep_alive tells Ollama to keep the model resident in RAM/VRAM so
-        # subsequent calls don't pay the (slow) load cost.
-        "keep_alive": settings.ollama_keep_alive,
-        "options": {"temperature": 0.2},
+        "options": {"temperature": 0.3},
     }
 
-    # connect/write timeouts stay short; only the *read* timeout needs to be
-    # generous because that's where the slow token streaming lives.
-    timeout = httpx.Timeout(60.0, read=settings.ollama_timeout_s)
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=120.0)) as client:
             r = await client.post(url, json=payload)
             r.raise_for_status()
             data = r.json()

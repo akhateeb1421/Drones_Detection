@@ -1,11 +1,13 @@
 import { useTranslation } from "react-i18next";
 
 /**
- * Returns a function that localizes a place / class / type / compass label.
- * Falls back to the original raw string when the key isn't translated in
- * the active language. We check `i18n.exists` instead of relying on
- * defaultValue because i18next's fallbackLng would otherwise pull a value
- * from another language and override our fallback.
+ * Returns a function that localizes a place / class / type label.
+ * Falls back to the original English string when the key isn't translated.
+ *
+ * Important: i18next normally falls back to the configured `fallbackLng`
+ * when a key is missing in the active language. With `places` we want the
+ * opposite — if Arabic doesn't define a key we'd rather show the raw English
+ * DB value than the English translation. So we check for existence first.
  */
 export function usePlaceLabel() {
   const { t, i18n } = useTranslation();
@@ -43,6 +45,20 @@ export function useClassLabel() {
   };
 }
 
+/**
+ * Returns a function that picks the right side of a bilingual record.
+ * Cameras and sensitive-areas carry a primary `name` (English) and an
+ * optional `name_ar` (Arabic). When the UI is in Arabic and the record
+ * has an Arabic name, use it; otherwise fall back to `name`.
+ */
+export function useBilingualName() {
+  const { i18n } = useTranslation();
+  return (row: { name: string; name_ar?: string | null }): string => {
+    if (i18n.language === "ar" && row.name_ar) return row.name_ar;
+    return row.name;
+  };
+}
+
 export function useCompassLabel() {
   const { t, i18n } = useTranslation();
   return (label: string | null | undefined): string => {
@@ -52,26 +68,5 @@ export function useCompassLabel() {
       return t(key);
     }
     return label;
-  };
-}
-
-/**
- * Picks the right name from a record that carries both English (`name`) and
- * Arabic (`name_ar`) versions. In Arabic mode prefer name_ar (falling back to
- * name when missing); in any other language use name. Then runs the result
- * through the static places dictionary so historical region/place strings
- * still translate even when no row-level Arabic name was provided.
- */
-export function useBilingualName() {
-  const { i18n } = useTranslation();
-  const placeLabel = usePlaceLabel();
-  return (row: { name: string; name_ar?: string | null } | null | undefined): string => {
-    if (!row) return "—";
-    if (i18n.language === "ar" && row.name_ar && row.name_ar.trim()) {
-      return row.name_ar;
-    }
-    if (i18n.language !== "ar") return row.name;
-    // Arabic mode but no row-level name_ar — fall back to dictionary lookup
-    return placeLabel(row.name);
   };
 }

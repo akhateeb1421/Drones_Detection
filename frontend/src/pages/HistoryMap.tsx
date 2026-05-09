@@ -22,9 +22,7 @@ export function HistoryMap() {
       date_to: to || undefined,
       region: region || undefined,
       attack_type: attackType || undefined,
-    })
-      .then(setData)
-      .finally(() => setLoading(false));
+    }).then(setData).finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -45,7 +43,7 @@ export function HistoryMap() {
     id: a.id,
     lat: a.latitude,
     lon: a.longitude,
-    color: a.attack_type.includes("missile") ? "#e94560" : "#0369a1",
+    color: a.attack_type.includes("missile") ? "#c5443c" : "#c89968",
     label: `${typeLabel(a.attack_type)} · ${a.region ? placeLabel(a.region) : ""} · ${a.occurred_at.slice(0, 10)}`,
     radius: 5,
   }));
@@ -56,29 +54,11 @@ export function HistoryMap() {
       <div className="card grid grid-cols-1 gap-3 md:grid-cols-5">
         <div>
           <div className="label">{t("history.date_from")}</div>
-          <input
-            type="text"
-            inputMode="numeric"
-            dir="ltr"
-            placeholder="YYYY-MM-DD"
-            pattern="\d{4}-\d{2}-\d{2}"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="input"
-          />
+          <input type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD" pattern="\d{4}-\d{2}-\d{2}" value={from} onChange={(e) => setFrom(e.target.value)} className="input" />
         </div>
         <div>
           <div className="label">{t("history.date_to")}</div>
-          <input
-            type="text"
-            inputMode="numeric"
-            dir="ltr"
-            placeholder="YYYY-MM-DD"
-            pattern="\d{4}-\d{2}-\d{2}"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="input"
-          />
+          <input type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD" pattern="\d{4}-\d{2}-\d{2}" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
         </div>
         <div>
           <div className="label">{t("history.region")}</div>

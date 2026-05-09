@@ -308,6 +308,8 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
             # has been raised at least once" rather than "most recent alarm".
             if det.get("_threat_fired") and track.alarm_fired_at is None:
                 track.alarm_fired_at = now
+            # Pass the existing link forward in subsequent frames too, so the
+            # frontend always knows the merge key.
             if track.linked_track_id is not None:
                 parent = db.get(Track, track.linked_track_id)
                 if parent is not None:

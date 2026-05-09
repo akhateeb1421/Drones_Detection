@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Areas, Area } from "../../services/api";
-import { useBilingualName } from "../../i18n/places";
+import { usePlaceLabel, useBilingualName } from "../../i18n/places";
+import { LocationPicker } from "../../components/LocationPicker";
 
 const blank: Omit<Area, "id" | "created_at"> = {
   name: "",
@@ -13,9 +14,11 @@ const blank: Omit<Area, "id" | "created_at"> = {
 
 export function AreasAdmin() {
   const { t } = useTranslation();
+  const placeLabel = usePlaceLabel();
   const bilingualName = useBilingualName();
   const [items, setItems] = useState<Area[]>([]);
   const [draft, setDraft] = useState({ ...blank });
+  const [showMap, setShowMap] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = () => Areas.list().then(setItems).catch((e) => setError(String(e)));
@@ -24,8 +27,9 @@ export function AreasAdmin() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Backend treats empty Arabic name as null.
       const payload = { ...draft, name_ar: draft.name_ar || null };
-      await Areas.create(payload as Omit<Area, "id" | "created_at">);
+      await Areas.create(payload);
       setDraft({ ...blank });
       load();
     } catch (e: unknown) {
@@ -51,11 +55,11 @@ export function AreasAdmin() {
       <form onSubmit={submit} className="card grid grid-cols-1 gap-3 md:grid-cols-4">
         <div>
           <div className="label">{t("admin.fields.name_en")}</div>
-          <input className="input" lang="en" dir="ltr" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
+          <input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
         </div>
         <div>
           <div className="label">{t("admin.fields.name_ar")}</div>
-          <input className="input" lang="ar" dir="rtl" value={draft.name_ar ?? ""} onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })} />
+          <input className="input" dir="rtl" value={draft.name_ar ?? ""} onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })} />
         </div>
         <div>
           <div className="label">{t("admin.fields.lat")}</div>
@@ -69,14 +73,27 @@ export function AreasAdmin() {
           <div className="label">{t("admin.fields.priority")}</div>
           <input type="number" className="input" value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value) })} />
         </div>
-        <div className="md:col-span-4">
-          <button className="btn-primary">{t("common.add")}</button>
+        <div className="md:col-span-3 flex items-end gap-2">
+          <button type="button" onClick={() => setShowMap((v) => !v)} className="btn-ghost">
+            {showMap ? t("admin.fields.hide_map") : t("admin.fields.show_map")}
+          </button>
+          <button type="submit" className="btn-primary">{t("common.add")}</button>
         </div>
+        {showMap && (
+          <div className="md:col-span-4">
+            <div className="text-xs text-muted mb-1">{t("admin.fields.pick_hint")}</div>
+            <LocationPicker
+              lat={draft.latitude}
+              lon={draft.longitude}
+              onChange={(lat, lon) => setDraft({ ...draft, latitude: lat, longitude: lon })}
+            />
+          </div>
+        )}
       </form>
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="text-xs uppercase text-slate-400">
+          <thead className="text-start text-xs uppercase text-slate-400">
             <tr>
               <th className="py-2 text-start">#</th>
               <th className="text-start">{t("admin.table.name")}</th>
@@ -88,10 +105,10 @@ export function AreasAdmin() {
           <tbody className="divide-y divide-slate-800">
             {items.map((a) => (
               <tr key={a.id}>
-                <td className="py-2 text-start"><span dir="ltr">{a.id}</span></td>
-                <td className="text-start">{bilingualName(a)}</td>
-                <td className="text-start"><span dir="ltr">{a.latitude.toFixed(4)}, {a.longitude.toFixed(4)}</span></td>
-                <td className="text-start"><span dir="ltr">{a.priority}</span></td>
+                <td className="py-2 text-start font-data" dir="ltr">{a.id}</td>
+                <td className="text-start">{a.name_ar ? bilingualName(a) : placeLabel(a.name)}</td>
+                <td className="text-start font-data whitespace-nowrap" dir="ltr">{a.latitude.toFixed(4)}, {a.longitude.toFixed(4)}</td>
+                <td className="text-start font-data" dir="ltr">{a.priority}</td>
                 <td className="text-end"><button onClick={() => remove(a.id)} className="btn-danger">{t("common.delete")}</button></td>
               </tr>
             ))}

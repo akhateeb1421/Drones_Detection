@@ -6,7 +6,7 @@ type AlarmsApi = {
   latest: AlarmEvent | null;
   history: AlarmEvent[];
   dismiss: () => void;
-  push: (event: AlarmEvent) => void;
+  // push intentionally omitted — alarms come from WebSocket
 };
 
 const AlarmsContext = createContext<AlarmsApi | null>(null);

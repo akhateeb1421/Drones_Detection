@@ -19,10 +19,7 @@ import { CamerasAdmin } from "./pages/admin/Cameras";
 import { AreasAdmin } from "./pages/admin/Areas";
 
 function navClass({ isActive }: { isActive: boolean }) {
-  return [
-    "block px-3 py-2 rounded-md text-sm",
-    isActive ? "bg-accent text-black font-semibold" : "text-slate-300 hover:bg-slate-800",
-  ].join(" ");
+  return ["nav-item", isActive ? "active" : ""].join(" ").trim();
 }
 
 function Banner() {
@@ -46,12 +43,15 @@ function Shell() {
   return (
     <div className="min-h-screen flex flex-col">
       <Banner />
-      <header className="border-b border-slate-800 bg-panel">
+      <header className="sticky top-0 z-20 border-b border-slate-800 bg-panel">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="" className="h-10 w-10 flex-shrink-0" />
+            <div className="relative">
+              <img src="/logo.svg" alt="" className="h-10 w-10 flex-shrink-0" />
+              <span className="status-dot absolute -bottom-0.5 -end-0.5 text-success" style={{ background: "currentColor" }} aria-hidden />
+            </div>
             <div>
-              <div className="text-lg font-bold text-accent">{t("app.title")}</div>
+              <div className="text-lg font-bold tracking-tight text-accent">{t("app.title")}</div>
               <div className="text-xs text-muted">{t("app.subtitle")}</div>
             </div>
           </div>
@@ -69,13 +69,11 @@ function Shell() {
           <NavLink to="/history" className={navClass}>{t("nav.history")}</NavLink>
           <NavLink to="/analysis" className={navClass}>{t("nav.analysis")}</NavLink>
           <NavLink to="/drones" className={navClass}>{t("nav.drones")}</NavLink>
-          {isAdmin && (
-            <NavLink to="/placement" className={navClass}>{t("nav.placement")}</NavLink>
-          )}
+          {isAdmin && (<NavLink to="/placement" className={navClass}>{t("nav.placement")}</NavLink>)}
           <NavLink to="/chatbot" className={navClass}>{t("nav.chatbot")}</NavLink>
           {isAdmin && (
             <>
-              <div className="mt-4 px-3 text-xs uppercase text-slate-500">{t("nav.admin")}</div>
+              <div className="mt-4 px-3 text-xs uppercase tracking-wider text-slate-500">{t("nav.admin")}</div>
               <NavLink to="/admin/cameras" className={navClass}>{t("nav.cameras")}</NavLink>
               <NavLink to="/admin/areas" className={navClass}>{t("nav.areas")}</NavLink>
             </>

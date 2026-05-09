@@ -2,204 +2,216 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
-  height: 100%;
-  background-color: #050a14;
-  color: #e2e8f0;
-}
+html, body, #root { height: 100%; background-color: #110c08; color: #e8dfd4; }
 
 body {
   font-family: "Inter", "Tajawal", system-ui, Arial, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  background-image:
+    radial-gradient(ellipse at 50% -15%, rgba(200, 153, 104, 0.16), transparent 60%),
+    radial-gradient(circle at 1px 1px, rgba(200, 153, 104, 0.04) 1px, transparent 0);
+  background-size: auto, 28px 28px;
+  background-attachment: fixed, fixed;
 }
 
-[dir="rtl"] body {
-  font-family: "Tajawal", "Inter", system-ui, Arial, sans-serif;
+[dir="rtl"] body { font-family: "Tajawal", "Inter", system-ui, Arial, sans-serif; }
+
+.leaflet-container { background: #1a130d; }
+
+/* Keep Leaflet's tile/marker panes below the sticky header. Leaflet ships
+ * panes at z-index 200–700 and controls at z-1000, which would float over
+ * the app shell on scroll. Anchoring the container at z-0 with a fresh
+ * stacking context fixes that without breaking marker layering. */
+.leaflet-container { position: relative; z-index: 0; isolation: isolate; }
+.leaflet-pane { z-index: auto; }
+.leaflet-top, .leaflet-bottom { z-index: 1; }
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+.font-data {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
-.leaflet-container {
-  background: #0a0f1e;
+.metric {
+  font-family: "EB Garamond", "Cormorant Garamond", ui-serif, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .btn {
-  @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors;
+  @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-all duration-200;
+  transform: translateZ(0);
 }
+.btn:active { transform: translateY(0.5px); }
 
 .btn-primary {
-  @apply btn bg-accent text-black hover:bg-accent2 hover:text-white;
+  @apply btn bg-accent;
+  color: #1a0e05;
+  box-shadow: 0 0 0 1px rgba(200, 153, 104, 0.45), 0 6px 24px -8px rgba(200, 153, 104, 0.32);
 }
+.btn-primary:hover { background-color: #d8ad7e; box-shadow: 0 0 0 1px rgba(200, 153, 104, 0.65), 0 10px 30px -8px rgba(200, 153, 104, 0.5); }
 
 .btn-danger {
-  @apply btn bg-danger text-white hover:opacity-90;
+  @apply btn bg-danger text-white;
+  box-shadow: 0 0 0 1px rgba(197, 68, 60, 0.45);
 }
+.btn-danger:hover { opacity: 0.92; }
+
+.btn-warning {
+  @apply btn bg-warning text-black;
+  box-shadow: 0 0 0 1px rgba(217, 160, 92, 0.45);
+}
+.btn-warning:hover { opacity: 0.92; }
 
 .btn-ghost {
-  @apply btn border border-slate-700 text-slate-200 hover:bg-slate-800;
+  @apply btn border;
+  color: #e8dfd4;
+  background: rgba(34, 26, 19, 0.65);
+  border-color: rgba(200, 153, 104, 0.2);
 }
+.btn-ghost:hover { background: rgba(48, 36, 26, 0.9); border-color: rgba(200, 153, 104, 0.4); }
 
 .card {
-  @apply rounded-xl border border-slate-800 bg-panel p-4 shadow-md;
+  @apply rounded-xl p-4;
+  background: linear-gradient(180deg, #1f160e 0%, #1a130d 100%);
+  border: 1px solid rgba(200, 153, 104, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255, 230, 200, 0.04), 0 1px 0 rgba(0, 0, 0, 0.4), 0 24px 40px -32px rgba(0, 0, 0, 0.6);
+  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+.card-interactive { cursor: pointer; }
+.card-interactive:hover {
+  transform: translateY(-1px);
+  border-color: rgba(200, 153, 104, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 230, 200, 0.06), 0 1px 0 rgba(0, 0, 0, 0.4), 0 24px 50px -28px rgba(200, 153, 104, 0.22);
 }
 
 .input {
-  @apply w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent;
+  @apply w-full rounded-md px-3 py-2 text-sm transition-colors duration-150;
+  background: #1a130d;
+  border: 1px solid rgba(200, 153, 104, 0.18);
+  color: #e8dfd4;
+}
+.input::placeholder { color: #7d6f5e; }
+.input:focus {
+  outline: none;
+  border-color: rgba(200, 153, 104, 0.55);
+  box-shadow: 0 0 0 3px rgba(200, 153, 104, 0.14);
 }
 
-.label {
-  @apply block text-xs uppercase tracking-wide text-slate-400 mb-1;
+.label { @apply block text-xs uppercase mb-1; color: #c89968; letter-spacing: 0.16em; font-weight: 500; font-size: 10.5px; }
+.badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+.scrollbar-thin::-webkit-scrollbar { width: 6px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(200, 153, 104, 0.18); border-radius: 3px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(200, 153, 104, 0.32); }
+
+.nav-item {
+  @apply relative block rounded-md px-3 py-2 text-sm transition-colors duration-150;
+  color: #c0b3a1;
+}
+.nav-item:hover { background: rgba(200, 153, 104, 0.06); color: #f0e7dc; }
+.nav-item.active { background: rgba(200, 153, 104, 0.14); color: #f0e7dc; font-weight: 500; }
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 1.5px;
+  background: #c89968;
+  border-radius: 1.5px;
+  animation: slideIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes slideIn { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+.status-dot { position: relative; display: inline-block; width: 8px; height: 8px; border-radius: 9999px; }
+.status-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.5;
+  animation: pulseRing 1.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes pulseRing { 0% { transform: scale(0.6); opacity: 0.5; } 100% { transform: scale(2.2); opacity: 0; } }
+
+[data-mount] > * { animation: mountKf 380ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+[data-mount] > *:nth-child(1) { animation-delay: 0ms; }
+[data-mount] > *:nth-child(2) { animation-delay: 70ms; }
+[data-mount] > *:nth-child(3) { animation-delay: 140ms; }
+[data-mount] > *:nth-child(4) { animation-delay: 210ms; }
+[data-mount] > *:nth-child(5) { animation-delay: 280ms; }
+[data-mount] > *:nth-child(6) { animation-delay: 350ms; }
+[data-mount] > *:nth-child(7) { animation-delay: 420ms; }
+[data-mount] > *:nth-child(8) { animation-delay: 490ms; }
+@keyframes mountKf { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
 
-.badge {
-  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+.text-slate-100 { color: #f0e7dc; }
+.text-slate-200 { color: #ddd0bf; }
+.text-slate-300 { color: #c0b3a1; }
+.text-slate-400 { color: #a89c8c; }
+.text-slate-500 { color: #82766a; }
+.text-muted     { color: #a89c8c; }
+.bg-slate-800   { background-color: #2a2018; }
+.bg-slate-900   { background-color: #1a130d; }
+.bg-slate-700   { background-color: #3a2c20; }
+.border-slate-800 { border-color: rgba(200, 153, 104, 0.12); }
+.border-slate-700 { border-color: rgba(200, 153, 104, 0.22); }
+.divide-slate-800 > * + * { border-color: rgba(200, 153, 104, 0.10); }
+.bg-panel       { background-color: #1a130d; }
+
+.leaflet-tile { filter: sepia(0.4) hue-rotate(-12deg) saturate(0.9) brightness(0.92); }
+html.light .leaflet-tile { filter: sepia(0.32) hue-rotate(-15deg) saturate(0.85) brightness(1.0); }
+
+html.light, html.light body, html.light #root { background-color: #f4ede0; color: #2b1f12; }
+html.light body {
+  background-image:
+    radial-gradient(ellipse at 50% -25%, rgba(140, 90, 43, 0.10), transparent 60%),
+    radial-gradient(circle at 1px 1px, rgba(43, 31, 18, 0.05) 1px, transparent 0);
 }
-
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
+html.light .leaflet-container { background: #ebe0c8; }
+html.light .bg-panel       { background-color: #fbf6ec !important; }
+html.light .bg-slate-900   { background-color: #f8f0df !important; }
+html.light .bg-slate-800   { background-color: #e7dac0 !important; }
+html.light .bg-slate-700   { background-color: #c9b694 !important; color: #2b1f12 !important; }
+html.light .hover\:bg-slate-800:hover { background-color: #e7dac0 !important; color: #2b1f12 !important; }
+html.light .border-slate-800 { border-color: #d8c9aa !important; }
+html.light .border-slate-700 { border-color: #a89172 !important; }
+html.light .text-slate-100 { color: #2b1f12 !important; }
+html.light .text-slate-200 { color: #3a2c1d !important; }
+html.light .text-slate-300 { color: #4d3d2b !important; }
+html.light .text-slate-400 { color: #6a5a44 !important; }
+html.light .text-slate-500 { color: #7d6f58 !important; }
+html.light .text-muted     { color: #6a5a44 !important; }
+html.light .text-accent    { color: #8c5a2b !important; }
+html.light .card  {
+  background: linear-gradient(180deg, #ffffff 0%, #fafbf3 100%) !important;
+  border-color: #d8c9aa !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 2px rgba(43,31,18,0.04), 0 12px 24px -16px rgba(43,31,18,0.14) !important;
 }
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 3px;
-}
-
-/* ---------------------------------------------------------------------- */
-/* Light theme overrides. The dashboard ships dark by default; toggling   */
-/* the ThemeContext adds `html.light` and these rules take over. We patch */
-/* surfaces, text, borders, and the leaflet basemap. Tailwind utility     */
-/* classes are overridden via `!important` because the dark values come   */
-/* from compiled atomic classes that already won the cascade.             */
-/* ---------------------------------------------------------------------- */
-html.light, html.light body, html.light #root {
-  background-color: #f1f5f9;
-  color: #0f172a;
-}
-
-html.light .leaflet-container {
-  background: #e2e8f0;
-}
-
-/* surfaces */
-html.light .bg-bg          { background-color: #f1f5f9 !important; }
-html.light .bg-panel       { background-color: #ffffff !important; }
-html.light .bg-slate-900   { background-color: #f8fafc !important; }
-html.light .bg-slate-800   { background-color: #e2e8f0 !important; }
-html.light .bg-slate-700   { background-color: #cbd5e1 !important; color: #0f172a !important; }
-
-/* hover variants — Tailwind compiles these as `.hover\:bg-slate-800:hover`,
- * which the plain `.bg-slate-800` override above can't reach. Without these
- * the sidebar nav links flash a dark navy on hover in light mode. */
-html.light .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; color: #0f172a !important; }
-html.light .hover\:bg-slate-700:hover { background-color: #cbd5e1 !important; color: #0f172a !important; }
-html.light .hover\:bg-slate-900:hover { background-color: #f8fafc !important; color: #0f172a !important; }
-
-/* dividers + borders */
-html.light .border-slate-800 { border-color: #cbd5e1 !important; }
-html.light .border-slate-700 { border-color: #94a3b8 !important; }
-html.light .divide-slate-800 > * + * { border-color: #e2e8f0 !important; }
-
-/* text */
-html.light .text-slate-100 { color: #0f172a !important; }
-html.light .text-slate-200 { color: #1e293b !important; }
-html.light .text-slate-300 { color: #334155 !important; }
-html.light .text-slate-400 { color: #475569 !important; }
-html.light .text-slate-500 { color: #64748b !important; }
-html.light .text-muted     { color: #475569 !important; }
-
-/* card / input / label / ghost button */
-html.light .card  { background-color: #ffffff !important; border-color: #cbd5e1 !important; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
-html.light .input { background-color: #ffffff !important; border-color: #94a3b8 !important; color: #0f172a !important; }
-html.light .input::placeholder { color: #94a3b8 !important; }
-html.light .label { color: #475569 !important; }
-html.light .btn-ghost { background-color: #ffffff; border-color: #cbd5e1; color: #1e293b; }
-html.light .btn-ghost:hover { background-color: #f1f5f9; }
-
-/* scrollbar */
-html.light .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; }
-
-/* keep status pills readable on white */
-html.light .bg-success\/20  { background-color: rgba(34, 197, 94, 0.18) !important; }
-html.light .bg-warning\/20  { background-color: rgba(245, 166, 35, 0.20) !important; }
-html.light .bg-danger\/20   { background-color: rgba(233, 69, 96, 0.18) !important; }
-
-/* ---------------------------------------------------------------------- */
-/* Recharts overrides in light mode. Recharts paints axes/legend/tooltip  */
-/* via inline SVG attributes and inline styles, so we need !important to  */
-/* beat them. Targets are stable Recharts class names.                    */
-/* ---------------------------------------------------------------------- */
-html.light .recharts-cartesian-axis-tick text { fill: #334155 !important; }
-html.light .recharts-cartesian-axis-line,
-html.light .recharts-cartesian-axis-tick-line { stroke: #94a3b8 !important; }
-html.light .recharts-cartesian-grid-horizontal line,
-html.light .recharts-cartesian-grid-vertical line { stroke: #cbd5e1 !important; }
-html.light .recharts-legend-item-text { color: #334155 !important; }
-
-/* Tooltip popup */
+html.light .input { background-color: #fbf6ec !important; border-color: #c9b694 !important; color: #2b1f12 !important; }
+html.light .input::placeholder { color: #a89172 !important; }
+html.light .label { color: #8c5a2b !important; }
+html.light .btn-primary { background-color: #c89968 !important; color: #1a0e05 !important; }
+html.light .btn-ghost { background-color: #fbf6ec; border-color: #c9b694; color: #2b1f12; }
+html.light .nav-item { color: #6a5a44; }
+html.light .nav-item:hover { background: rgba(10,20,16,0.04); color: #2b1f12; }
+html.light .nav-item.active { background: rgba(200,153,104,0.22); color: #2b1f12; }
+html.light .nav-item.active::before { background: #8c5a2b; }
+html.light .recharts-cartesian-axis-tick text { fill: #6a5a44 !important; }
+html.light .recharts-cartesian-grid-horizontal line, html.light .recharts-cartesian-grid-vertical line { stroke: #d8c9aa !important; }
 html.light .recharts-default-tooltip {
-  background: #ffffff !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #0f172a !important;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12) !important;
+  background: #1a130d !important;
+  border: 1px solid rgba(200,153,104,0.4) !important;
+  color: #f0e7dc !important;
 }
-html.light .recharts-tooltip-label { color: #0369a1 !important; }
-html.light .recharts-tooltip-item { color: #0f172a !important; }
-html.light .recharts-tooltip-item-name,
-html.light .recharts-tooltip-item-separator,
-html.light .recharts-tooltip-item-value,
-html.light .recharts-tooltip-item-unit { color: #0f172a !important; }
-
-/* In-slice percentage labels stay white-on-color for contrast against the
- * pie segments — explicit so theme override doesn't accidentally invert. */
-html.light .recharts-pie-label-text { fill: #ffffff !important; }
-
-/* The active region readout above the donut needs a dark text color */
-html.light .text-slate-200 { color: #1e293b !important; }
-
-/* The Legend formatter and Tooltip contentStyle in our chart components
- * inline style="color: #e2e8f0" / similar light tokens onto child spans.
- * Inline styles only get beaten by author CSS marked !important, AND the
- * targeted element must match. The Legend wrapper's children carry the
- * inline style, so we have to descend into them. */
-html.light .recharts-legend-item-text,
-html.light .recharts-legend-item-text * {
-  color: #334155 !important;
-}
-
-html.light .recharts-default-tooltip,
-html.light .recharts-default-tooltip * {
-  color: #0f172a !important;
-}
-html.light .recharts-default-tooltip {
-  background: #ffffff !important;
-  border-color: #cbd5e1 !important;
-}
-html.light .recharts-default-tooltip .recharts-tooltip-label {
-  color: #0369a1 !important;
-}
-
-/* Cell stroke between pie slices: was #0a0f1e (dark navy), too jarring on
- * a white panel. Force it to match the panel background so slices read as
- * separated by thin white gaps. */
-html.light .recharts-pie .recharts-sector {
-  stroke: #ffffff !important;
-}
-
-/* Bar chart numeric labels on top/right of bars: <LabelList fill="#e2e8f0">
- * inlines the SVG fill attribute. Override via the recharts-label-list
- * descendant text elements with !important. */
-html.light .recharts-bar-rectangle text,
-html.light .recharts-bar-labels text,
-html.light .recharts-label-list text {
-  fill: #334155 !important;
-}
-
-/* Switch the hover tooltip to white-on-dark in BOTH themes — easier to
- * read on top of any chart fill, and matches the user request. */
-html.light .recharts-default-tooltip {
-  background: #0a0f1e !important;
-  border-color: #1e3a5f !important;
-}
-html.light .recharts-default-tooltip,
-html.light .recharts-default-tooltip * {
-  color: #e2e8f0 !important;
-}
-html.light .recharts-default-tooltip .recharts-tooltip-label {
-  color: #38bdf8 !important;
-}
+html.light .recharts-default-tooltip, html.light .recharts-default-tooltip * { color: #f0e7dc !important; }
+html.light .recharts-default-tooltip .recharts-tooltip-label { color: #c89968 !important; }
