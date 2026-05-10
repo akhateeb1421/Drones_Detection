@@ -5,8 +5,8 @@ import { useTheme } from "../contexts/ThemeContext";
 
 const SENSITIVE_PIN = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
-    <path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 22 12.5 41 12.5 41S25 22 25 12.5C25 5.6 19.4 0 12.5 0Z" fill="#c89968" stroke="#1a0810" stroke-width="1.5"/>
-    <circle cx="12.5" cy="12.5" r="4.5" fill="#1a0810"/>
+    <path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 22 12.5 41 12.5 41S25 22 25 12.5C25 5.6 19.4 0 12.5 0Z" fill="#03DA9A" stroke="#0a1410" stroke-width="1.5"/>
+    <circle cx="12.5" cy="12.5" r="4.5" fill="#0a1410"/>
   </svg>`,
 );
 const sensitiveIcon = new Icon({
@@ -62,10 +62,10 @@ export function DroneMap({
   const tileUrl = theme === "light"
     ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
     : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-  const camPinFill = theme === "light" ? "#fbf6ec" : "#1a130d";
-  const camThreat = "#c5443c";
-  const camNormal = "#6ea892";
-  const interceptColor = "#6ea892";
+  const camPinFill = theme === "light" ? "#ffffff" : "#0e1a14";
+  const camThreat = "#ff4757";
+  const camNormal = "#03DA9A";
+  const interceptColor = "#03DA9A";
   return (
     <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="h-full w-full rounded-md">
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' url={tileUrl} />
@@ -97,7 +97,7 @@ export function DroneMap({
         </CircleMarker>
       ))}
       {predictedPath && predictedPath.length >= 2 && (
-        <Polyline positions={predictedPath} pathOptions={{ color: "#d9a05c", dashArray: "6 8", weight: 3 }} />
+        <Polyline positions={predictedPath} pathOptions={{ color: "#f5a623", dashArray: "6 8", weight: 3 }} />
       )}
       {interceptPoint && (
         <>

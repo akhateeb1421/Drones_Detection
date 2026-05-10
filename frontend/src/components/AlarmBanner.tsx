@@ -7,6 +7,12 @@ interface Props {
   onDismiss: () => void;
 }
 
+/**
+ * Crimson alarm bar with a slow MINT shimmer underline. The crimson keeps
+ * the visceral "incident" reading while the mint shimmer ties it back to
+ * the ZeBeyond brand — same hue family as the rest of the operator UI, so
+ * the alarm reads as part of the platform, not a separate emergency widget.
+ */
 export function AlarmBanner({ event, onDismiss }: Props) {
   const { t } = useTranslation();
   const placeLabel = usePlaceLabel();
@@ -17,8 +23,8 @@ export function AlarmBanner({ event, onDismiss }: Props) {
     <div
       className="sticky top-0 z-30 w-full overflow-hidden text-white animate-mount"
       style={{
-        background: "linear-gradient(90deg, #6b1f25 0%, #c5443c 50%, #6b1f25 100%)",
-        boxShadow: "0 6px 24px -8px rgba(197, 68, 60, 0.45)",
+        background: "linear-gradient(90deg, #b32d3a 0%, #ff4757 50%, #b32d3a 100%)",
+        boxShadow: "0 6px 24px -8px rgba(255, 71, 87, 0.45)",
       }}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
@@ -37,9 +43,23 @@ export function AlarmBanner({ event, onDismiss }: Props) {
             </div>
           </div>
         </div>
-        <button onClick={onDismiss} className="rounded-md border border-white/30 bg-white/10 px-3 py-1 text-xs font-medium transition-colors hover:bg-white/25" aria-label="Dismiss">×</button>
+        <button
+          onClick={onDismiss}
+          className="rounded-md border border-white/30 bg-white/10 px-3 py-1 text-xs font-medium transition-colors hover:bg-white/25"
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
       </div>
-      <div className="absolute bottom-0 left-0 h-[2px] w-full opacity-70" style={{ background: "linear-gradient(90deg, transparent 0%, #c89968 50%, transparent 100%)", backgroundSize: "200% 100%", animation: "shimmer 2.4s linear infinite" }} />
+      {/* Mint shimmer — communicates "still live" without a busy spinner. */}
+      <div
+        className="absolute bottom-0 left-0 h-[2px] w-full opacity-80"
+        style={{
+          background: "linear-gradient(90deg, transparent 0%, #3ee0a4 50%, transparent 100%)",
+          backgroundSize: "200% 100%",
+          animation: "shimmer 2.4s linear infinite",
+        }}
+      />
     </div>
   );
 }

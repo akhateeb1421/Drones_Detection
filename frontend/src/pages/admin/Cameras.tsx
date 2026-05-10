@@ -65,7 +65,7 @@ export function CamerasAdmin() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-accent">{t("admin.cameras_title")}</h1>
+      <h1 className="text-xl font-semibold gradient-text">{t("admin.cameras_title")}</h1>
 
       <div className="card">
         <div className="label">{t("admin.token_label")}</div>

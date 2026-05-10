@@ -196,9 +196,13 @@ export const Predictions = {
     api.get<CameraPlacement[]>("/predict/camera-placements", { params }).then((r) => r.data),
 };
 
-// LLM responses on CPU can take a couple of minutes for the first request
-// (cold model load), so override the default 30 s axios timeout.
-const CHAT_TIMEOUT_MS = 5 * 60 * 1000;
+// Local Qwen2.5-3B on CPU is ~1–3 tok/s, and the first call also pays
+// the ~1–2 min cold-start tax — give it up to 15 min. The Anthropic API
+// path is fast; cap it tighter so a stuck request fails clearly.
+const CHAT_TIMEOUT_LOCAL_MS = 15 * 60 * 1000;
+const CHAT_TIMEOUT_API_MS = 90 * 1000;
+
+export type ChatBackend = "api" | "local";
 
 export const Chat = {
   ask: (
@@ -206,12 +210,13 @@ export const Chat = {
     history: { role: string; content: string }[],
     language: string,
     role: "admin" | "viewer" = "viewer",
+    backend: ChatBackend = "local",
   ) =>
     api
       .post<{ answer: string; model: string }>(
         "/chat",
-        { message, history, language, role },
-        { timeout: CHAT_TIMEOUT_MS },
+        { message, history, language, role, backend },
+        { timeout: backend === "api" ? CHAT_TIMEOUT_API_MS : CHAT_TIMEOUT_LOCAL_MS },
       )
       .then((r) => r.data),
 };

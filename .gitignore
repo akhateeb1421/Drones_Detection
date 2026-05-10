@@ -69,3 +69,25 @@ logs/
 /sdb_agentic_analysis.json
 /live_assessment.csv
 /final_processed_history_fixed.csv
+
+C:/
+
+
+# Cowork / agent-mode stray writes
+C:/
+**/.cowork-write-test
+
+
+# Cowork / agent-mode stray writes
+.cowork-write-test
+
+
+# Local LLM weights — Qwen2.5-3B base (~6 GB) + drone_qa LoRA adapter.
+# These live on disk only; pulled fresh from HuggingFace if missing.
+models/llm/
+
+# Cowork / agent-mode write-test artifacts. The literal "C:" folder name
+# uses a Unicode lookalike (U+F03A) that gets created when a tool hands
+# a Windows-style path to a Linux-side mkdir.
+.cowork-write-test
+**/.cowork-write-test

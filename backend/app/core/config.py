@@ -45,16 +45,44 @@ class Settings(BaseSettings):
     threat_conf_threshold: float = 0.6
     threat_eta_seconds: float = 60.0
 
-    # Ollama
+    # --- LLM backend selection ----------------------------------------
+    # "ollama" -> hit a local Ollama server (the original setup).
+    # "local"  -> load a HuggingFace base model + PEFT LoRA in-process.
+    #             Slower per token but self-contained (no Ollama needed).
+    # The chatbot service branches on this at request time.
+    llm_backend: str = "local"
+
+    # --- Ollama (used when llm_backend == "ollama") -------------------
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b"
-    # Read-timeout (seconds) for Ollama replies. Bigger models take longer,
-    # and the very first call after a model switch must wait for Ollama to
-    # load the weights into memory — that alone can be 30-120s on CPU.
     ollama_timeout_s: float = 600.0
-    # How long Ollama keeps the model resident after a request. "30m" matches
-    # Ollama's default; raise to e.g. "12h" to avoid cold reloads.
     ollama_keep_alive: str = "30m"
+
+    # --- Google Gemini API (used when chat backend == "api") ----------
+    # gemini-2.0-flash on Google AI Studio — free tier, no credit card.
+    # The key is read from GOOGLE_API_KEY in .env. If unset, the API
+    # path surfaces a clear error rather than 500.
+    google_api_key: str = ""
+    # gemini-2.5-flash is the current default flash model on AI Studio.
+    # The 1.5 family was deprecated on v1beta at the end of 2025, and
+    # 2.0-flash sometimes ships with limit:0 on older projects, so 2.5
+    # is the most reliable free-tier choice in 2026.
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_max_tokens: int = 1024
+
+    # --- Local LLM (used when llm_backend == "local") -----------------
+    # Base model — Ultralytics-style auto-download from HuggingFace on
+    # first run. The downloaded weights are cached under
+    # ~/.cache/huggingface/.
+    llm_base_model: str = "Qwen/Qwen2.5-3B"
+    # Path to the PEFT LoRA adapter folder (must contain
+    # adapter_config.json + adapter_model.safetensors). Resolves relative
+    # to backend/ if not absolute.
+    llm_lora_path: str = "../models/llm/drone_qa_qwen_lora_saved"
+    # Generation params. Lower temperature for ops-style answers.
+    llm_max_new_tokens: int = 512
+    llm_temperature: float = 0.3
+    llm_top_p: float = 0.9
 
     # Demo fallback
     fallback_video: str = "../data/raw/shahed.mp4"

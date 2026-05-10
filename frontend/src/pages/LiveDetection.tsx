@@ -270,7 +270,7 @@ export function LiveDetection() {
       const isStale = elapsedS > 0.5;
       // Luxe palette: oxblood crimson for Shahed-class hostiles, copper
       // for everything else. Matches the historical map and chart language.
-      const baseColor = String(s.droneClass ?? "").toLowerCase().includes("shahed") ? "#c5443c" : "#c89968";
+      const baseColor = String(s.droneClass ?? "").toLowerCase().includes("shahed") ? "#ff4757" : "#03DA9A";
 
       // Last confirmed sighting (solid)
       items.push({
@@ -294,7 +294,7 @@ export function LiveDetection() {
           id: `pred-${s.trackId}`,
           lat,
           lon,
-          color: "#d9a05c",
+          color: "#f5a623",  // amber predicted-position dot
           label: `#${s.trackId} predicted at +${elapsedS.toFixed(0)}s (${s.speedMps.toFixed(1)} m/s ${s.direction})`,
           radius: 6,
         });
@@ -405,7 +405,7 @@ export function LiveDetection() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold text-accent">{t("live.title")}</h1>
+        <h1 className="text-xl font-semibold gradient-text">{t("live.title")}</h1>
         <div className="flex items-center gap-2">
           <span className={`badge ${connected ? "bg-success text-white" : "bg-slate-700 text-slate-300"}`}>
             {connected ? t("live.online") : t("live.offline")}
@@ -493,7 +493,7 @@ export function LiveDetection() {
                       : "border-slate-700 bg-slate-900/50 text-slate-400 hover:text-slate-200",
                   ].join(" ")}
                 >
-                  <span className="h-2 w-2 rounded-full" style={{ background: "#c89968" }} aria-hidden />
+                  <span className="h-2 w-2 rounded-full" style={{ background: "#03DA9A" }} aria-hidden />
                   {t("live.toggle_areas")}
                 </button>
                 <button

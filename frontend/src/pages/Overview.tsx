@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, LabelList, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, XAxis, YAxis } from "recharts";
 import { Analysis, CombinedAttack, RegionStat, TotalCounts, TypeStat } from "../services/api";
@@ -6,22 +7,34 @@ import { usePlaceLabel, useTypeLabel, useClassLabel } from "../i18n/places";
 import { CountUp } from "../components/CountUp";
 import { useAlarmsContext } from "../contexts/AlarmsContext";
 
+// ZeBeyond categorical palette: mint leads, then a tuned mid-rotation that
+// stays distinguishable on the green base. Each stop is a different *hue*,
+// not a different shade of mint.
+// ZeBeyond categorical palette: the three gradient stops lead, then a
+// tuned mid-rotation. Each stop is a different *hue*.
 const COLORS = [
-  "#c89968", "#c5443c", "#6ea892", "#c89c2c",
-  "#7d8aa3", "#9e6b8e", "#b87a6f", "#8c8a6f",
-  "#e8dfd4", "#5a8a8c",
+  "#01F2CF",  // cyan — gradient start
+  "#03DA9A",  // mint — gradient mid
+  "#03B3DA",  // sky  — gradient end
+  "#f5a623",  // amber
+  "#ff4757",  // crimson (danger)
+  "#a78bfa",  // plum
+  "#fb923c",  // pumpkin
+  "#facc15",  // sunflower
+  "#f472b6",  // rose
+  "#7dd17a",  // sage
 ];
 
 const LTR_STYLE: React.CSSProperties = { direction: "ltr" };
 const TOOLTIP_STYLE = {
-  background: "#1a130d",
-  border: "1px solid rgba(200, 153, 104, 0.4)",
+  background: "#1c302c",
+  border: "1px solid rgba(3,218,154,0.4)",
   borderRadius: 8,
-  color: "#f0e7dc",
+  color: "#e7ecdf",
   boxShadow: "0 16px 40px -16px rgba(0,0,0,0.7)",
 } as const;
-const TOOLTIP_LABEL_STYLE = { color: "#c89968", fontWeight: 600 } as const;
-const TOOLTIP_ITEM_STYLE = { color: "#f0e7dc" } as const;
+const TOOLTIP_LABEL_STYLE = { color: "#03DA9A", fontWeight: 600 } as const;
+const TOOLTIP_ITEM_STYLE = { color: "#e7ecdf" } as const;
 
 function filterMinPercent<T extends { count: number }>(rows: T[], total: number, minPct = 0.01, labelKey: keyof T): T[] {
   if (!total || rows.length === 0) return rows;
@@ -37,6 +50,7 @@ function filterMinPercent<T extends { count: number }>(rows: T[], total: number,
 
 export function Overview() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const placeLabel = usePlaceLabel();
   const typeLabel = useTypeLabel();
   const classLabel = useClassLabel();
@@ -74,7 +88,7 @@ export function Overview() {
     const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
     return (
       <g>
-        <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 6} startAngle={startAngle} endAngle={endAngle} fill={fill} stroke="#1a130d" strokeWidth={2} />
+        <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 6} startAngle={startAngle} endAngle={endAngle} fill={fill} stroke="#1c302c" strokeWidth={2} />
         <Sector cx={cx} cy={cy} innerRadius={outerRadius + 9} outerRadius={outerRadius + 11} startAngle={startAngle} endAngle={endAngle} fill={fill} opacity={0.45} />
       </g>
     );
@@ -89,7 +103,7 @@ export function Overview() {
     const x = cx + r * Math.cos(-midAngle * RAD);
     const y = cy + r * Math.sin(-midAngle * RAD);
     return (
-      <text x={x} y={y} fill="#1a0e05" textAnchor="middle" dominantBaseline="central" style={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.2 }}>
+      <text x={x} y={y} fill="#082522" textAnchor="middle" dominantBaseline="central" style={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.2 }}>
         {`${(percent * 100).toFixed(0)}%`}
       </text>
     );
@@ -103,7 +117,7 @@ export function Overview() {
     <div className="space-y-4" data-mount>
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">
-          <span className="text-accent">{t("nav.overview")}</span>
+          <span className="gradient-text">{t("nav.overview")}</span>
         </h1>
         <div className="flex items-center gap-2 text-xs text-muted font-data">
           <span className="status-dot text-success" style={{ background: "currentColor" }} />
@@ -113,7 +127,7 @@ export function Overview() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="card">
           <div className="label">{t("overview.total_attacks")}</div>
-          <div className="metric text-5xl text-accent leading-none">
+          <div className="metric gradient-text-drift text-5xl leading-none">
             <CountUp value={total} />
           </div>
           {totals && total !== totalRows && (
@@ -122,7 +136,7 @@ export function Overview() {
         </div>
         <div className="card">
           <div className="label">{t("overview.regions")}</div>
-          <div className="metric text-5xl text-accent leading-none">
+          <div className="metric gradient-text-drift text-5xl leading-none">
             <CountUp value={regionsAffected} />
           </div>
         </div>
@@ -147,15 +161,30 @@ export function Overview() {
           <div className="h-72 w-full" style={LTR_STYLE}>
             <ResponsiveContainer>
               <PieChart margin={{ top: 16, right: 16, bottom: 8, left: 16 }}>
-                <Pie data={regionsTrimDisp} dataKey="count" nameKey="region" cx="50%" cy="48%" outerRadius="68%" innerRadius="40%" paddingAngle={1} label={renderPct} labelLine={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" activeIndex={activeIndex >= 0 ? activeIndex : undefined} activeShape={renderActiveShape} onMouseEnter={(_d, i) => setActiveIndex(i)} onMouseLeave={() => setActiveIndex(-1)}>
-                  {regionsTrimDisp.map((_, i) => (<Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#1a130d" strokeWidth={1.5} />))}
+                <Pie
+                  data={regionsTrimDisp} dataKey="count" nameKey="region" cx="50%" cy="48%" outerRadius="68%" innerRadius="40%" paddingAngle={1} label={renderPct} labelLine={false}
+                  isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
+                  activeIndex={activeIndex >= 0 ? activeIndex : undefined} activeShape={renderActiveShape}
+                  onMouseEnter={(_d, i) => setActiveIndex(i)}
+                  onMouseLeave={() => setActiveIndex(-1)}
+                  // Click-to-drill: jump to History pre-filtered by region.
+                  // Uses the un-localized region key from the original row so
+                  // the History dropdown matches even when the pie label is
+                  // showing the localized version.
+                  onClick={(_d, i) => {
+                    const r = regionsTrim[i];
+                    if (r?.region) navigate(`/history?region=${encodeURIComponent(r.region)}`);
+                  }}
+                  cursor="pointer"
+                >
+                  {regionsTrimDisp.map((_, i) => (<Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#1c302c" strokeWidth={1.5} />))}
                 </Pie>
                 <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE}
                   formatter={(value: number, _name: string, p: { payload?: RegionStat }) => [
                     `${value} (${totalRows ? ((value / totalRows) * 100).toFixed(1) : 0}%)`,
                     p.payload?.region ?? "",
                   ]} />
-                <Legend verticalAlign="bottom" height={48} wrapperStyle={{ fontSize: 12, color: "#f0e7dc" }} formatter={(value: string) => <span style={{ color: "#f0e7dc" }}>{value}</span>} />
+                <Legend verticalAlign="bottom" height={48} wrapperStyle={{ fontSize: 12, color: "#e7ecdf" }} formatter={(value: string) => <span style={{ color: "#e7ecdf" }}>{value}</span>} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -165,12 +194,12 @@ export function Overview() {
           <div className="h-80 w-full" style={LTR_STYLE}>
             <ResponsiveContainer>
               <BarChart data={typesTrimDisp} margin={{ top: 24, right: 24, bottom: 8, left: 24 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(200,153,104,0.10)" />
-                <XAxis dataKey="attack_type" stroke="#a89c8c" tick={{ fill: "#c0b3a1", fontSize: 12 }} tickLine={{ stroke: "#6a5a44" }} axisLine={{ stroke: "#6a5a44" }} />
-                <YAxis stroke="#a89c8c" width={56} tick={{ fill: "#c0b3a1", fontSize: 12 }} tickLine={{ stroke: "#6a5a44" }} axisLine={{ stroke: "#6a5a44" }} allowDecimals={false} />
-                <Tooltip cursor={{ fill: "rgba(200,153,104,0.10)" }} contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
-                <Bar dataKey="count" fill="#c89968" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={700} animationEasing="ease-out">
-                  <LabelList dataKey="count" position="top" fill="#f0e7dc" fontSize={12} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(3,218,154,0.10)" />
+                <XAxis dataKey="attack_type" stroke="#a8b3a9" tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} />
+                <YAxis stroke="#a8b3a9" width={56} tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} allowDecimals={false} />
+                <Tooltip cursor={{ fill: "rgba(3,218,154,0.10)" }} contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
+                <Bar dataKey="count" fill="#03DA9A" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={700} animationEasing="ease-out">
+                  <LabelList dataKey="count" position="top" fill="#e7ecdf" fontSize={12} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -185,12 +214,12 @@ export function Overview() {
           <div className="h-80 w-full" style={LTR_STYLE}>
             <ResponsiveContainer>
               <BarChart data={combinedTrimDisp} layout="vertical" margin={{ top: 16, right: 56, bottom: 8, left: 200 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(200,153,104,0.10)" />
-                <XAxis type="number" stroke="#a89c8c" tick={{ fill: "#c0b3a1", fontSize: 12 }} tickLine={{ stroke: "#6a5a44" }} axisLine={{ stroke: "#6a5a44" }} allowDecimals={false} />
-                <YAxis type="category" dataKey="label" stroke="#a89c8c" width={196} tick={{ fill: "#c0b3a1", fontSize: 11 }} tickLine={{ stroke: "#6a5a44" }} axisLine={{ stroke: "#6a5a44" }} />
-                <Tooltip cursor={{ fill: "rgba(217,160,92,0.12)" }} contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
-                <Bar dataKey="count" fill="#d9a05c" radius={[0, 4, 4, 0]} isAnimationActive={true} animationDuration={700} animationEasing="ease-out">
-                  <LabelList dataKey="count" position="right" fill="#f0e7dc" fontSize={12} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(3,218,154,0.10)" />
+                <XAxis type="number" stroke="#a8b3a9" tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} allowDecimals={false} />
+                <YAxis type="category" dataKey="label" stroke="#a8b3a9" width={196} tick={{ fill: "#b9c4bb", fontSize: 11 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} />
+                <Tooltip cursor={{ fill: "rgba(245,166,35,0.12)" }} contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
+                <Bar dataKey="count" fill="#f5a623" radius={[0, 4, 4, 0]} isAnimationActive={true} animationDuration={700} animationEasing="ease-out">
+                  <LabelList dataKey="count" position="right" fill="#e7ecdf" fontSize={12} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

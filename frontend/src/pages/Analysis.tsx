@@ -7,16 +7,16 @@ import { usePlaceLabel } from "../i18n/places";
 const LTR_STYLE: React.CSSProperties = { direction: "ltr" };
 
 const TOOLTIP_STYLE = {
-  background: "#1a130d",
-  border: "1px solid rgba(200, 153, 104, 0.4)",
+  background: "#0e1a14",
+  border: "1px solid rgba(3,218,154,0.4)",
   borderRadius: 8,
-  color: "#f0e7dc",
+  color: "#e7ecdf",
   boxShadow: "0 16px 40px -16px rgba(0,0,0,0.7)",
 } as const;
-const TOOLTIP_LABEL_STYLE = { color: "#c89968", fontWeight: 600 } as const;
-const TOOLTIP_ITEM_STYLE = { color: "#f0e7dc" } as const;
+const TOOLTIP_LABEL_STYLE = { color: "#03DA9A", fontWeight: 600 } as const;
+const TOOLTIP_ITEM_STYLE = { color: "#e7ecdf" } as const;
 
-const REGION_COLORS = ["#c89968", "#c5443c", "#6ea892", "#c89c2c", "#7d8aa3", "#9e6b8e", "#b87a6f", "#8c8a6f"];
+const REGION_COLORS = ["#01F2CF", "#03DA9A", "#03B3DA", "#f5a623", "#ff4757", "#a78bfa", "#fb923c", "#facc15"];
 
 function isoDay(s: string): string {
   if (!s) return "";
@@ -53,7 +53,7 @@ export function Analysis() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-accent">{t("analysis.title")}</h1>
+        <h1 className="text-xl font-semibold gradient-text">{t("analysis.title")}</h1>
         <label className="flex items-center gap-2 text-sm">
           <span className="label">{t("analysis.horizon")}</span>
           <input type="number" min={7} max={120} value={horizon} onChange={(e) => setHorizon(Number(e.target.value))} className="input w-24" />
@@ -65,12 +65,12 @@ export function Analysis() {
         <div className="h-72 w-full" style={LTR_STYLE}>
           <ResponsiveContainer>
             <LineChart data={timelineFmt} margin={{ top: 16, right: 24, bottom: 8, left: 16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(200,153,104,0.10)" />
-              <XAxis dataKey="period" stroke="#a89c8c" tick={{ fill: "#c0b3a1", fontSize: 12 }} tickLine={{ stroke: "#6a5a44" }} axisLine={{ stroke: "#6a5a44" }} />
-              <YAxis stroke="#a89c8c" width={48} tick={{ fill: "#c0b3a1", fontSize: 12 }} tickLine={{ stroke: "#6a5a44" }} axisLine={{ stroke: "#6a5a44" }} allowDecimals={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(3,218,154,0.10)" />
+              <XAxis dataKey="period" stroke="#a8b3a9" tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} />
+              <YAxis stroke="#a8b3a9" width={48} tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} allowDecimals={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
-              <Legend wrapperStyle={{ fontSize: 12, color: "#f0e7dc" }} formatter={(value: string) => <span style={{ color: "#f0e7dc" }}>{value}</span>} />
-              <Line type="monotone" dataKey="count" name={t("analysis.count")} stroke="#c89968" strokeWidth={2} dot={false} />
+              <Legend wrapperStyle={{ fontSize: 12, color: "#e7ecdf" }} formatter={(value: string) => <span style={{ color: "#e7ecdf" }}>{value}</span>} />
+              <Line type="monotone" dataKey="count" name={t("analysis.count")} stroke="#03DA9A" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -87,12 +87,12 @@ export function Analysis() {
           ) : (
             <ResponsiveContainer>
               <LineChart data={forecastWide.rows} margin={{ top: 16, right: 24, bottom: 8, left: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(200,153,104,0.10)" />
-                <XAxis dataKey="date" stroke="#a89c8c" tick={{ fill: "#c0b3a1", fontSize: 12 }} tickLine={{ stroke: "#6a5a44" }} axisLine={{ stroke: "#6a5a44" }} minTickGap={24} />
-                <YAxis stroke="#a89c8c" width={48} tick={{ fill: "#c0b3a1", fontSize: 12 }} tickLine={{ stroke: "#6a5a44" }} axisLine={{ stroke: "#6a5a44" }} allowDecimals={true} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(3,218,154,0.10)" />
+                <XAxis dataKey="date" stroke="#a8b3a9" tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} minTickGap={24} />
+                <YAxis stroke="#a8b3a9" width={48} tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} allowDecimals={true} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE}
                   formatter={(value: number, name: string) => [Number(value).toFixed(2), name]} />
-                <Legend wrapperStyle={{ fontSize: 12, color: "#f0e7dc" }} formatter={(value: string) => <span style={{ color: "#f0e7dc" }}>{value}</span>} />
+                <Legend wrapperStyle={{ fontSize: 12, color: "#e7ecdf" }} formatter={(value: string) => <span style={{ color: "#e7ecdf" }}>{value}</span>} />
                 {forecastWide.regions.map((region, i) => (
                   <Line key={region} type="monotone" dataKey={region} name={placeLabel(region)} stroke={REGION_COLORS[i % REGION_COLORS.length]} strokeWidth={2} dot={false} />
                 ))}

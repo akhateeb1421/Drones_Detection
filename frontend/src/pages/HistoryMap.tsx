@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Attacks, Attack } from "../services/api";
 import { DroneMap } from "../components/DroneMap";
@@ -8,9 +9,12 @@ export function HistoryMap() {
   const { t } = useTranslation();
   const placeLabel = usePlaceLabel();
   const typeLabel = useTypeLabel();
+  const [searchParams] = useSearchParams();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [region, setRegion] = useState("");
+  // Pre-fill region from ?region=... so Overview pie click-through lands here
+  // with the right filter already applied.
+  const [region, setRegion] = useState(() => searchParams.get("region") ?? "");
   const [attackType, setAttackType] = useState("");
   const [data, setData] = useState<Attack[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,14 +47,15 @@ export function HistoryMap() {
     id: a.id,
     lat: a.latitude,
     lon: a.longitude,
-    color: a.attack_type.includes("missile") ? "#c5443c" : "#c89968",
+    // Mint for drone strikes, crimson for missile attacks — semantic and distinct.
+    color: a.attack_type.includes("missile") ? "#ff4757" : "#03DA9A",
     label: `${typeLabel(a.attack_type)} · ${a.region ? placeLabel(a.region) : ""} · ${a.occurred_at.slice(0, 10)}`,
     radius: 5,
   }));
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-accent">{t("history.title")}</h1>
+      <h1 className="text-xl font-semibold gradient-text">{t("history.title")}</h1>
       <div className="card grid grid-cols-1 gap-3 md:grid-cols-5">
         <div>
           <div className="label">{t("history.date_from")}</div>

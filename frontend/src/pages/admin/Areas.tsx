@@ -49,7 +49,7 @@ export function AreasAdmin() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-accent">{t("admin.areas_title")}</h1>
+      <h1 className="text-xl font-semibold gradient-text">{t("admin.areas_title")}</h1>
       {error && <div className="card text-danger">{error}</div>}
 
       <form onSubmit={submit} className="card grid grid-cols-1 gap-3 md:grid-cols-4">

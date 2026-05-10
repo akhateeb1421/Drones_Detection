@@ -302,8 +302,18 @@ async def ask(
     history: list[ChatTurn],
     language: str = "ar",
     role: str = "viewer",
+    backend: str | None = None,
 ) -> tuple[str, str]:
+    """Generate a chatbot reply.
+
+    `backend` overrides the global `settings.llm_backend`. Valid values:
+        - "api"    -> Anthropic Claude Haiku 4.5 (fast, network-bound)
+        - "local"  -> Qwen2.5-3B + drone_qa LoRA (offline, slower)
+        - "ollama" -> the original Ollama HTTP path (legacy fallback)
+    Pass None to fall back to the env-configured default.
+    """
     settings = get_settings()
+    chosen = (backend or settings.llm_backend or "local").lower()
     if role == "admin":
         system_prompt = SYSTEM_AR if language == "ar" else SYSTEM_EN
         context = _build_context(db, language)
@@ -316,6 +326,57 @@ async def ask(
     for turn in history:
         messages.append({"role": turn.role, "content": turn.content})
     messages.append({"role": "user", "content": message})
+
+    # Branch on backend selection. The `local` path runs Qwen2.5-3B + LoRA
+    # in-process via transformers + peft (slower but self-contained); the
+    # `api` path calls Anthropic Claude Haiku (fast, requires API key);
+    # the `ollama` path keeps the original HTTP-to-Ollama wiring.
+    if chosen == "api":
+        import asyncio
+        from app.services import gemini_llm
+        try:
+            answer = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: gemini_llm.generate(messages)
+            )
+            answer = answer.strip() or "(empty response)"
+            return answer, f"gemini:{settings.gemini_model}"
+        except gemini_llm.GeminiNotConfigured as e:
+            msg = (
+                "مفتاح Google API غير مضبوط. احصل على مفتاح مجاني من "
+                "https://aistudio.google.com/app/apikey وأضفه في ملف .env."
+                if language == "ar"
+                else "Google API key is not configured. Get a free key at "
+                "https://aistudio.google.com/app/apikey and add it to .env."
+            )
+            return f"{msg} ({e})", "gemini"
+        except Exception as e:  # noqa: BLE001
+            log.exception("Gemini API call failed.")
+            msg = (
+                "تعذّر الاتصال بـ Gemini API. تحقق من المفتاح وحالة الشبكة."
+                if language == "ar"
+                else "Gemini API call failed. Check the key and network."
+            )
+            return f"{msg} ({e})", "gemini"
+
+    if chosen == "local":
+        import asyncio
+        from app.services import local_llm
+        try:
+            # model.generate is blocking — push to a thread so the FastAPI
+            # event loop stays responsive.
+            answer = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: local_llm.generate(messages)
+            )
+            answer = answer.strip() or "(empty response)"
+            return answer, f"{settings.llm_base_model}+lora"
+        except Exception as e:  # noqa: BLE001
+            log.exception("Local LLM call failed.")
+            msg = (
+                "تعذّر تحميل النموذج المحلي. تحقق من مسار LoRA أو بدّل LLM_BACKEND إلى ollama."
+                if language == "ar"
+                else "Local LLM failed to load. Check the LoRA path or switch LLM_BACKEND to ollama."
+            )
+            return f"{msg} ({e})", "local"
 
     url = settings.ollama_url.rstrip("/") + "/api/chat"
     payload = {

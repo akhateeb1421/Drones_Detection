@@ -24,7 +24,7 @@ export function DroneViewer({ modelUrl, embedUrl, modelKey }: Props) {
     return () => { alive = false; };
   }, [modelUrl, embedUrl]);
 
-  const bg = theme === "light" ? "#ebe0c8" : "#1a130d";
+  const bg = theme === "light" ? "#e8edf2" : "#0e1a14";
 
   if (embedUrl) {
     const base = embedUrl.split("?")[0];

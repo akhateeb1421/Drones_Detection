@@ -1,9 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" role="img" aria-label="Drone Defense System logo">
   <title>Drone Defense System</title>
-  <path d="M14 70 Q70 14 126 70 Q70 126 14 70 Z" fill="none" stroke="#c5443c" stroke-width="2.6" stroke-linejoin="round"/>
-  <circle cx="70" cy="70" r="30" fill="#c5443c"/>
-  <circle cx="70" cy="70" r="30" fill="none" stroke="#6b1f25" stroke-width="1"/>
-  <g fill="#1a0810" stroke="#1a0810" stroke-linejoin="round" stroke-linecap="round">
+  <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#01F2CF"/>
+      <stop offset="45%" stop-color="#03DA9A"/>
+      <stop offset="100%" stop-color="#03B3DA"/>
+    </linearGradient>
+  </defs>
+  <path d="M14 70 Q70 14 126 70 Q70 126 14 70 Z" fill="none" stroke="url(#brandGrad)" stroke-width="2.6" stroke-linejoin="round"/>
+  <circle cx="70" cy="70" r="30" fill="url(#brandGrad)"/>
+  <circle cx="70" cy="70" r="30" fill="none" stroke="#057a57" stroke-width="1"/>
+  <g fill="#082522" stroke="#082522" stroke-linejoin="round" stroke-linecap="round">
     <polygon points="70,55 86,82 70,79 54,82" stroke-width="0.6"/>
     <rect x="68.5" y="56" width="3" height="24" rx="0.8"/>
     <line x1="70" y1="80" x2="76" y2="86" stroke-width="2.2"/>

@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Chat } from "../services/api";
+import { Chat, ChatBackend } from "../services/api";
 import { useRole } from "../contexts/RoleContext";
 import { useChatbot } from "../contexts/ChatbotContext";
+
+const BACKEND_KEY = "chatbot_backend";
+
+function loadBackend(): ChatBackend {
+  const v = localStorage.getItem(BACKEND_KEY);
+  return v === "api" ? "api" : "local";
+}
 
 export function Chatbot() {
   const { t, i18n } = useTranslation();
@@ -10,6 +17,12 @@ export function Chatbot() {
   const { history, setHistory, clear } = useChatbot();
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [backend, setBackend] = useState<ChatBackend>(loadBackend);
+
+  // Persist the chosen backend so it sticks across reloads.
+  useEffect(() => {
+    localStorage.setItem(BACKEND_KEY, backend);
+  }, [backend]);
 
   // Auto-scroll the message list to the latest reply whenever the history
   // changes or while we're waiting for a response.
@@ -25,7 +38,7 @@ export function Chatbot() {
     setHistory((h) => [...h, { role: "user", content: message }]);
     setBusy(true);
     try {
-      const res = await Chat.ask(message, history, i18n.language, role);
+      const res = await Chat.ask(message, history, i18n.language, role, backend);
       setHistory((h) => [...h, { role: "assistant", content: res.answer }]);
     } catch (e) {
       setHistory((h) => [...h, { role: "assistant", content: `${t("common.error")}: ${e}` }]);
@@ -36,9 +49,15 @@ export function Chatbot() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-accent">{t("chatbot.title")}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold gradient-text">{t("chatbot.title")}</h1>
+          <BackendToggle value={backend} onChange={setBackend} disabled={busy} t={t} />
+        </div>
         <button onClick={clear} className="btn-ghost">{t("chatbot.clear")}</button>
+      </div>
+      <div className="text-xs text-muted">
+        {backend === "api" ? t("chatbot.api_hint") : t("chatbot.local_hint")}
       </div>
       <div className="card flex h-[60vh] flex-col">
         <div className="scrollbar-thin flex-1 overflow-y-auto pr-2">
@@ -76,6 +95,65 @@ export function Chatbot() {
           <button onClick={send} disabled={busy} className="btn-primary">{t("chatbot.send")}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Compact pill toggle that lets the user pick the API or Local chat
+// backend. The active option uses the gradient accent; the inactive one
+// is muted. Disabled while a reply is in flight.
+function BackendToggle({
+  value,
+  onChange,
+  disabled,
+  t,
+}: {
+  value: ChatBackend;
+  onChange: (b: ChatBackend) => void;
+  disabled: boolean;
+  // Loose any-typed t to keep the file from importing TFunction generics.
+  t: (k: string) => string;
+}) {
+  const base =
+    "px-3 py-1 text-xs font-semibold rounded-full transition-colors duration-150";
+  return (
+    <div
+      role="tablist"
+      aria-label="chatbot backend"
+      className="inline-flex gap-1 rounded-full border border-accent/25 bg-panel-2/40 p-1"
+    >
+      <button
+        role="tab"
+        aria-selected={value === "api"}
+        disabled={disabled}
+        onClick={() => onChange("api")}
+        className={[
+          base,
+          value === "api"
+            ? "gradient-accent text-bg shadow-sm"
+            : "text-muted hover:text-white",
+          disabled ? "cursor-not-allowed opacity-60" : "",
+        ].join(" ")}
+        title={t("chatbot.api_hint")}
+      >
+        {t("chatbot.api")}
+      </button>
+      <button
+        role="tab"
+        aria-selected={value === "local"}
+        disabled={disabled}
+        onClick={() => onChange("local")}
+        className={[
+          base,
+          value === "local"
+            ? "gradient-accent text-bg shadow-sm"
+            : "text-muted hover:text-white",
+          disabled ? "cursor-not-allowed opacity-60" : "",
+        ].join(" ")}
+        title={t("chatbot.local_hint")}
+      >
+        {t("chatbot.local")}
+      </button>
     </div>
   );
 }

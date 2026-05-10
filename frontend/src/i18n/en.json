@@ -111,7 +111,11 @@
     "title": "AI Assistant",
     "placeholder": "Ask a question...",
     "send": "Send",
-    "clear": "Clear conversation"
+    "clear": "Clear conversation",
+    "api": "API",
+    "local": "Local",
+    "api_hint": "Cloud — Gemini Flash. Free, fast, high-quality. Requires internet.",
+    "local_hint": "On-device — Qwen2.5-3B + drone-QA LoRA. Slower, runs offline."
   },
   "admin": {
     "token_label": "Admin token",

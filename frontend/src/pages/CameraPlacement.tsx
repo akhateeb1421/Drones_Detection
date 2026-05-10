@@ -118,7 +118,7 @@ export function CameraPlacementPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl font-semibold text-accent">{t("placement.title")}</h1>
+        <h1 className="text-xl font-semibold gradient-text">{t("placement.title")}</h1>
         <div className="text-xs text-muted">
           {t("placement.summary_counts", { area: counts.area, forward: counts.forward })}
         </div>

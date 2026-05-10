@@ -29,7 +29,7 @@ export function Drones() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-2xl font-semibold">{t("drones.title")}</h1>
+        <h1 className="text-2xl font-semibold gradient-text">{t("drones.title")}</h1>
         <div className="inline-flex rounded-md border border-slate-700 overflow-hidden">
           {DRONES.map((d) => {
             const isActive = d.id === active;

@@ -1,4 +1,4 @@
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { LanguageToggle } from "./components/LanguageToggle";
 import { AlarmBanner } from "./components/AlarmBanner";
@@ -17,6 +17,7 @@ import { Drones } from "./pages/Drones";
 import { CameraPlacementPage } from "./pages/CameraPlacement";
 import { CamerasAdmin } from "./pages/admin/Cameras";
 import { AreasAdmin } from "./pages/admin/Areas";
+import { ToastHost } from "./components/Toast";
 
 function navClass({ isActive }: { isActive: boolean }) {
   return ["nav-item", isActive ? "active" : ""].join(" ").trim();
@@ -36,6 +37,30 @@ function AdminOnly({ children }: { children: JSX.Element }) {
   return children;
 }
 
+// Re-keys the <Routes> tree on every navigation so the route-fade animation
+// plays on entry. We pass the AdminOnly wrapper down because it depends on
+// the role context inside Shell — keeping it parametric avoids a duplicate
+// hook call in this component.
+function RoutedPages({ adminOnly }: { adminOnly: (n: JSX.Element) => JSX.Element }) {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="route-fade">
+      <Routes location={location}>
+        <Route path="/" element={<Overview />} />
+        <Route path="/live" element={<LiveDetection />} />
+        <Route path="/history" element={<HistoryMap />} />
+        <Route path="/analysis" element={<Analysis />} />
+        <Route path="/drones" element={<Drones />} />
+        <Route path="/placement" element={adminOnly(<CameraPlacementPage />)} />
+        <Route path="/chatbot" element={<Chatbot />} />
+        <Route path="/admin/cameras" element={adminOnly(<CamerasAdmin />)} />
+        <Route path="/admin/areas" element={adminOnly(<AreasAdmin />)} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
+  );
+}
+
 function Shell() {
   const { t } = useTranslation();
   const { role } = useRole();
@@ -51,7 +76,7 @@ function Shell() {
               <span className="status-dot absolute -bottom-0.5 -end-0.5 text-success" style={{ background: "currentColor" }} aria-hidden />
             </div>
             <div>
-              <div className="text-lg font-bold tracking-tight text-accent">{t("app.title")}</div>
+              <div className="text-lg font-bold tracking-tight gradient-text">{t("app.title")}</div>
               <div className="text-xs text-muted">{t("app.subtitle")}</div>
             </div>
           </div>
@@ -80,18 +105,9 @@ function Shell() {
           )}
         </aside>
         <main className="flex-1 min-w-0">
-          <Routes>
-            <Route path="/" element={<Overview />} />
-            <Route path="/live" element={<LiveDetection />} />
-            <Route path="/history" element={<HistoryMap />} />
-            <Route path="/analysis" element={<Analysis />} />
-            <Route path="/drones" element={<Drones />} />
-            <Route path="/placement" element={<AdminOnly><CameraPlacementPage /></AdminOnly>} />
-            <Route path="/chatbot" element={<Chatbot />} />
-            <Route path="/admin/cameras" element={<AdminOnly><CamerasAdmin /></AdminOnly>} />
-            <Route path="/admin/areas" element={<AdminOnly><AreasAdmin /></AdminOnly>} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          {/* useLocation().key changes per route — keying on it lets the
+              `route-fade` animation play on every navigation. */}
+          <RoutedPages adminOnly={(node: JSX.Element) => <AdminOnly>{node}</AdminOnly>} />
         </main>
       </div>
     </div>
@@ -105,6 +121,8 @@ export default function App() {
         <AlarmsProvider>
           <ChatbotProvider>
             <Shell />
+            {/* Single mount point for toast notifications anywhere in the app */}
+            <ToastHost />
           </ChatbotProvider>
         </AlarmsProvider>
       </RoleProvider>
