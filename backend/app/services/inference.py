@@ -89,10 +89,18 @@ class TrackingPipeline:
     def step(self, frame_bgr: np.ndarray, tracker_cfg_path: str) -> FrameOutput:
         model = _ensure_model()
         settings = get_settings()
+        # Lower the floor we hand to YOLO to the *hostile* threshold so
+        # marginal DJI/Shahed/Orlan detections survive past NMS and reach
+        # the tracker. Non-hostile classes that come through at this low
+        # bar are dropped further down in the per-detection loop, so
+        # bird/airplane/helicopter noise stays at the regular yolo_conf
+        # floor. min(...) is defensive in case an operator inverts the
+        # two values via env vars.
+        conf_floor = min(settings.yolo_conf, settings.yolo_conf_hostile)
         results = model.track(
             source=frame_bgr,
             tracker=tracker_cfg_path,
-            conf=settings.yolo_conf,
+            conf=conf_floor,
             iou=settings.yolo_iou,
             imgsz=settings.yolo_imgsz,
             persist=True,
@@ -113,6 +121,16 @@ class TrackingPipeline:
         confs = result.boxes.conf.cpu().numpy()
         classes = result.boxes.cls.cpu().numpy().astype(int)
 
+        # Mirror of alarms.HOSTILE_CLASSES, duplicated here as a local
+        # set to avoid the circular import inference <-> alarms. If you
+        # add a new hostile class to alarms.HOSTILE_CLASSES, add it here
+        # too so its low-conf detections aren't filtered out.
+        _HOSTILE = {
+            "shahed", "shahed_136", "shahed-136", "shahed136",
+            "orlan", "orlan-10", "orlan10", "orlan_10",
+            "dji", "drone",
+        }
+
         frame_h, frame_w = frame_bgr.shape[:2]
         for box, raw_tid, conf, cls_id in zip(boxes, ids, confs, classes):
             x1, y1, x2, y2 = map(int, box)
@@ -121,6 +139,14 @@ class TrackingPipeline:
             self._class_votes[raw_tid].append(int(cls_id))
             voted_cls = max(set(self._class_votes[raw_tid]), key=self._class_votes[raw_tid].count)
             drone_class = _class_names.get(voted_cls, f"cls_{voted_cls}")
+
+            # Per-class confidence gate: non-hostile classes still have
+            # to clear the regular yolo_conf bar (default 0.50). Hostile
+            # classes ride the looser yolo_conf_hostile floor we passed
+            # to YOLO above, so a marginal DJI sighting still gets
+            # tracked and ends up in the pending-approvals queue.
+            if drone_class.lower().strip() not in _HOSTILE and float(conf) < settings.yolo_conf:
+                continue
 
             history = self._history[raw_tid]
             history.append((cx, cy))

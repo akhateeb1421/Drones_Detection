@@ -257,6 +257,15 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
             # frontend can keep treating it as the same drone.
             link = cross_camera.find_link(db, camera_id, float(det["lat"]), float(det["lon"]), now)
             link_id = link.id if link is not None else None
+            # Loud INFO so the operator can verify in uvicorn output that
+            # hostile tracks are actually being persisted with
+            # status="pending". If you see "non-hostile" classes here
+            # (bird/airplane/helicopter) they will be created BUT the
+            # frontend now filters them out — that's expected.
+            log.info(
+                "NEW TRACK cam=%s track=%s class=%s conf=%.2f -> status=pending",
+                camera_id, det["track_id"], det["drone_class"], float(det["confidence"]),
+            )
 
             thumb_rel = None
             if det.get("_thumb_bytes"):
@@ -286,6 +295,26 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
             det["linked_track_id"] = link.track_id if link is not None else None
             det["link_root_camera_id"] = link.camera_id if link is not None else None
         else:
+            # ByteTrack restarts its ID counter from 1 every time the
+            # worker (re)starts, so after a uvicorn restart a brand-new
+            # drone can collide with a previously reviewed track_id. If
+            # the row was approved or rejected AND the new sighting
+            # arrives after a meaningful gap, treat it as a fresh
+            # sighting: flip status back to "pending", clear the prior
+            # verdict, and re-stamp first_seen_at. Without this, old
+            # rejected decisions silently hide every future DJI track
+            # on the same ID.
+            gap_s = (now - track.last_seen_at).total_seconds()
+            if track.status != "pending" and gap_s > 60:
+                log.info(
+                    "TRACK REUSED cam=%s track=%s was %s -> resetting to pending (gap=%.1fs)",
+                    camera_id, det["track_id"], track.status, gap_s,
+                )
+                track.status = "pending"
+                track.reviewed_at = None
+                track.outcome = None
+                track.alarm_fired_at = None
+                track.first_seen_at = now
             track.last_seen_at = now
             track.voted_class = det["drone_class"]
             # New high-water confidence -> overwrite the saved thumbnail.

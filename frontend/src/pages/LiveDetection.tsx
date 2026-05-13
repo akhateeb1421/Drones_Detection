@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Cameras, Camera, Detections, Track, Areas, Area, trackThumbUrl } from "../services/api";
 import { useLiveStream } from "../hooks/useLiveStream";
 import { useAlarmsContext } from "../contexts/AlarmsContext";
+import { useTheme } from "../contexts/ThemeContext";
 import { DroneMap } from "../components/DroneMap";
 import { usePlaceLabel, useClassLabel, useBilingualName } from "../i18n/places";
 import { SAUDI_POPULATED_AREAS } from "../data/saudiPopulatedAreas";
@@ -100,6 +101,7 @@ type Weather = { tempC: number; windKmh: number; code: number; isDay: boolean };
 
 function WeatherPanel({ camera }: { camera: Camera | null }) {
   const { t } = useTranslation();
+  const { theme } = useTheme();
   const bilingualName = useBilingualName();
   const [w, setW] = useState<Weather | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -136,11 +138,14 @@ function WeatherPanel({ camera }: { camera: Camera | null }) {
 
   // Brand tones used for background tints, borders, and tile hairlines.
   // All TEXT inside the panel uses INK so the copy reads as one tone.
+  // INK flips with the theme: deep teal-black on light cards, pure
+  // white on dark cards so the copy stays readable against the navy
+  // gradient.
   const C_MINT = "#01F2CF";
   const C_SKY  = "#03B3DA";
   const C_WARN = "#fbbf24";
   const C_DANG = "#f87171";
-  const INK    = "#0b2422";
+  const INK    = theme === "dark" ? "#ffffff" : "#0b2422";
 
   const cond = w ? wmoCondition(w.code, w.isDay) : null;
   const status = w ? detectionStatus(w.code, w.windKmh) : null;
@@ -244,6 +249,10 @@ function WeatherPanel({ camera }: { camera: Camera | null }) {
 
 /** Single metric tile inside the weather panel — label on top, big value below. */
 function WTile({ label, value, accent }: { label: string; value: string; accent: string }) {
+  // Theme-aware text color so the tile copy is readable on both the
+  // navy dark card and the white light card. Mirrors INK in the parent.
+  const { theme } = useTheme();
+  const ink = theme === "dark" ? "#ffffff" : "#0b2422";
   return (
     <div
       style={{
@@ -257,10 +266,10 @@ function WTile({ label, value, accent }: { label: string; value: string; accent:
       }}
     >
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${accent}55, transparent)` }} aria-hidden />
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#0b2422", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: ink, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
         {label}
       </div>
-      <div style={{ fontSize: "clamp(14px,1.6vw,17px)", fontWeight: 800, color: "#0b2422" }} dir="ltr">
+      <div style={{ fontSize: "clamp(14px,1.6vw,17px)", fontWeight: 800, color: ink }} dir="ltr">
         {value}
       </div>
     </div>
@@ -807,14 +816,16 @@ export function LiveDetection() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="label">{t("live.pending_approvals")}</div>
         </div>
-        {/* Pending approvals shows every pending detection — operators
-            need to triage non-hostile classes (Bird/Airplane/Helicopter)
-            too, even though the alarm hard-gate prevents them from firing
-            an audible/visual alarm. Filtering here just hides the queue
-            and made the page look broken. The map / focused-track UI
-            higher up is still hostile-only. */}
+        {/* Pending approvals shows ONLY hostile classes (DJI, Shahed,
+            Orlan, generic drone). Birds, airplanes, helicopters never
+            warrant operator review — they can't fire an alarm anyway
+            (see alarms.HOSTILE_CLASSES) so they're filtered out of the
+            queue entirely. Any new hostile track surfaces immediately
+            because backend/pipeline.py writes every new track with
+            status="pending" the first frame it sees it, regardless of
+            whether the threat-score gate fired an alarm. */}
         {(() => {
-          const visiblePending = pending;
+          const visiblePending = pending.filter((p) => isHostileClass(p.voted_class));
           if (visiblePending.length === 0) {
             return <div className="text-sm text-muted">{t("common.no_data")}</div>;
           }

@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     yolo_weights: str = "../models/best.pt"
     yolo_imgsz: int = 640
     yolo_conf: float = 0.50
+    # Looser threshold reserved for hostile classes (DJI / Shahed /
+    # Orlan / generic drone). YOLO is asked to emit detections down to
+    # this floor so a marginal-conf DJI still reaches the tracker; the
+    # inference loop then re-applies `yolo_conf` to NON-hostile classes
+    # (bird/airplane/helicopter) to keep their noise down. Net effect:
+    # any DJI sighting lands in the pending-approvals queue immediately,
+    # regardless of whether the threat-score gate fires an alarm.
+    yolo_conf_hostile: float = 0.15
     yolo_iou: float = 0.45
     tracker_cfg: str = "../scripts/bytetrack_drone.yaml"
 

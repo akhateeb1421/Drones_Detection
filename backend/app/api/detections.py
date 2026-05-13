@@ -1,17 +1,17 @@
 """Live detections + admin approve/reject endpoints."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.security import require_admin
-from app.models import Attack, Detection, Track
+from app.models import Attack, Camera, Detection, Track
 from app.schemas.detection import ApprovalOut, ApproveIn, DetectionOut, TrackOut
 from app.services.synthetic import _region_for  # canonicalize "Area-A" -> "Riyadh"
 
@@ -145,3 +145,98 @@ def reject_track(
     track.outcome = None
     db.commit()
     return ApprovalOut(track_id=track_id, status="rejected")
+
+
+@router.get("/debug")
+def debug_state(db: Session = Depends(get_db)) -> dict:
+    """Diagnostic snapshot of the live-detection pipeline state.
+
+    Hit this from a browser or `curl http://localhost:8000/detections/debug`
+    when the Pending Approvals queue looks empty. Tells you in one
+    response whether: (a) any cameras are enabled, (b) any tracks exist
+    in the DB and what their statuses/classes are, (c) the YOLO pipeline
+    is producing detection rows, and (d) the most recent detection
+    timestamp. If everything looks zero, the worker isn't running or
+    YOLO isn't seeing anything in the stream.
+    """
+    cameras_total = db.execute(select(func.count(Camera.id))).scalar_one() or 0
+    cameras_enabled = db.execute(
+        select(func.count(Camera.id)).where(Camera.enabled.is_(True))
+    ).scalar_one() or 0
+
+    # Track counts grouped by (status, voted_class) so we can spot the
+    # exact reason the frontend filter shows "no_data" (wrong class,
+    # wrong status, or just zero rows).
+    by_status_class = db.execute(
+        select(Track.status, Track.voted_class, func.count(Track.id))
+        .group_by(Track.status, Track.voted_class)
+    ).all()
+    tracks_breakdown = [
+        {"status": s or "(null)", "voted_class": c or "(null)", "count": int(n)}
+        for s, c, n in by_status_class
+    ]
+    tracks_total = sum(row["count"] for row in tracks_breakdown)
+
+    # Detection rows in the last 5 minutes — a non-zero count proves
+    # YOLO is finding objects, even if no Track has been created yet.
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+    detections_recent = db.execute(
+        select(func.count(Detection.id)).where(Detection.captured_at >= cutoff)
+    ).scalar_one() or 0
+    detections_total = db.execute(select(func.count(Detection.id))).scalar_one() or 0
+    last_detection_at = db.execute(
+        select(func.max(Detection.captured_at))
+    ).scalar_one()
+
+    # Recent detection class histogram — if YOLO is firing at all this
+    # tells you which classes it's actually outputting.
+    classes_recent = db.execute(
+        select(Detection.drone_class, func.count(Detection.id))
+        .where(Detection.captured_at >= cutoff)
+        .group_by(Detection.drone_class)
+    ).all()
+
+    return {
+        "cameras": {"total": int(cameras_total), "enabled": int(cameras_enabled)},
+        "tracks": {
+            "total": int(tracks_total),
+            "by_status_and_class": tracks_breakdown,
+        },
+        "detections": {
+            "total": int(detections_total),
+            "last_5_min": int(detections_recent),
+            "last_5_min_by_class": {c or "(null)": int(n) for c, n in classes_recent},
+            "last_seen_at": last_detection_at.isoformat() if last_detection_at else None,
+        },
+    }
+
+
+@router.post("/admin/reset-rejected")
+def reset_rejected_tracks(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+) -> dict:
+    """Flip every Track currently marked `rejected` back to `pending`.
+
+    Surfaces stale ByteTrack-ID-reuse victims that the operator can no
+    longer see in the pending queue. Useful as a one-shot cleanup after
+    a uvicorn restart populated the DB with rejected rows that future
+    DJI sightings keep updating instead of creating fresh entries. The
+    permanent fix lives in pipeline.py (stale-reuse detector); this
+    endpoint just unblocks tracks that were already reviewed before
+    that fix shipped.
+    """
+    rows = (
+        db.execute(select(Track).where(Track.status == "rejected"))
+        .scalars()
+        .all()
+    )
+    count = 0
+    for track in rows:
+        track.status = "pending"
+        track.reviewed_at = None
+        track.outcome = None
+        count += 1
+    db.commit()
+    return {"reset": count}
+
