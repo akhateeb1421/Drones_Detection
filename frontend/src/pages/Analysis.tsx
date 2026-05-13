@@ -1,22 +1,56 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  CartesianGrid, Legend, Line, LineChart, Area, AreaChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine,
+} from "recharts";
 import { Analysis as AnalysisAPI, Predictions, ForecastPoint, TimelinePoint } from "../services/api";
 import { usePlaceLabel } from "../i18n/places";
 
-const LTR_STYLE: React.CSSProperties = { direction: "ltr" };
+const C1 = "#01F2CF";
+const C2 = "#03DA9A";
+const C3 = "#03B3DA";
+const DANGER = "#f87171";
+const WARN = "#fbbf24";
+const PURPLE = "#a78bfa";
 
-const TOOLTIP_STYLE = {
-  background: "#0e1a14",
-  border: "1px solid rgba(3,218,154,0.4)",
-  borderRadius: 8,
-  color: "#e7ecdf",
-  boxShadow: "0 16px 40px -16px rgba(0,0,0,0.7)",
-} as const;
-const TOOLTIP_LABEL_STYLE = { color: "#03DA9A", fontWeight: 600 } as const;
-const TOOLTIP_ITEM_STYLE = { color: "#e7ecdf" } as const;
+const REGION_COLORS = [C1, DANGER, C3, WARN, PURPLE, C2, "#60a5fa", "#fb923c"];
 
-const REGION_COLORS = ["#01F2CF", "#03DA9A", "#03B3DA", "#f5a623", "#ff4757", "#a78bfa", "#fb923c", "#facc15"];
+const CARD: React.CSSProperties = {
+  background: "linear-gradient(160deg,rgba(14,22,40,0.97) 0%,rgba(10,15,28,0.98) 100%)",
+  border: "0.5px solid rgba(1,242,207,0.10)",
+  borderRadius: 16,
+  padding: "clamp(16px,2vw,24px)",
+  position: "relative",
+  overflow: "hidden",
+};
+
+const TT: React.CSSProperties = {
+  background: "rgba(8,14,22,0.97)",
+  border: "1px solid rgba(1,242,207,0.2)",
+  borderRadius: 10, color: "#e0f5f2",
+  fontSize: 13, padding: "10px 14px",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+};
+const TTL: React.CSSProperties = { color: C1, fontWeight: 700, marginBottom: 4 };
+const TTI: React.CSSProperties = { color: "#5fa09a" };
+const GRID = { stroke: "rgba(1,242,207,0.05)", strokeDasharray: "4 4" };
+const AXIS = { fill: "#3d7872", fontSize: 11 };
+
+function CardShine() {
+  return <div style={{ position:"absolute",top:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,rgba(1,242,207,0.16),transparent)",pointerEvents:"none" }}/>;
+}
+function Tag({ label }: { label: string }) {
+  return <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C1,opacity:0.6,marginBottom:4 }}>{label}</div>;
+}
+function CardTitle({ label, sub }: { label:string; sub?:string }) {
+  return (
+    <div style={{ marginBottom:"clamp(12px,1.5vw,18px)" }}>
+      <div style={{ fontSize:"clamp(13px,1.6vw,16px)",fontWeight:700,color:"#e0f5f2" }}>{label}</div>
+      {sub && <div style={{ fontSize:12,color:"#3d7872",marginTop:3 }}>{sub}</div>}
+    </div>
+  );
+}
 
 function isoDay(s: string): string {
   if (!s) return "";
@@ -24,82 +58,153 @@ function isoDay(s: string): string {
   return i > 0 ? s.slice(0, i) : s.slice(0, 10);
 }
 
+/* Format timeline dates nicely */
+function fmtMonth(s: string): string {
+  const d = new Date(isoDay(s));
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleDateString("ar-SA-u-nu-latn", { year:"2-digit", month:"short" });
+}
+
 export function Analysis() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isAr = i18n.language === "ar";
   const placeLabel = usePlaceLabel();
+
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
   const [horizon, setHorizon] = useState(30);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { AnalysisAPI.timeline({ granularity: "month" }).then(setTimeline); }, []);
-  useEffect(() => { Predictions.forecast({ days: String(horizon) }).then(setForecast); }, [horizon]);
+  useEffect(() => {
+    setLoading(true);
+    AnalysisAPI.timeline({ granularity: "month" })
+      .then(setTimeline)
+      .catch(e => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const forecastWide = useMemo(() => {
-    const byDate: Record<string, Record<string, number>> = {};
-    const regionSet = new Set<string>();
-    for (const p of forecast) {
-      const d = isoDay(p.forecast_date);
-      if (!byDate[d]) byDate[d] = { date: 0 } as any;
-      (byDate[d] as any).date = d;
-      (byDate[d] as any)[p.region] = Number(p.expected_count.toFixed(2));
-      regionSet.add(p.region);
-    }
-    const rows = Object.values(byDate).sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
-    return { rows, regions: Array.from(regionSet) };
+  useEffect(() => {
+    Predictions.forecast({ days: String(horizon) })
+      .then(setForecast)
+      .catch(e => setError(String(e)));
+  }, [horizon]);
+
+  /* Format timeline for chart */
+  const tlData = useMemo(() =>
+    timeline.map(p => ({ ...p, _date: fmtMonth(p.date ?? p.month ?? "") }))
+  , [timeline]);
+
+  /* Format forecast — get unique regions */
+  const regions = useMemo(() => {
+    const s = new Set<string>();
+    forecast.forEach(p => s.add(p.region));
+    return [...s];
   }, [forecast]);
 
-  const timelineFmt = useMemo(() => timeline.map((tp) => ({ ...tp, period: isoDay(tp.period) })), [timeline]);
+  const fcData = useMemo(() => {
+    const byDate: Record<string, any> = {};
+    forecast.forEach(p => {
+      const d = isoDay(p.date ?? "");
+      if (!byDate[d]) byDate[d] = { date: d };
+      byDate[d][placeLabel(p.region)] = p.predicted_count ?? p.count;
+    });
+    return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+  }, [forecast, placeLabel]);
+
+  if (error) return <div style={{ ...CARD, color: DANGER, fontSize:14 }}><CardShine/>{error}</div>;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold gradient-text">{t("analysis.title")}</h1>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="label">{t("analysis.horizon")}</span>
-          <input type="number" min={7} max={120} value={horizon} onChange={(e) => setHorizon(Number(e.target.value))} className="input w-24" />
-        </label>
-      </div>
+    <div style={{ display:"flex",flexDirection:"column",gap:"clamp(10px,1.5vw,16px)" }} data-mount>
 
-      <div className="card">
-        <div className="label">{t("analysis.timeline")}</div>
-        <div className="h-72 w-full" style={LTR_STYLE}>
-          <ResponsiveContainer>
-            <LineChart data={timelineFmt} margin={{ top: 16, right: 24, bottom: 8, left: 16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(3,218,154,0.10)" />
-              <XAxis dataKey="period" stroke="#a8b3a9" tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} />
-              <YAxis stroke="#a8b3a9" width={48} tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} allowDecimals={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
-              <Legend wrapperStyle={{ fontSize: 12, color: "#e7ecdf" }} formatter={(value: string) => <span style={{ color: "#e7ecdf" }}>{value}</span>} />
-              <Line type="monotone" dataKey="count" name={t("analysis.count")} stroke="#03DA9A" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+      {/* Page header + horizon control */}
+      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12 }}>
+        <div>
+          <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C1,opacity:0.6,marginBottom:4 }}>{t("nav.analysis","الاستخبارات")}</div>
+          <h1 style={{ fontSize:"clamp(18px,2.5vw,24px)",fontWeight:800,color:"#e0f5f2",margin:0 }}>{t("analysis.title","التحليلات")}</h1>
+        </div>
+        {/* Horizon selector */}
+        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+          <div style={{ fontSize:12,color:"#5fa09a" }}>{t("analysis.horizon_days","أيام التوقع")}</div>
+          <div style={{ display:"flex",gap:3,padding:3,background:"rgba(1,242,207,0.05)",border:"0.5px solid rgba(1,242,207,0.10)",borderRadius:10 }}>
+            {[7, 14, 30, 60, 90].map(d => (
+              <button key={d} onClick={() => setHorizon(d)}
+                style={{ padding:"6px 12px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s",
+                  background: horizon===d ? `linear-gradient(135deg,${C1},${C3})` : "transparent",
+                  color: horizon===d ? "#0a1410" : "#5fa09a",
+                }}>
+                {d}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="card">
-        <div className="flex items-center justify-between">
-          <div className="label">{t("analysis.forecast")}</div>
-          <div className="text-xs text-muted">{t("analysis.forecast_help", { days: horizon })}</div>
-        </div>
-        <div className="h-96 w-full" style={LTR_STYLE}>
-          {forecastWide.rows.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-muted text-sm">{t("common.no_data")}</div>
-          ) : (
-            <ResponsiveContainer>
-              <LineChart data={forecastWide.rows} margin={{ top: 16, right: 24, bottom: 8, left: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(3,218,154,0.10)" />
-                <XAxis dataKey="date" stroke="#a8b3a9" tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} minTickGap={24} />
-                <YAxis stroke="#a8b3a9" width={48} tick={{ fill: "#b9c4bb", fontSize: 12 }} tickLine={{ stroke: "#4a5650" }} axisLine={{ stroke: "#4a5650" }} allowDecimals={true} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE}
-                  formatter={(value: number, name: string) => [Number(value).toFixed(2), name]} />
-                <Legend wrapperStyle={{ fontSize: 12, color: "#e7ecdf" }} formatter={(value: string) => <span style={{ color: "#e7ecdf" }}>{value}</span>} />
-                {forecastWide.regions.map((region, i) => (
-                  <Line key={region} type="monotone" dataKey={region} name={placeLabel(region)} stroke={REGION_COLORS[i % REGION_COLORS.length]} strokeWidth={2} dot={false} />
+      {/* Timeline */}
+      <div style={{ ...CARD }}>
+        <CardShine/>
+        <Tag label={t("analysis.historical","تاريخي")}/>
+        <CardTitle label={t("analysis.timeline","السلسلة الزمنية")} sub={t("analysis.timeline_sub","إجمالي الهجمات الشهرية")}/>
+        {loading ? (
+          <div style={{ height:200,display:"flex",alignItems:"center",justifyContent:"center",color:"#3d7872",fontSize:13 }}>
+            {t("common.loading","جارٍ التحميل...")}
+          </div>
+        ) : (
+          <div style={{ direction:"ltr",height:"clamp(160px,22vw,260px)" }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={tlData} margin={{ top:8,right:8,left:-10,bottom:0 }}>
+                <defs>
+                  <linearGradient id="tg1" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={C1} stopOpacity={0.4}/>
+                    <stop offset="100%" stopColor={C1} stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid {...GRID}/>
+                <XAxis dataKey="_date" tick={AXIS} tickLine={false} axisLine={false}
+                  angle={-30} textAnchor="end" height={48} interval="preserveStartEnd"/>
+                <YAxis tick={AXIS} tickLine={false} axisLine={false} width={36}/>
+                <Tooltip contentStyle={TT} labelStyle={TTL} itemStyle={TTI}/>
+                <Area type="monotone" dataKey="count" name={t("analysis.attacks","الهجمات")}
+                  stroke={C1} strokeWidth={2.5} fill="url(#tg1)"
+                  dot={false} activeDot={{ r:5,fill:C1,stroke:"#0d1117",strokeWidth:2 }}/>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Forecast */}
+      <div style={{ ...CARD }}>
+        <CardShine/>
+        <Tag label={t("analysis.forecast","توقع")}/>
+        <CardTitle
+          label={t("analysis.attack_forecast","توقعات الهجمات")}
+          sub={`${t("analysis.next","الـ")} ${horizon} ${t("analysis.days","يوم القادمة")}`}
+        />
+        {fcData.length === 0 ? (
+          <div style={{ height:200,display:"flex",alignItems:"center",justifyContent:"center",color:"#3d7872",fontSize:13 }}>
+            {t("common.loading","جارٍ التحميل...")}
+          </div>
+        ) : (
+          <div style={{ direction:"ltr",height:"clamp(180px,24vw,300px)" }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={fcData} margin={{ top:8,right:8,left:-10,bottom:0 }}>
+                <CartesianGrid {...GRID}/>
+                <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false}
+                  angle={-30} textAnchor="end" height={48} interval={Math.floor(fcData.length / 7)}/>
+                <YAxis tick={AXIS} tickLine={false} axisLine={false} width={36}/>
+                <Tooltip contentStyle={TT} labelStyle={TTL} itemStyle={TTI}/>
+                <Legend wrapperStyle={{ fontSize:"clamp(10px,1.2vw,13px)",color:"#5fa09a",paddingTop:8 }}/>
+                {regions.map((r, i) => (
+                  <Line key={r} type="monotone" dataKey={placeLabel(r)}
+                    stroke={REGION_COLORS[i % REGION_COLORS.length]}
+                    strokeWidth={2} dot={false}
+                    activeDot={{ r:4 }}/>
                 ))}
               </LineChart>
             </ResponsiveContainer>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
