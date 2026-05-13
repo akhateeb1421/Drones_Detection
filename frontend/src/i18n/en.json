@@ -63,6 +63,7 @@
     "eta": "ETA",
     "predicted_path": "Predicted path",
     "pending_approvals": "Pending approvals",
+    "non_hostile_hidden": "{{count}} non-hostile detections hidden",
     "toggle_areas": "Sensitive areas",
     "toggle_cameras": "Cameras",
     "thumb": "Frame",

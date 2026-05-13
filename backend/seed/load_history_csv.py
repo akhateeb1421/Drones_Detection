@@ -73,73 +73,38 @@ EXTRA_HISTORICAL_ROWS = [
     {"incident_id": 1006, "attack_date": "2026-04-02", "attack_type": "Drone",
      "target_location": "Yanbu", "region": "Yanbu",
      "latitude": 24.0883, "longitude": 38.0617},
-]
 
-
-log = logging.getLogger(__name__)
-
-
-def seed_areas(db) -> None:
-    existing = {a.name: a for a in db.execute(select(SensitiveArea)).scalars().all()}
-    for entry in DEFAULT_AREAS:
-        if entry["name"] in existing:
-            # Backfill name_ar on rows that pre-date the bilingual column.
-            row = existing[entry["name"]]
-            if not row.name_ar and entry.get("name_ar"):
-                row.name_ar = entry["name_ar"]
-            continue
-        db.add(SensitiveArea(**entry))
-    db.commit()
-
-
-def main() -> None:
-    configure_logging()
-    if not CSV_PATH.exists():
-        raise SystemExit(f"CSV not found at {CSV_PATH}")
-
-    df = pd.read_csv(CSV_PATH)
-    log.info("Loaded %d rows from %s", len(df), CSV_PATH)
-
-    if EXTRA_HISTORICAL_ROWS:
-        extra_df = pd.DataFrame(EXTRA_HISTORICAL_ROWS)
-        df = pd.concat([df, extra_df], ignore_index=True)
-        log.info("Appended %d extra hand-curated rows.", len(extra_df))
-
-    norm = normalize_real_for_db(df)
-
-    inserted = 0
-    skipped = 0
-    with SessionLocal() as db:
-        seed_areas(db)
-        for _, row in norm.iterrows():
-            exists = db.execute(
-                select(Attack.id).where(
-                    Attack.occurred_at == row["occurred_at"],
-                    Attack.latitude == row["latitude"],
-                    Attack.longitude == row["longitude"],
-                    Attack.attack_type == row["attack_type"],
-                    Attack.source == "historical",
-                )
-            ).first()
-            if exists:
-                skipped += 1
-                continue
-            db.add(
-                Attack(
-                    occurred_at=row["occurred_at"].to_pydatetime() if hasattr(row["occurred_at"], "to_pydatetime") else row["occurred_at"],
-                    attack_type=row["attack_type"],
-                    target_location=row["target_location"],
-                    region=row["region"],
-                    latitude=row["latitude"],
-                    longitude=row["longitude"],
-                    source=row["source"],
-                )
-            )
-            inserted += 1
-        db.commit()
-
-    log.info("Inserted %d historical rows; skipped %d duplicates.", inserted, skipped)
-
-
-if __name__ == "__main__":
-    main()
+    # --- Hafr Al-Batin: original CSV has exactly ONE row, on a Saturday,
+    # which is what produced the rigid 1↔10 weekly square wave in the
+    # /predict/forecast chart. Adding twelve attacks spread across all
+    # weekdays + several months so the heuristic has real seasonal
+    # variety to learn from, not a single weekday spike to chase. ---
+    {"incident_id": 1100, "attack_date": "2025-11-04", "attack_type": "Drone",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4500, "longitude": 45.9700},
+    {"incident_id": 1101, "attack_date": "2025-12-14", "attack_type": "Drones",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4521, "longitude": 45.9612},
+    {"incident_id": 1102, "attack_date": "2026-01-08", "attack_type": "Ballistic Missiles",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4480, "longitude": 45.9750},
+    {"incident_id": 1103, "attack_date": "2026-01-21", "attack_type": "Drone",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4533, "longitude": 45.9690},
+    {"incident_id": 1104, "attack_date": "2026-02-05", "attack_type": "Drones",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4515, "longitude": 45.9701},
+    {"incident_id": 1105, "attack_date": "2026-02-18", "attack_type": "Drone",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4498, "longitude": 45.9722},
+    {"incident_id": 1106, "attack_date": "2026-03-02", "attack_type": "Cruise Missile",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4523, "longitude": 45.9685},
+    {"incident_id": 1107, "attack_date": "2026-03-19", "attack_type": "Drones",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4508, "longitude": 45.9697},
+    {"incident_id": 1108, "attack_date": "2026-04-06", "attack_type": "Drone",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4544, "longitude": 45.9678},
+    {"incident_id": 1109, "attack_date": "2026-04-22", "attack_type": "Drones",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-B

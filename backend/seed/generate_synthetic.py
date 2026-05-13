@@ -2,8 +2,11 @@
 
 Run after `seed/load_history_csv.py`.
 
-Default date range is 2025-05-20 to 2026-05-20 (one year of synthetic history).
-Override with --start / --end (ISO format, e.g. 2024-01-01).
+Default date range is 2024-11-20 to 2026-05-20 — 1.5 years of synthetic
+history so the forecast heuristic has enough seasons to fit a smooth
+annual cycle against. 3000 rows spread over ~547 days averages out to
+~5-6 attacks/day across all regions combined. Override with --start /
+--end / --n (ISO date format).
 
 Run: `python -m seed.generate_synthetic [--n 3000] [--seed 42] [--start ...] [--end ...]`
 """
@@ -51,8 +54,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", type=int, default=3000)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--start", default="2025-05-20", help="ISO start date (inclusive). Default: 2025-05-20")
-    parser.add_argument("--end", default="2026-05-20", help="ISO end date (inclusive). Default: 2026-05-20")
+    parser.add_argument("--start", default="2024-11-20",
+                        help="ISO start date (inclusive). Default: 2024-11-20 (1.5y pre-May-2026)")
+    parser.add_argument("--end", default="2026-05-20",
+                        help="ISO end date (inclusive). Default: 2026-05-20")
     args = parser.parse_args()
 
     if not CSV_PATH.exists():
@@ -78,13 +83,4 @@ def main() -> None:
                     target_location=row["target_location"],
                     region=row["region"],
                     latitude=row["latitude"],
-                    longitude=row["longitude"],
-                    source="synthetic",
-                )
-            )
-        db.commit()
-        log.info("Inserted %d synthetic rows into attacks.", len(synth))
-
-
-if __name__ == "__main__":
-    main()
+            

@@ -48,7 +48,19 @@ def generate(
 
     region_counts = df["region"].fillna("Unknown").value_counts()
     regions = region_counts.index.tolist()
-    region_probs = (region_counts / region_counts.sum()).values
+    empirical = (region_counts / region_counts.sum()).values
+
+    # Smooth region distribution with a uniform prior. The raw empirical
+    # distribution skews so heavily toward Eastern Region / Riyadh that
+    # thin regions (Hafr Al-Batin, Yanbu) get ~1% of samples — far too
+    # few to support a meaningful per-region forecast (see the forecast
+    # heuristic's per-DOW sample floor). Mixing 60% empirical + 40%
+    # uniform gives every region a floor of ~7%/n_regions while still
+    # preserving the heavy-tailed shape of the real distribution.
+    n_regions = len(regions)
+    uniform = np.full(n_regions, 1.0 / max(n_regions, 1))
+    region_probs = 0.6 * empirical + 0.4 * uniform
+    region_probs = region_probs / region_probs.sum()  # re-normalize for safety
 
     type_by_region: dict[str, tuple[list[str], np.ndarray]] = {}
     loc_by_region: dict[str, tuple[list[str], np.ndarray, dict[str, tuple[float, float]]]] = {}
@@ -260,22 +272,4 @@ def normalize_real_for_db(real_df: pd.DataFrame, seed: int = 1234) -> pd.DataFra
                 lat, lon = base_lat, base_lon
             else:
                 lat, lon = coords
-            d_lat, d_lon = _jitter(rng)
-            out_rows.append(
-                {
-                    "occurred_at": row["attack_date"],
-                    "attack_type": attack_type,
-                    "target_location": place.strip(),
-                    "region": _region_for(place, region_str or None),
-                    "latitude": round(lat + d_lat, 6),
-                    "longitude": round(lon + d_lon, 6),
-                    "source": "historical",
-                }
-            )
-
-    out = pd.DataFrame(out_rows)
-    log.info(
-        "Normalized %d CSV rows (of which %d were combined) into %d location rows (jitter=%.3f deg).",
-        len(df), split_count, len(out), _JITTER_DEG,
-    )
-    return out
+            d_la

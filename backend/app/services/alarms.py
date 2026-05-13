@@ -14,9 +14,25 @@ class ThreatEval:
     reasons: list[str]
 
 
-# Any drone-shaped object should be treated as hostile by default.
-# (Bird / airplane / helicopter remain non-hostile.)
-HOSTILE_CLASSES = {"shahed", "orlan-10", "orlan10", "orlan_10", "dji", "drone"}
+# Hostile drone classes. The set MUST include every spelling the YOLO
+# model can emit — the current model exports shahed_136 / orlan / dji,
+# so older spellings (shahed, orlan-10) are kept for backward compat
+# but the canonical entries are the underscore variants.
+#
+# Bird / airplane / helicopter are explicitly non-hostile and the
+# evaluate() function short-circuits on them — see the hard-gate below.
+HOSTILE_CLASSES = {
+    "shahed",
+    "shahed_136",
+    "shahed-136",
+    "shahed136",
+    "orlan",
+    "orlan-10",
+    "orlan10",
+    "orlan_10",
+    "dji",
+    "drone",
+}
 
 # Demo-priority classes get the maximum hostile boost so they fire the alarm
 # even at low confidence and without ETA/speed signals — useful for a live
@@ -24,24 +40,48 @@ HOSTILE_CLASSES = {"shahed", "orlan-10", "orlan10", "orlan_10", "dji", "drone"}
 DEMO_PRIORITY_CLASSES = {"dji"}
 
 
+def _is_hostile(cls_l: str) -> bool:
+    """Case-insensitive, whitespace-trimmed membership check.
+    Centralised so the gate, the scorer, and any future caller agree."""
+    return cls_l.strip() in HOSTILE_CLASSES
+
+
 def evaluate(
-    drone_class: str,
+    drone_class: str | None,
     confidence: float,
     eta_s: float | None,
     nearest_area: str | None,
     speed_mps: float | None,
 ) -> ThreatEval:
-    """Return a threat score + flag based on configurable thresholds."""
+    """Return a threat score + flag based on configurable thresholds.
+
+    HARD GATE: a detection that isn't a hostile drone class never fires
+    an alarm, regardless of how fast / close / confident it is. Birds,
+    airplanes, and helicopters can clear the geometric thresholds
+    (e.g. an airliner flying near a sensitive area at high speed), but
+    they're not threats — only drones are.
+    """
     s = get_settings()
+
+    # Defensive boundary coerce — a new YOLO model can emit None or an
+    # unexpected label. Treat anything we can't read as non-hostile.
+    cls_l = str(drone_class or "").lower().strip()
+
+    if not _is_hostile(cls_l):
+        # Non-hostile classes (bird/airplane/helicopter/unknown) never
+        # alarm. Return early so the rest of the scorer can't accidentally
+        # push them over the threshold via high-confidence + fast-moving
+        # + imminent-arrival.
+        return ThreatEval(is_threat=False, score=0, reasons=["non_hostile_class"])
+
     score = 0
     reasons: list[str] = []
 
-    cls_l = drone_class.lower()
     if cls_l in DEMO_PRIORITY_CLASSES:
         # Auto-clears the 60 threshold by itself; any DJI sighting alarms.
         score += 70
         reasons.append("demo_priority")
-    elif cls_l in HOSTILE_CLASSES:
+    else:
         score += 40
         reasons.append("hostile_class")
     if confidence >= s.threat_conf_threshold:

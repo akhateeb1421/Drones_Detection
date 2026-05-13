@@ -25,14 +25,30 @@ const PREDICT_HORIZON_S = 60;
 // CRITICAL/HIGH the alarm should also be firing. Non-hostile classes
 // (bird, airplane, helicopter, unknown) cap at LOW regardless of
 // ETA/distance — they're not threats even when geometrically close.
+//
+// IMPORTANT: include every spelling the YOLO model can emit. The current
+// model exports Bird / shahed_136 / orlan / Airplane / Helicopter / dji
+// — so `shahed_136`, `orlan`, and `dji` are the hostile labels. Older
+// spellings are kept so legacy training runs still match.
 const HOSTILE_CLASSES = new Set([
   "shahed",
+  "shahed_136",
+  "shahed-136",
+  "shahed136",
+  "orlan",
   "orlan-10",
   "orlan10",
   "orlan_10",
   "dji",
   "drone",
 ]);
+
+/** True if the class name is one of the hostile drone types we render
+ *  on the live map and queue for human approval. Birds, airplanes,
+ *  helicopters, and unknown labels are filtered out. */
+function isHostileClass(cls: string | null | undefined): boolean {
+  return HOSTILE_CLASSES.has(String(cls ?? "").toLowerCase().trim());
+}
 
 type Snapshot = {
   trackId: number;
@@ -170,25 +186,18 @@ export function LiveDetection() {
     return () => clearInterval(i);
   }, []);
 
-  // Pick the most recent track to drive the "details" panel + map focus.
+  // Pick the most recent HOSTILE track to drive the "details" panel +
+  // map focus. Birds/airplanes/helicopters are filtered out — this is a
+  // counter-drone display, so the focused track must be a real threat.
   const focused: Snapshot | null = useMemo(() => {
-    const all = Array.from(tracks.values());
-    if (all.length === 0) return null;
-    return all.reduce<Snapshot>((acc, s) => (s.lastSeenMs > acc.lastSeenMs ? s : acc), all[0]);
+    const hostile = Array.from(tracks.values()).filter((s) => isHostileClass(s.droneClass));
+    if (hostile.length === 0) return null;
+    return hostile.reduce<Snapshot>((acc, s) => (s.lastSeenMs > acc.lastSeenMs ? s : acc), hostile[0]);
   }, [tracks]);
 
-  // 60-second straight-line prediction from the last-known position.
-  // Trajectory + intercept logic only runs for hostile drone classes —
-  // birds, airplanes, helicopters, and "unknown" detections shouldn't
-  // produce an aim line on the operator map. HOSTILE_CLASSES is the same
-  // set the alarm pipeline uses, so the on-screen prediction can never
-  // disagree with whether an alarm fired.
-  // Defensive: a new YOLO model can emit class names we didn't seed in the
-  // frontend (or, in pathological cases, null/undefined). Coerce to string
-  // before .toLowerCase() so a single rogue detection doesn't tear down
-  // the whole React tree.
-  const focusedIsHostile = focused != null
-    && HOSTILE_CLASSES.has(String(focused.droneClass ?? "").toLowerCase().trim());
+  // `focused` is already hostile by construction. The flag is kept for
+  // clarity at the call sites that previously used it as a guard.
+  const focusedIsHostile = focused != null;
 
   const predictedPath = useMemo(() => {
     if (!focused || !focusedIsHostile) return null;
@@ -266,6 +275,10 @@ export function LiveDetection() {
     const items: { id: string; lat: number; lon: number; color: string; label: string; radius: number }[] = [];
     const now = Date.now();
     tracks.forEach((s) => {
+      // Counter-drone display: skip birds, airplanes, helicopters, and
+      // anything else that isn't a hostile drone. Otherwise the map and
+      // its predicted-position dots end up cluttered with non-threats.
+      if (!isHostileClass(s.droneClass)) return;
       const elapsedS = (now - s.lastSeenMs) / 1000;
       const isStale = elapsedS > 0.5;
       // Luxe palette: oxblood crimson for Shahed-class hostiles, copper
@@ -542,10 +555,27 @@ export function LiveDetection() {
       )}
 
       <div className="card">
-        <div className="label">{t("live.pending_approvals")}</div>
-        {pending.length === 0 ? (
-          <div className="text-sm text-muted">{t("common.no_data")}</div>
-        ) : (
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="label">{t("live.pending_approvals")}</div>
+          {(() => {
+            const hidden = pending.length - pending.filter((p) => isHostileClass(p.voted_class)).length;
+            if (hidden <= 0) return null;
+            return (
+              <span className="text-xs text-muted">
+                {t("live.non_hostile_hidden", {
+                  count: hidden,
+                  defaultValue: "{{count}} non-hostile detections hidden",
+                })}
+              </span>
+            );
+          })()}
+        </div>
+        {(() => {
+          const visiblePending = pending.filter((p) => isHostileClass(p.voted_class));
+          if (visiblePending.length === 0) {
+            return <div className="text-sm text-muted">{t("common.no_data")}</div>;
+          }
+          return (
           <table className="w-full text-sm">
             <thead className="text-start text-xs uppercase text-slate-400">
               <tr>
@@ -559,7 +589,7 @@ export function LiveDetection() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {pending.map((p) => (
+              {visiblePending.map((p) => (
                 <tr key={p.id}>
                   <td className="py-2">
                     {p.thumbnail_path ? (
@@ -601,7 +631,8 @@ export function LiveDetection() {
               ))}
             </tbody>
           </table>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

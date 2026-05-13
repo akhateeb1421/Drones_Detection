@@ -63,6 +63,7 @@
     "eta": "الوقت المتوقع للوصول",
     "predicted_path": "المسار المتوقع",
     "pending_approvals": "كشوفات في انتظار المراجعة",
+    "non_hostile_hidden": "تم إخفاء {{count}} كشف غير عدائي",
     "toggle_areas": "المناطق الحساسة",
     "toggle_cameras": "الكاميرات",
     "thumb": "صورة",
