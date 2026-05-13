@@ -29,13 +29,34 @@ export function Drones() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-2xl font-semibold gradient-text">{t("drones.title")}</h1>
-        <div className="inline-flex rounded-md border border-slate-700 overflow-hidden">
+        <h1 className="text-2xl font-semibold">{t("drones.title")}</h1>
+        {/* Pill-group toggle — same shape as the Analysis horizon
+            selector. Subtle outer track, gradient pill on the active
+            option, muted text on inactive. Reads clearly in both
+            light and dark modes. */}
+        <div style={{
+          display:"flex", gap:3, padding:3,
+          background:"var(--bg-elevated)",
+          border:"1px solid var(--border-subtle)",
+          borderRadius:10,
+        }}>
           {DRONES.map((d) => {
             const isActive = d.id === active;
             return (
-              <button key={d.id} onClick={() => setActive(d.id)}
-                className={["px-4 py-2 text-sm transition-colors", isActive ? "bg-accent text-black font-semibold" : "text-slate-300 hover:bg-slate-800"].join(" ")}>
+              <button
+                key={d.id}
+                onClick={() => setActive(d.id)}
+                style={{
+                  padding:"6px 14px", borderRadius:8, border:"none",
+                  cursor:"pointer", fontFamily:"inherit",
+                  fontSize:13, fontWeight:700,
+                  transition:"all 0.15s",
+                  background: isActive
+                    ? "linear-gradient(135deg,#01F2CF,#03B3DA)"
+                    : "transparent",
+                  color: isActive ? "#0a1410" : "var(--text-muted)",
+                }}
+              >
                 {t(`${d.keyBase}.name`)}
               </button>
             );
@@ -61,13 +82,20 @@ export function Drones() {
             {SPEC_ROWS.map((row) => (
               <div key={row.key} className="flex items-start justify-between gap-3 py-2 text-sm">
                 <dt className="w-1/3 shrink-0 text-muted">{t(row.labelKey)}</dt>
-                <dd className="flex-1 text-end text-slate-200" dir="auto">
+                <dd className="flex-1 text-end" dir="auto" style={{ color: "var(--text-primary)" }}>
                   {t(`${drone.keyBase}.values.${row.key}`)}
                 </dd>
               </div>
             ))}
           </dl>
-          <div className="mt-3 rounded-md bg-slate-800 p-3 text-xs text-slate-200 leading-relaxed">
+          <div
+            className="mt-3 rounded-md p-3 text-xs leading-relaxed"
+            style={{
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-primary)",
+            }}
+          >
             {t(`${drone.keyBase}.summary`)}
           </div>
         </div>

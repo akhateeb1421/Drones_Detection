@@ -42,7 +42,11 @@ class Settings(BaseSettings):
     # Pipeline
     inference_frame_skip: int = 2
     inference_queue_max: int = 2
-    threat_conf_threshold: float = 0.6
+    # Confidence floor used by alarms.evaluate to award the
+    # `high_confidence` bonus. Lower than the frontend's display
+    # threshold so backend alarms don't lag the on-screen CRITICAL
+    # badge for moderate-confidence sightings.
+    threat_conf_threshold: float = 0.45
     threat_eta_seconds: float = 60.0
 
     # --- LLM backend selection ----------------------------------------

@@ -23,11 +23,33 @@ CANONICAL_TYPES = {
 }
 
 
-def normalize_type(raw: str) -> str:
+def normalize_type(raw: str, rng: np.random.Generator | None = None) -> str:
+    """Normalize a raw attack_type to a canonical key.
+
+    "mixed" was the historical bucket for rows whose original
+    attack_type contained a "+" separator (e.g., "Drones + Cruise
+    Missile"). That bucket muddied analytics — operators wanted the
+    underlying types instead. We now split "+" rows by picking ONE
+    canonical component at normalization time (random pick when an rng
+    is provided, deterministic first-match otherwise). The literal
+    "mixed" label is no longer emitted anywhere.
+    """
     raw_l = (raw or "").strip().lower()
     if "+" in raw_l:
-        return "mixed"
-    return CANONICAL_TYPES.get(raw_l, "mixed")
+        # Split into components, map each through CANONICAL_TYPES.
+        parts = [p.strip() for p in raw_l.split("+") if p.strip()]
+        components: list[str] = []
+        for p in parts:
+            c = CANONICAL_TYPES.get(p)
+            if c:
+                components.append(c)
+        if not components:
+            return "drone"  # safe fallback
+        if rng is not None:
+            return str(rng.choice(components))
+        # Deterministic without rng (used in tests / one-off scripts).
+        return components[0]
+    return CANONICAL_TYPES.get(raw_l, "drone")
 
 
 def generate(
@@ -242,7 +264,9 @@ def normalize_real_for_db(real_df: pd.DataFrame, seed: int = 1234) -> pd.DataFra
     out_rows: list[dict] = []
     split_count = 0
     for _, row in df.iterrows():
-        attack_type = normalize_type(str(row.get("attack_type", "")))
+        # Pass the rng so "+" rows are split into one of their
+        # canonical components rather than collapsed to "mixed".
+        attack_type = normalize_type(str(row.get("attack_type", "")), rng=rng)
         target_location = str(row.get("target_location", "") or "")
         region_raw = row.get("region")
         region_str = str(region_raw) if region_raw is not None and pd.notna(region_raw) else ""

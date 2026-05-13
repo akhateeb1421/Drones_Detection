@@ -56,9 +56,14 @@ export function ToastHost() {
         return (
           <div
             key={t.id}
-            className="animate-mount pointer-events-auto rounded-lg px-4 py-2 text-sm text-slate-100 backdrop-blur-md"
+            className="animate-mount pointer-events-auto rounded-lg px-4 py-2 text-sm backdrop-blur-md"
             style={{
               background: "rgba(14,26,20,0.92)",
+              // Toast bg stays dark in both modes, so the text must also
+              // stay light. Inline color overrides the index.css light-
+              // mode `text-slate-100` rule which would otherwise make
+              // the text near-black on the dark bg (1.2:1 — unreadable).
+              color: "#e0f5f2",
               border: `1px solid ${s.border}`,
               boxShadow: `0 0 0 1px ${s.tint} inset`,
             }}

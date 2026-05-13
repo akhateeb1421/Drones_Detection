@@ -109,6 +109,36 @@ def by_type(db: Session = Depends(get_db)) -> list[TypeStat]:
     return [TypeStat(attack_type=t, count=int(c)) for t, c in rows]
 
 
+@router.get("/by-weekday")
+def by_weekday(db: Session = Depends(get_db)) -> list[dict]:
+    """Attacks grouped by weekday (Sun..Sat) × region.
+
+    Returns one row per weekday, with each region's count as a key.
+    Shape: [{ day: "Sun", day_index: 0, "Riyadh": 47, "Yanbu": 12, ... },
+            { day: "Mon", day_index: 1, ... }, ...]
+
+    Postgres `EXTRACT(dow FROM ts)` returns 0=Sunday … 6=Saturday.
+    The frontend translates the day strings via i18n for display.
+    """
+    rows = db.execute(
+        select(
+            func.extract("dow", Attack.occurred_at).label("dow"),
+            Attack.region,
+            func.count(Attack.id).label("n"),
+        )
+        .where(Attack.region.is_not(None))
+        .group_by(func.extract("dow", Attack.occurred_at), Attack.region)
+    ).all()
+
+    DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    week: list[dict] = [{"day": DAY_NAMES[i], "day_index": i} for i in range(7)]
+    for dow, region, n in rows:
+        if region is None:
+            continue
+        week[int(dow)][region] = int(n)
+    return week
+
+
 @router.get("/timeline", response_model=list[TimelinePoint])
 def timeline(
     db: Session = Depends(get_db),

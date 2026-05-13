@@ -34,10 +34,27 @@ HOSTILE_CLASSES = {
     "drone",
 }
 
-# Demo-priority classes get the maximum hostile boost so they fire the alarm
-# even at low confidence and without ETA/speed signals — useful for a live
-# demo where DJI is the target we want to react to instantly.
-DEMO_PRIORITY_CLASSES = {"dji"}
+# Demo-priority classes auto-clear the score threshold on their own — used
+# for any sighting we want to react to instantly without piling up enough
+# secondary signals (speed / ETA / nearest_area). The frontend's threatTier
+# treats *any* hostile class within 30 s ETA as CRITICAL with no other
+# conditions, so we keep the backend alarm rule equally permissive — every
+# hostile drone class is demo-priority. Without this, a moderate-confidence
+# Shahed without a known nearest_area would score 40 (no alarm) while the
+# frontend still painted Threat=CRITICAL — the badge and the audible alarm
+# would disagree.
+DEMO_PRIORITY_CLASSES = {
+    "dji",
+    "shahed",
+    "shahed_136",
+    "shahed-136",
+    "shahed136",
+    "orlan",
+    "orlan-10",
+    "orlan10",
+    "orlan_10",
+    "drone",
+}
 
 
 def _is_hostile(cls_l: str) -> bool:

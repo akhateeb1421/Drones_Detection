@@ -63,9 +63,16 @@ export function DroneMap({
     ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
     : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
   const camPinFill = theme === "light" ? "#ffffff" : "#0e1a14";
-  const camThreat = "#ff4757";
+  const camThreat = "#ff4757";        // crimson when an alarm is live
+  // Three distinct map-layer colors so the operator can tell them
+  // apart at a glance:
+  //   • Camera markers + sensitive pins → mint #03DA9A (friendly assets)
+  //   • Predicted path polyline         → sky  #03B3DA (future track)
+  //   • Predicted-now drone ghost dot   → amber #fbbf24 (warning — see LiveDetection.tsx)
+  //   • Intercept point                 → purple #a78bfa (action target)
+  //   • Shahed threat                   → crimson #ff4757
   const camNormal = "#03DA9A";
-  const interceptColor = "#03DA9A";
+  const interceptColor = "#a78bfa";
   return (
     <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="h-full w-full rounded-md">
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' url={tileUrl} />
@@ -97,7 +104,7 @@ export function DroneMap({
         </CircleMarker>
       ))}
       {predictedPath && predictedPath.length >= 2 && (
-        <Polyline positions={predictedPath} pathOptions={{ color: "#f5a623", dashArray: "6 8", weight: 3 }} />
+        <Polyline positions={predictedPath} pathOptions={{ color: "#03B3DA", dashArray: "6 8", weight: 3 }} />
       )}
       {interceptPoint && (
         <>

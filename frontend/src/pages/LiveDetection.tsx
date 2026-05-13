@@ -65,6 +65,208 @@ type Snapshot = {
   lastSeenMs: number;
 };
 
+/* ── Weather panel ──────────────────────────────────────────────────
+ * Live current-weather readout pulled from Open-Meteo (keyless, free)
+ * for the selected camera's coordinates. Surfaces a detection-quality
+ * verdict so the operator can tell at a glance whether visibility is
+ * good enough to trust EO frames. Brand palette: mint→teal→sky.
+ * ─────────────────────────────────────────────────────────────────── */
+
+/** Map WMO weather codes to a label key + an emoji glyph. The label
+ *  key resolves through i18n so we get Arabic/English copy for free. */
+function wmoCondition(code: number, isDay: boolean): { key: string; glyph: string } {
+  if (code === 0) return { key: "clear", glyph: isDay ? "☀" : "🌙" };
+  if (code === 1) return { key: "mostly_clear", glyph: isDay ? "🌤" : "🌙" };
+  if (code === 2) return { key: "partly_cloudy", glyph: "⛅" };
+  if (code === 3) return { key: "cloudy", glyph: "☁" };
+  if (code === 45 || code === 48) return { key: "fog", glyph: "🌫" };
+  if (code >= 51 && code <= 57) return { key: "drizzle", glyph: "🌦" };
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return { key: "rain", glyph: "🌧" };
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return { key: "snow", glyph: "❄" };
+  if (code >= 95 && code <= 99) return { key: "storm", glyph: "⛈" };
+  return { key: "unknown", glyph: "" };
+}
+
+/** Detection-quality verdict — drives the colored status pill + footer. */
+function detectionStatus(code: number, windKmh: number): "optimal" | "degraded" | "poor" {
+  // Storm / heavy rain / snow / fog / very strong wind → poor visibility
+  if ([45, 48, 95, 96, 99, 71, 73, 75, 77, 65, 67, 82, 86].includes(code) || windKmh >= 35) return "poor";
+  // Light precip, overcast, or moderate wind → degraded but still usable
+  if ([3, 51, 53, 55, 56, 57, 61, 63, 66, 80, 81, 85].includes(code) || windKmh >= 20) return "degraded";
+  return "optimal";
+}
+
+type Weather = { tempC: number; windKmh: number; code: number; isDay: boolean };
+
+function WeatherPanel({ camera }: { camera: Camera | null }) {
+  const { t } = useTranslation();
+  const bilingualName = useBilingualName();
+  const [w, setW] = useState<Weather | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Re-fetch whenever the operator selects a different camera. Open-Meteo
+  // refreshes its `current_weather` block once per ~15 min, so we don't
+  // poll — one fetch per camera switch is plenty.
+  useEffect(() => {
+    if (!camera) return;
+    let cancelled = false;
+    setW(null); setErr(null);
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${camera.latitude}` +
+      `&longitude=${camera.longitude}&current_weather=true` +
+      `&windspeed_unit=kmh&temperature_unit=celsius`;
+    fetch(url)
+      .then((r) => r.json())
+      .then((d: any) => {
+        if (cancelled) return;
+        const cw = d?.current_weather;
+        if (!cw) throw new Error("no_data");
+        setW({
+          tempC: Number(cw.temperature),
+          windKmh: Number(cw.windspeed),
+          code: Number(cw.weathercode),
+          isDay: cw.is_day === 1 || cw.is_day === true,
+        });
+      })
+      .catch((e) => { if (!cancelled) setErr(String(e)); });
+    return () => { cancelled = true; };
+  }, [camera?.id]);
+
+  if (!camera) return null;
+
+  // Brand tones used for background tints, borders, and tile hairlines.
+  // All TEXT inside the panel uses INK so the copy reads as one tone.
+  const C_MINT = "#01F2CF";
+  const C_SKY  = "#03B3DA";
+  const C_WARN = "#fbbf24";
+  const C_DANG = "#f87171";
+  const INK    = "#0b2422";
+
+  const cond = w ? wmoCondition(w.code, w.isDay) : null;
+  const status = w ? detectionStatus(w.code, w.windKmh) : null;
+  const statusColor =
+    status === "optimal"  ? C_MINT :
+    status === "degraded" ? C_WARN :
+    status === "poor"     ? C_DANG : C_MINT;
+
+  // Camera label — use the bilingual helper so the chip reads the
+  // Arabic `name_ar` when the UI is in Arabic and the row provides one,
+  // and falls back to the English `name` otherwise. We avoid forcing
+  // upper-case because Arabic has no letter case.
+  const camChip = bilingualName(camera);
+
+  return (
+    <div className="card" style={{ padding: "clamp(14px,1.8vw,18px)" }}>
+      {/* Header row — WEATHER · <camera> on the right, condition glyph on the far right */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* Status pill on the left — chrome (bg/border) keeps the
+              brand status color so the pill still reads as a verdict,
+              but the text itself is INK (#0b2422). */}
+          {status && (
+            <span
+              className="badge"
+              style={{
+                background: `${statusColor}1F`,
+                color: INK,
+                border: `0.5px solid ${statusColor}55`,
+                textTransform: "uppercase",
+                letterSpacing: "0.10em",
+                fontSize: 11,
+              }}
+            >
+              {t(`live.weather_status_${status}`)}
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: INK, textTransform: "uppercase" }}>
+          <span>{t("live.weather")}</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span>{camChip}</span>
+          {cond && <span style={{ fontSize: 18, marginInlineStart: 4 }} aria-hidden>{cond.glyph}</span>}
+        </div>
+      </div>
+
+      {/* Three metric tiles */}
+      {err ? (
+        <div style={{ padding: "16px 0", textAlign: "center", color: INK, fontSize: 13 }}>
+          {t("common.error")}
+        </div>
+      ) : !w ? (
+        <div style={{ padding: "16px 0", textAlign: "center", color: INK, fontSize: 13 }}>
+          {t("common.loading")}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+          <WTile
+            label={t("live.weather_wind")}
+            value={`${Math.round(w.windKmh)} km/h`}
+            accent={C_SKY}
+          />
+          <WTile
+            label={t("live.weather_temp")}
+            value={`${Math.round(w.tempC)}°C`}
+            accent={C_MINT}
+          />
+          <WTile
+            label={t("live.weather_condition")}
+            value={`${t(`live.weather_cond_${cond?.key ?? "unknown"}`)} ${cond?.glyph ?? ""}`.trim()}
+            accent={statusColor}
+          />
+        </div>
+      )}
+
+      {/* Detection-quality footer strip — chrome uses the status color
+          (subtle tint + border), text is INK (#0b2422). */}
+      {w && status && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: "9px 14px",
+            borderRadius: 12,
+            background: `${statusColor}12`,
+            border: `0.5px solid ${statusColor}33`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontSize: 12,
+            color: INK,
+            fontWeight: 600,
+          }}
+        >
+          <span>{t(`live.weather_caption_${status}`)}</span>
+          <span aria-hidden>{status === "optimal" ? "✓" : status === "degraded" ? "!" : "✗"}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Single metric tile inside the weather panel — label on top, big value below. */
+function WTile({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return (
+    <div
+      style={{
+        background: "var(--bg-elevated)",
+        border: "0.5px solid var(--border-subtle)",
+        borderRadius: 12,
+        padding: "12px 14px",
+        textAlign: "center",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${accent}55, transparent)` }} aria-hidden />
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#0b2422", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: "clamp(14px,1.6vw,17px)", fontWeight: 800, color: "#0b2422" }} dir="ltr">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export function LiveDetection() {
   const { t } = useTranslation();
   const placeLabel = usePlaceLabel();
@@ -111,9 +313,41 @@ export function LiveDetection() {
     return () => clearInterval(i);
   }, []);
 
+  // Pending approvals are polled. Previously the first fetch ran only
+  // after 5s, so a freshly-detected drone would appear to "flash and
+  // disappear" — the alarm banner and the focused track would update
+  // instantly off the WebSocket stream while the pending table sat
+  // empty until the first poll landed. Two changes:
+  //   1. Fetch once on mount so the table is populated immediately.
+  //   2. Poll faster (2 s) so newly-created tracks surface within ~1 s
+  //      of the alarm rather than waiting the full 5 s window.
+  // We also guard against a flaky response transiently emptying the
+  // local list — if the server returns [] but we had rows a moment ago,
+  // we keep showing them for one more cycle so a single failed/empty
+  // response doesn't make the table flash. Confirmed empty after two
+  // consecutive empties.
   useEffect(() => {
-    const i = setInterval(() => Detections.pendingTracks().then(setPending).catch(() => {}), 5000);
-    return () => clearInterval(i);
+    let cancelled = false;
+    let emptyHits = 0;
+    const fetchOnce = () => {
+      Detections.pendingTracks()
+        .then((rows) => {
+          if (cancelled) return;
+          if (rows.length === 0) {
+            emptyHits++;
+            // Only clear after we've seen two empties in a row. Avoids
+            // a single hiccup wiping the table for the operator.
+            if (emptyHits >= 2) setPending([]);
+            return;
+          }
+          emptyHits = 0;
+          setPending(rows);
+        })
+        .catch(() => { /* swallow — never wipe local state on error */ });
+    };
+    fetchOnce();                             // immediate
+    const i = setInterval(fetchOnce, 2000);  // every 2 s
+    return () => { cancelled = true; clearInterval(i); };
   }, []);
 
   const { imageUrl, meta, connected } = useLiveStream(selected);
@@ -281,9 +515,11 @@ export function LiveDetection() {
       if (!isHostileClass(s.droneClass)) return;
       const elapsedS = (now - s.lastSeenMs) / 1000;
       const isStale = elapsedS > 0.5;
-      // Luxe palette: oxblood crimson for Shahed-class hostiles, copper
-      // for everything else. Matches the historical map and chart language.
-      const baseColor = String(s.droneClass ?? "").toLowerCase().includes("shahed") ? "#ff4757" : "#03DA9A";
+      // Brand triad palette: crimson stays for Shahed-class threats so
+      // the operator can spot them at a glance; non-Shahed hostiles use
+      // primary cyan, the same accent color the rest of the dashboard
+      // chrome uses. Reads consistently against the dark map tiles.
+      const baseColor = String(s.droneClass ?? "").toLowerCase().includes("shahed") ? "#ff4757" : "#01F2CF";
 
       // Last confirmed sighting (solid)
       items.push({
@@ -307,7 +543,11 @@ export function LiveDetection() {
           id: `pred-${s.trackId}`,
           lat,
           lon,
-          color: "#f5a623",  // amber predicted-position dot
+          // Predicted-now ghost dot — amber. Distinct from the sky-cyan
+          // predicted path line, the purple intercept marker, and the
+          // mint friendly assets. Amber reads as "where the drone is
+          // RIGHT NOW (extrapolated)" — a warning-tier indicator.
+          color: "#fbbf24",
           label: `#${s.trackId} predicted at +${elapsedS.toFixed(0)}s (${s.speedMps.toFixed(1)} m/s ${s.direction})`,
           radius: 6,
         });
@@ -402,7 +642,7 @@ export function LiveDetection() {
       if (distM < 10000) return { label: "MEDIUM", cls: "bg-yellow-500 text-black" };
       return { label: "LOW", cls: "bg-success text-white" };
     }
-    return { label: "—", cls: "bg-slate-700 text-slate-300" };
+    return { label: "—", cls: "badge-muted" };
   }
 
   function distToNearest(p: Track): number | null {
@@ -418,9 +658,9 @@ export function LiveDetection() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold gradient-text">{t("live.title")}</h1>
+        <h1 className="text-xl font-semibold">{t("live.title")}</h1>
         <div className="flex items-center gap-2">
-          <span className={`badge ${connected ? "bg-success text-white" : "bg-slate-700 text-slate-300"}`}>
+          <span className={`badge ${connected ? "bg-success text-white" : "badge-muted"}`}>
             {connected ? t("live.online") : t("live.offline")}
           </span>
           {cameras.length > 0 && (
@@ -437,6 +677,10 @@ export function LiveDetection() {
         <div className="card">{t("live.no_camera")}</div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Left column — camera feed + focused-detection details, with
+              a live Weather panel pinned underneath so the operator can
+              see at a glance whether visibility is good for the EO frame. */}
+          <div className="flex flex-col gap-4">
           <div className="card">
             <div className="label">{t("live.title")}</div>
             <div className="aspect-video w-full overflow-hidden rounded-md bg-black">
@@ -486,6 +730,9 @@ export function LiveDetection() {
               );
             })()}
           </div>
+          {/* Weather panel — Open-Meteo readout for the selected camera. */}
+          <WeatherPanel camera={cameras.find((c) => c.id === selected) ?? null} />
+          </div>
           <div className="card flex flex-col">
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <div className="label !mb-0">{t("live.predicted_path")}</div>
@@ -503,7 +750,7 @@ export function LiveDetection() {
                     "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-150",
                     showAreas
                       ? "border-accent/60 bg-accent/15 text-slate-100"
-                      : "border-slate-700 bg-slate-900/50 text-slate-400 hover:text-slate-200",
+                      : "border-slate-700 bg-slate-900/50 text-muted hover:text-slate-200",
                   ].join(" ")}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: "#03DA9A" }} aria-hidden />
@@ -517,10 +764,10 @@ export function LiveDetection() {
                     "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-150",
                     showCams
                       ? "border-accent/60 bg-accent/15 text-slate-100"
-                      : "border-slate-700 bg-slate-900/50 text-slate-400 hover:text-slate-200",
+                      : "border-slate-700 bg-slate-900/50 text-muted hover:text-slate-200",
                   ].join(" ")}
                 >
-                  <span className="h-2 w-2 rounded-full" style={{ background: "#6ea892" }} aria-hidden />
+                  <span className="h-2 w-2 rounded-full" style={{ background: "#03DA9A" }} aria-hidden />
                   {t("live.toggle_cameras")}
                 </button>
                 <button
@@ -531,10 +778,12 @@ export function LiveDetection() {
                     "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-150",
                     showIntercept
                       ? "border-accent/60 bg-accent/15 text-slate-100"
-                      : "border-slate-700 bg-slate-900/50 text-slate-400 hover:text-slate-200",
+                      : "border-slate-700 bg-slate-900/50 text-muted hover:text-slate-200",
                   ].join(" ")}
                 >
-                  <span className="h-2 w-2 rounded-full" style={{ background: "#6ea892" }} aria-hidden />
+                  {/* Match the purple intercept marker on the map so
+                      the legend dot and the map dot agree. */}
+                  <span className="h-2 w-2 rounded-full" style={{ background: "#a78bfa" }} aria-hidden />
                   {t("live.toggle_intercept")}
                 </button>
               </div>
@@ -557,21 +806,15 @@ export function LiveDetection() {
       <div className="card">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="label">{t("live.pending_approvals")}</div>
-          {(() => {
-            const hidden = pending.length - pending.filter((p) => isHostileClass(p.voted_class)).length;
-            if (hidden <= 0) return null;
-            return (
-              <span className="text-xs text-muted">
-                {t("live.non_hostile_hidden", {
-                  count: hidden,
-                  defaultValue: "{{count}} non-hostile detections hidden",
-                })}
-              </span>
-            );
-          })()}
         </div>
+        {/* Pending approvals shows every pending detection — operators
+            need to triage non-hostile classes (Bird/Airplane/Helicopter)
+            too, even though the alarm hard-gate prevents them from firing
+            an audible/visual alarm. Filtering here just hides the queue
+            and made the page look broken. The map / focused-track UI
+            higher up is still hostile-only. */}
         {(() => {
-          const visiblePending = pending.filter((p) => isHostileClass(p.voted_class));
+          const visiblePending = pending;
           if (visiblePending.length === 0) {
             return <div className="text-sm text-muted">{t("common.no_data")}</div>;
           }
@@ -591,7 +834,7 @@ export function LiveDetection() {
             <tbody className="divide-y divide-slate-800">
               {visiblePending.map((p) => (
                 <tr key={p.id}>
-                  <td className="py-2">
+                  <td className="py-2 text-start">
                     {p.thumbnail_path ? (
                       <img
                         src={trackThumbUrl(p.id)}
@@ -603,10 +846,10 @@ export function LiveDetection() {
                       <div className="h-12 w-16 rounded bg-slate-800 text-xs text-muted flex items-center justify-center">—</div>
                     )}
                   </td>
-                  <td className="text-start font-data" dir="ltr">#{p.track_id}</td>
+                  <td className="text-start font-data"><span dir="ltr">#{p.track_id}</span></td>
                   <td className="text-start">{classLabel(p.voted_class)}</td>
                   <td className="text-start">{placeLabel(p.nearest_area)}</td>
-                  <td className="text-start font-data" dir="ltr">{p.min_eta_s !== null ? `${p.min_eta_s?.toFixed(1)}s` : "—"}</td>
+                  <td className="text-start font-data"><span dir="ltr">{p.min_eta_s !== null ? `${p.min_eta_s?.toFixed(1)}s` : "—"}</span></td>
                   <td className="text-start">
                     {(() => {
                       const tier = threatTier(p.min_eta_s, distToNearest(p), p.voted_class, p.alarm_fired_at);

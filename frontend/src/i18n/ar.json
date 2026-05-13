@@ -8,12 +8,13 @@
     "live": "الكشف المباشر",
     "history": "خريطة الهجمات",
     "analysis": "التحليلات",
-    "chatbot": "المساعد الذكي",
+    "chatbot": "سند",
     "admin": "الإدارة",
     "cameras": "الكاميرات",
     "areas": "المناطق الحساسة",
     "placement": "اقتراح المواقع",
-    "drones": "المسيّرات"
+    "drones": "المسيّرات",
+    "about": "نبذة"
   },
   "common": {
     "language": "اللغة",
@@ -25,6 +26,7 @@
     "cancel": "إلغاء",
     "delete": "حذف",
     "delete_confirm": "هل تريد الحذف؟",
+    "confirm_delete": "هل أنت متأكد؟",
     "edit": "تعديل",
     "add": "إضافة",
     "approve": "اعتماد",
@@ -40,12 +42,27 @@
   "overview": {
     "total_attacks": "إجمالي الهجمات",
     "regions": "المناطق المتأثرة",
-    "by_region": "التوزيع الجغرافي",
+    "drone_attacks": "هجمات المسيرات",
+    "recent_alarms": "الإنذارات النشطة",
+    "location_points": "سجل",
+    "by_region": "الجغرافي",
     "by_type": "أنواع الهجمات",
-    "combined": "هجمات في نفس اليوم",
+    "combined": "مشترك",
     "recent_threats": "التهديدات الأخيرة",
     "hover_hint": "مرّر فوق الشريحة لعرض التفاصيل",
-    "points_events": "{{rows}} نقطة موقع ضمن {{events}} حادثة"
+    "points_events": "{{rows}} نقطة موقع ضمن {{events}} حادثة",
+    "attack_vector": "تحليل ناقل الهجوم",
+    "weekly_trend": "نمط الهجمات الأسبوعي",
+    "threat_profile": "الاستخبارات",
+    "region_radar": "المناطق الأكثر ضرراً",
+    "attacks_per_region": "الهجمات حسب المنطقة",
+    "distribution": "التوزيع الجغرافي",
+    "combined_attacks_today": "الهجمات المشتركة",
+    "recent_events": "الأحداث الأخيرة",
+    "alarm_timeline": "سجل الإنذارات",
+    "attacks": "هجمات",
+    "critical_threat": "تهديد حرج",
+    "mixed": "مختلط"
   },
   "live": {
     "title": "الكشف المباشر",
@@ -85,7 +102,27 @@
     "btn_countered": "اعتُرضت",
     "btn_hit": "أصابت الهدف",
     "outcome_countered": "اعتُرضت",
-    "outcome_hit": "أصابت الهدف"
+    "outcome_hit": "أصابت الهدف",
+    "weather": "الطقس",
+    "weather_wind": "سرعة الرياح",
+    "weather_temp": "الحرارة",
+    "weather_condition": "الحالة",
+    "weather_status_optimal": "مثالي",
+    "weather_status_degraded": "متدنٍّ",
+    "weather_status_poor": "ضعيف",
+    "weather_caption_optimal": "ظروف رؤية مثالية للكشف",
+    "weather_caption_degraded": "رؤية محدودة — تأكد من الكشوفات",
+    "weather_caption_poor": "رؤية ضعيفة — الكاميرا غير موثوقة",
+    "weather_cond_clear": "صافٍ",
+    "weather_cond_mostly_clear": "صافٍ غالباً",
+    "weather_cond_partly_cloudy": "غائم جزئياً",
+    "weather_cond_cloudy": "غائم",
+    "weather_cond_fog": "ضباب",
+    "weather_cond_drizzle": "رذاذ",
+    "weather_cond_rain": "أمطار",
+    "weather_cond_snow": "ثلوج",
+    "weather_cond_storm": "عواصف رعدية",
+    "weather_cond_unknown": "غير معروف"
   },
   "history": {
     "title": "خريطة الهجمات التاريخية",
@@ -98,29 +135,66 @@
     "results": "النتائج"
   },
   "analysis": {
-    "title": "تحليلات",
+    "title": "التحليلات",
     "timeline": "السلسلة الزمنية",
+    "timeline_sub": "عدد الهجمات الشهري",
     "by_region": "حسب المنطقة",
     "by_type": "حسب النوع",
     "risk": "تقييم المخاطر",
     "forecast": "توقعات الهجمات",
+    "attack_forecast": "توقعات الهجمات",
     "horizon": "الأفق الزمني (أيام)",
+    "horizon_days": "أيام التوقع",
     "forecast_help": "تتنبأ بعدد الهجمات اليومية لكل منطقة خلال {{days}} يومًا القادمة.",
-    "count": "عدد الهجمات"
+    "count": "عدد الهجمات",
+    "historical": "تاريخي",
+    "next": "خلال",
+    "days": "يوم",
+    "year_label": "سنة",
+    "year_horizon": "سنة كاملة"
   },
   "chatbot": {
-    "title": "المساعد الذكي",
+    "title": "سند",
     "placeholder": "اكتب سؤالك هنا...",
     "send": "إرسال",
     "clear": "مسح المحادثة",
     "api": "API",
     "local": "محلي",
-    "api_hint": "سحابي — Gemini Flash. مجاني وسريع وعالي الجودة. يتطلب إنترنت.",
-    "local_hint": "محلي — Qwen2.5-3B مع تعديل LoRA. أبطأ لكنه يعمل بدون إنترنت."
+    "api_hint": "موديل سحابي — Gemini Flash. مجاني وسريع وعالي الجودة. يتطلب إنترنت.",
+    "local_hint": "موديل محلي — Qwen2.5-3B مع تعديل LoRA. أبطأ لكنه يعمل بدون إنترنت."
+  },
+  "cameras": {
+    "add": "إضافة كاميرا",
+    "active": "مفعّلة",
+    "inactive": "معطّلة",
+    "name_en": "الاسم (إنجليزي)",
+    "name_ar": "الاسم (عربي)",
+    "stream_url": "رابط البث",
+    "latitude": "خط العرض",
+    "longitude": "خط الطول",
+    "heading": "الاتجاه (درجة)",
+    "altitude": "الارتفاع (م)",
+    "distance": "المسافة المفترضة للهدف (م)",
+    "fov_h": "زاوية الرؤية الأفقية",
+    "fov_v": "زاوية الرؤية الرأسية",
+    "sensor_w": "عرض المستشعر (بكسل)",
+    "enabled": "مفعّلة",
+    "col_name": "الاسم",
+    "col_stream": "البث",
+    "col_latlon": "الإحداثيات",
+    "col_heading": "الاتجاه",
+    "col_enabled": "الحالة",
+    "pick_on_map": "اختر من الخريطة",
+    "show_map": "إظهار الخريطة",
+    "hide_map": "إخفاء الخريطة",
+    "map_hint": "انقر أو اسحب العلامة لتحديد الإحداثيات.",
+    "name_required": "الاسم مطلوب."
   },
   "admin": {
     "token_label": "رمز الإدارة",
     "token_save": "حفظ الرمز",
+    "save_token": "حفظ الرمز",
+    "token_note": "يُحفظ الرمز محلياً ويُرسل في رأس X-Admin-Token مع طلبات الكتابة.",
     "token_help": "يُحفظ الرمز محلياً في المتصفح ويُرسل في رأس X-Admin-Token مع طلبات الكتابة.",
     "cameras_title": "إدارة الكاميرات",
     "areas_title": "المناطق الحساسة",
@@ -142,7 +216,8 @@
       "hide_map": "إخفاء الخريطة",
       "pick_hint": "انقر أو اسحب علامة الموقع لضبط خطّي العرض والطول.",
       "name_en": "الاسم (إنجليزي)",
-      "name_ar": "الاسم (عربي)"
+      "name_ar": "الاسم (عربي)",
+      "name_required": "الاسم مطلوب."
     },
     "table": {
       "name": "الاسم",
@@ -159,9 +234,9 @@
   },
   "placement": {
     "title": "اقتراح أماكن وتوجيه الكاميرات",
-    "radius": "نصف القطر",
-    "fov": "زاوية الرؤية",
-    "range": "المسافة المفترضة",
+    "radius": "بعد الهجمات",
+    "fov": "زاوية رؤية الكاميرا",
+    "range": "مسافة الإلتقاط المبكر",
     "recompute": "إعادة الحساب",
     "map": "الخريطة",
     "suggestions": "الاقتراحات",
@@ -169,9 +244,9 @@
     "heading": "الاتجاه",
     "attacks": "الهجمات",
     "details": "التفاصيل",
-    "clusters": "عدد البؤر",
+    "clusters": "مناطق الخطر",
     "forward": "موقع المراقبة الأمامية",
-    "early_warning": "إنذار مبكر",
+    "early_warning": "بعد الكاميرا",
     "summary_counts": "{{area}} منطقة · {{forward}} أمامية",
     "kind_area": "منطقة",
     "kind_forward": "أمامية",
@@ -257,6 +332,15 @@
     "MEDIUM": "متوسط",
     "LOW": "منخفض"
   },
+  "days": {
+    "Sun": "الأحد",
+    "Mon": "الاثنين",
+    "Tue": "الثلاثاء",
+    "Wed": "الأربعاء",
+    "Thu": "الخميس",
+    "Fri": "الجمعة",
+    "Sat": "السبت"
+  },
   "auth": {
     "role_admin": "مسؤول",
     "role_viewer": "مشغّل",
@@ -265,7 +349,8 @@
     "sign_out": "تسجيل الخروج",
     "token_required": "الرمز مطلوب",
     "admin_only": "هذه الصفحة متاحة للمسؤولين فقط.",
-    "invalid_token": "الرمز غير صحيح"
+    "invalid_token": "الرمز غير صحيح",
+    "token_invalid": "الرمز غير مقبول — تحقق منه وحاول مرة أخرى."
   },
   "theme": {
     "switch_to_light": "تبديل إلى الوضع الفاتح",
@@ -312,8 +397,8 @@
         "speed": "90–150 كم/س",
         "range": "120 كم بالتحكم اللاسلكي · 600 كم بالملاحة الذاتية",
         "wingspan": "3.1 م",
-        "payload": "كاميرا EO/IR، استخبارات إشارات، حتى 5 كجم",
-        "counter": "تشويش إلكتروني (التحكم + GPS)، صواريخ كتفية، مدفعية متحركة، شباك مضادة، خداع GPS"
+        "payload": "كاميرا خفيفه للتصوير النهاري، كاميرا تصوير حراري، باعث اشارات راديو",
+        "counter": "تشويش إلكتروني (التحكم + GPS)، صواريخ MANPADS كتفية، مدفعية مضادة متحركة، شباك مضادة للطائرات المسيّرة، اختراق سيبراني عبر انتحال إشارات GPS"
       }
     }
   }

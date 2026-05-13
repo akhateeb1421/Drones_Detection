@@ -1,6 +1,11 @@
 """Schemas for /predict and /analysis endpoints."""
 
-from datetime import date
+# Import `date` under an alias because one of the response fields below
+# is also named `date` (mirrors the frontend's preferred JSON key). If
+# both shared the bare name `date` Python would resolve the annotation
+# `date | None` against the half-declared field, not the datetime type,
+# and raise TypeError at import time.
+from datetime import date as DateType
 
 from pydantic import BaseModel
 
@@ -14,7 +19,7 @@ class RegionRisk(BaseModel):
 
 class ForecastPoint(BaseModel):
     region: str
-    forecast_date: date
+    forecast_date: DateType
     expected_count: float
     lower: float
     upper: float
@@ -22,7 +27,7 @@ class ForecastPoint(BaseModel):
     # values, different keys — keeps the contract backwards-compatible
     # for any existing consumer while letting the new Analysis page
     # read `p.date` / `p.predicted_count` directly.
-    date: date | None = None
+    date: DateType | None = None
     predicted_count: float | None = None
 
 

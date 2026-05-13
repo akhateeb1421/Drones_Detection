@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell,
-  Pie, PieChart, RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis,
   ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
 } from "recharts";
-import { Analysis, CombinedAttack, RegionStat, TotalCounts, TypeStat } from "../services/api";
+import { Analysis, CombinedAttack, RegionStat, TotalCounts, TypeStat, WeekdayPoint } from "../services/api";
 import { usePlaceLabel, useTypeLabel } from "../i18n/places";
 import { CountUp } from "../components/CountUp";
 import { useAlarmsContext } from "../contexts/AlarmsContext";
@@ -24,28 +24,40 @@ const GRAD_PAIRS = [
   ["#fb923c", "#ea580c"], ["#34d399", "#059669"],
 ];
 
+// Theme-aware via CSS variables — index.css defines :root and html.light
+// variants so the dark/light toggle actually flips the surface tones.
+// 1px border + drop shadow makes every box read as a floating panel
+// against the deeper light-mode page bg.
 const CARD: React.CSSProperties = {
-  background: "linear-gradient(160deg,rgba(14,22,40,0.97) 0%,rgba(10,15,28,0.98) 100%)",
-  border: "0.5px solid rgba(1,242,207,0.10)",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border-subtle)",
   borderRadius: 16,
   padding: "clamp(16px,2vw,24px)",
   position: "relative",
   overflow: "hidden",
+  boxShadow: "0 8px 24px -12px rgba(0,0,0,0.25),0 2px 6px -2px rgba(0,0,0,0.12)",
 };
 
 const TT: React.CSSProperties = {
-  background: "rgba(8,14,22,0.97)",
-  border: "1px solid rgba(1,242,207,0.2)",
+  background: "var(--bg-elevated)",
+  border: "1px solid var(--border-medium)",
   borderRadius: 10,
-  color: "#e0f5f2",
+  color: "var(--text-primary)",
   fontSize: 13,
   padding: "10px 14px",
   boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
 };
-const TTL: React.CSSProperties = { color: C1, fontWeight: 700, marginBottom: 4 };
-const TTI: React.CSSProperties = { color: "#5fa09a" };
+// Tooltip title was bright brand cyan on a light tooltip bg in light
+// mode (~1.4:1). Use --text-primary so it reads in both modes.
+const TTL: React.CSSProperties = { color: "var(--text-primary)", fontWeight: 700, marginBottom: 4 };
+const TTI: React.CSSProperties = { color: "var(--text-muted)" };
+// Axis tick labels need to read on white cards in light mode — the
+// faint token sits at ~2.6:1 on white. Use --text-muted (~5:1 on white,
+// ~4.4:1 on dark card). GRID stroke kept as low-alpha brand cyan
+// because the html.light .recharts-cartesian-grid line override in
+// index.css upgrades it for light mode.
 const GRID = { stroke: "rgba(1,242,207,0.05)", strokeDasharray: "4 4" };
-const AXIS = { fill: "#3d7872", fontSize: 11 };
+const AXIS = { fill: "var(--text-muted)", fontSize: 11 };
 
 function filterMin<T extends { count: number }>(rows: T[], total: number, key: keyof T): T[] {
   if (!total || !rows.length) return rows;
@@ -60,12 +72,18 @@ function CardShine() {
 }
 
 function Tag({ label }: { label: string }) {
-  return <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C1,opacity:0.6,marginBottom:4 }}>{label}</div>;
+  // Use --text-muted instead of brand cyan at 60% opacity, which was
+  // invisible on light cards. Same uppercase eyebrow style otherwise.
+  return <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"var(--text-muted)",marginBottom:4 }}>{label}</div>;
 }
 
 function CardTitle({ label }: { label: string }) {
-  return <div style={{ fontSize:"clamp(13px,1.6vw,16px)",fontWeight:700,color:"#e0f5f2",marginBottom:"clamp(10px,1.5vw,16px)" }}>{label}</div>;
+  return <div style={{ fontSize:"clamp(13px,1.6vw,16px)",fontWeight:700,color:"var(--text-primary)",marginBottom:"clamp(10px,1.5vw,16px)" }}>{label}</div>;
 }
+
+// InteractiveDonut removed per request — Geographic Distribution
+// chart is no longer on the Overview page. Region info still shows
+// in the Radar (left of the type chart) and on the History page.
 
 /* ── KPI Card ── */
 function KpiCard({ label, value, sub, color, iconPath }: {
@@ -76,17 +94,21 @@ function KpiCard({ label, value, sub, color, iconPath }: {
       <CardShine/>
       <div style={{ position:"absolute",top:0,left:0,right:0,height:1,background:`linear-gradient(90deg,transparent,${color}30,transparent)` }}/>
       <div style={{ display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:"clamp(8px,1vw,12px)" }}>
-        <div style={{ fontSize:"clamp(9px,1vw,11px)",fontWeight:700,letterSpacing:"0.13em",textTransform:"uppercase",color:"#3d7872" }}>{label}</div>
+        <div style={{ fontSize:"clamp(9px,1vw,11px)",fontWeight:700,letterSpacing:"0.13em",textTransform:"uppercase",color:"var(--text-muted)" }}>{label}</div>
         <div style={{ width:"clamp(26px,3vw,34px)",height:"clamp(26px,3vw,34px)",borderRadius:9,background:`${color}18`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d={iconPath}/>
           </svg>
         </div>
       </div>
-      <div style={{ fontSize:"clamp(24px,3.5vw,36px)",fontWeight:800,lineHeight:1,marginBottom:"clamp(5px,0.8vw,9px)",background:`linear-gradient(135deg,${color},${color}88)`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text" }}>
+      {/* Earlier the gradient ended at `${color}88` (semi-transparent),
+          which faded to near-white on light cards — half the digit
+          disappeared. Solid color end keeps the number readable in
+          both modes. */}
+      <div style={{ fontSize:"clamp(24px,3.5vw,36px)",fontWeight:800,lineHeight:1,marginBottom:"clamp(5px,0.8vw,9px)",background:`linear-gradient(135deg,${color},${color})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text" }}>
         {typeof value === "number" && !isNaN(value) ? <CountUp end={value}/> : (typeof value === "number" ? "0" : value)}
       </div>
-      {sub && <div style={{ fontSize:"clamp(10px,1.1vw,12px)",color:"#3d7872" }}>{sub}</div>}
+      {sub && <div style={{ fontSize:"clamp(10px,1.1vw,12px)",color:"var(--text-faint)" }}>{sub}</div>}
     </div>
   );
 }
@@ -105,11 +127,11 @@ function AlertBanner({ alarm }: { alarm: any }) {
         </div>
         <div>
           <div style={{ fontSize:"clamp(12px,1.4vw,14px)",fontWeight:800,color:DANGER,textTransform:"uppercase",letterSpacing:"0.04em" }}>{t("overview.critical_threat","Critical Threat Detected")}</div>
-          <div style={{ fontSize:"clamp(9px,1vw,11px)",color:"rgba(248,113,113,0.55)",textTransform:"uppercase",letterSpacing:"0.10em",marginTop:2 }}>{alarm.drone_class ?? "—"} · {alarm.nearest_area ?? "—"}</div>
+          <div style={{ fontSize:"clamp(9px,1vw,11px)",color:"#dc2626",textTransform:"uppercase",letterSpacing:"0.10em",marginTop:2 }}>{alarm.drone_class ?? "—"} · {alarm.nearest_area ?? "—"}</div>
         </div>
       </div>
       <div style={{ textAlign:"end" }}>
-        <div style={{ fontSize:"clamp(8px,0.9vw,10px)",fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"rgba(248,113,113,0.5)" }}>{t("live.eta","ETA")}</div>
+        <div style={{ fontSize:"clamp(8px,0.9vw,10px)",fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"#dc2626" }}>{t("live.eta","ETA")}</div>
         <div style={{ fontSize:"clamp(20px,2.8vw,28px)",fontWeight:800,color:DANGER,fontFamily:"monospace",lineHeight:1,marginTop:2 }}>
           {alarm.eta_s != null ? `${Math.floor(alarm.eta_s)}s` : "—"}
         </div>
@@ -129,6 +151,11 @@ export function Overview() {
   const [types,    setTypes]    = useState<TypeStat[]>([]);
   const [totals,   setTotals]   = useState<TotalCounts | null>(null);
   const [combined, setCombined] = useState<CombinedAttack[]>([]);
+  const [weekly,   setWeekly]   = useState<WeekdayPoint[]>([]);
+  // Set of region keys currently plotted in the Weekly Trend chart.
+  // null = "first fetch hasn't returned yet, default to all regions on
+  // arrival"; an empty set = explicit "show nothing".
+  const [selectedRegions, setSelectedRegions] = useState<Set<string> | null>(null);
   const [error,    setError]    = useState<string | null>(null);
   const [loading,  setLoading]  = useState(true);
 
@@ -138,14 +165,34 @@ export function Overview() {
     Analysis.byRegionPure().then(setRegions).catch(() => {});
     Analysis.byType().then(setTypes).catch(() => {});
     Analysis.combined().then(setCombined).catch(() => {});
+    Analysis.byWeekday().then(rows => {
+      setWeekly(rows);
+      // Default-select every region present in the response so the
+      // chart starts populated. Users uncheck cities they don't care
+      // about via the chip toggles above the chart.
+      const found = new Set<string>();
+      for (const row of rows) {
+        for (const k of Object.keys(row)) {
+          if (k !== "day" && k !== "day_index") found.add(k);
+        }
+      }
+      setSelectedRegions(found);
+    }).catch(() => {});
     Analysis.total()
       .then(tot => { setTotals(tot); setLoading(false); })
       .catch(e => { setError(String(e)); setLoading(false); });
   }, []);
 
-  const total      = Number(totals?.events  ?? 0);
-  const isReady    = totals !== null;
+  // Total Attacks = rows (one row per logical attack), same unit as
+  // /analysis/by-type and /analysis/by-region. Earlier we used
+  // `events` (distinct source+timestamp), but that's a different unit
+  // — it could be smaller than the per-type counts because a single
+  // event expands into multiple rows when it hits multiple locations.
+  // Keeping all KPI numbers in the same unit avoids "Drone Attacks
+  // exceeds Total Attacks" weirdness.
   const totalRows  = Number(totals?.rows    ?? 0);
+  const total      = totalRows;
+  const isReady    = totals !== null;
   const typesTotal = useMemo(() => types.reduce((a, t) => a + t.count, 0), [types]);
   const combTotal  = useMemo(() => combined.reduce((a, c) => a + c.count, 0), [combined]);
 
@@ -154,19 +201,36 @@ export function Overview() {
   const combDisp = useMemo(() => filterMin(combined, combTotal, "label").slice(0, 8).map(c => ({ ...c, label: c.label.split(/\s*\+\s*/).map((p: string) => placeLabel(p)).join(" + ") })), [combined, combTotal, placeLabel]);
   const radarData= useMemo(() => regDisp.slice(0, 6).map(r => ({ subject: r.region, value: r.count })), [regDisp]);
 
-  const droneKey = "Drone";
-  const mixedKey = "Mixed";
-  const waveData = useMemo(() => {
-    const base = Math.max(1, Math.round(total / 30));
-    const days = isAr
-      ? ["الأحد","السبت","الجمعة","الخميس","الأربعاء","الثلاثاء","الاثنين"]
-      : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-    return days.map((day, i) => ({
-      day,
-      [droneKey]: Math.round(base * (0.6 + Math.sin(i * 0.9) * 0.35)),
-      [mixedKey]: Math.round(base * (0.25 + Math.sin(i * 1.2 + 1) * 0.15)),
+  // Regions present in the weekly response, sorted by total attacks
+  // descending so the biggest threats appear first in the chip row.
+  const weeklyRegions = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const row of weekly) {
+      for (const [k, v] of Object.entries(row)) {
+        if (k === "day" || k === "day_index") continue;
+        totals[k] = (totals[k] ?? 0) + (typeof v === "number" ? v : 0);
+      }
+    }
+    return Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  }, [weekly]);
+
+  // Build the chart-ready data. Translate the English day labels via
+  // i18n so Arabic mode reads "الأحد" / "الاثنين" / etc. Keep rows
+  // in Sun..Sat order — the backend already returns them that way.
+  const weekData = useMemo(() => {
+    return weekly.map(row => ({
+      ...row,
+      day: t(`days.${row.day}`, row.day as string),
     }));
-  }, [total, isAr, droneKey, mixedKey]);
+  }, [weekly, t]);
+
+  const toggleRegion = (r: string) => {
+    setSelectedRegions(prev => {
+      const next = new Set(prev ?? []);
+      if (next.has(r)) next.delete(r); else next.add(r);
+      return next;
+    });
+  };
 
   if (error) return (
     <div style={{ ...CARD, color: DANGER, fontSize: 14 }}><CardShine/>{error}</div>
@@ -187,8 +251,11 @@ export function Overview() {
 
       {/* KPI row */}
       <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"clamp(8px,1.2vw,12px)" }}>
+        {/* sub-line dropped — it used to show totalRows ("3,116 records")
+            which is the row count, while the big number shows the
+            distinct-event count. Two different numbers right next to
+            each other read like a typo. The hero metric stands alone. */}
         <KpiCard label={t("overview.total_attacks","إجمالي الهجمات")} value={total}
-          sub={`${totalRows.toLocaleString()} ${t("overview.location_points","سجل")}`}
           color={C1} iconPath="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
         <KpiCard label={t("overview.regions","المناطق المتأثرة")} value={regions.length}
           color={C2} iconPath="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
@@ -199,40 +266,97 @@ export function Overview() {
           color={DANGER} iconPath="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
       </div>
 
-      {/* Wave chart */}
+      {/* Weekly Attack Trend — REAL data via /analysis/by-weekday, with
+          a chip-row at the top that toggles each city on/off. Each
+          selected city renders as its own stroked Area; color is taken
+          from the GRAD_PAIRS palette by region index (same order as
+          the chips). */}
       <div style={{ ...CARD }}>
         <CardShine/>
         <Tag label={t("overview.attack_vector","تحليل ناقل الهجوم")}/>
         <CardTitle label={t("overview.weekly_trend","اتجاه الهجمات الأسبوعي")}/>
-        <div style={{ direction:"ltr",height:"clamp(130px,18vw,200px)" }}>
+
+        {/* City chip toggles */}
+        {weeklyRegions.length > 0 && (
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10 }}>
+            {weeklyRegions.map((r, i) => {
+              const isActive = selectedRegions?.has(r) ?? false;
+              const [a, b] = GRAD_PAIRS[i % GRAD_PAIRS.length];
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => toggleRegion(r)}
+                  style={{
+                    padding:"4px 10px", borderRadius:14, border:"1px solid",
+                    cursor:"pointer", fontFamily:"inherit",
+                    fontSize:"clamp(10px,1.1vw,12px)", fontWeight:600,
+                    transition:"all 0.15s",
+                    background: isActive ? `linear-gradient(135deg,${a},${b})` : "transparent",
+                    borderColor: isActive ? "transparent" : "var(--border-medium)",
+                    color: isActive ? "#0a1410" : "var(--text-muted)",
+                  }}
+                >
+                  {placeLabel(r)}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{ direction:"ltr",height:"clamp(180px,22vw,260px)" }}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={waveData} margin={{ top:8,right:8,left:-20,bottom:0 }}>
+            <AreaChart data={weekData} margin={{ top:8,right:8,left:-20,bottom:0 }}>
               <defs>
-                <linearGradient id="wg1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={C1} stopOpacity={0.45}/>
-                  <stop offset="100%" stopColor={C1} stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="wg2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={C2} stopOpacity={0.3}/>
-                  <stop offset="100%" stopColor={C2} stopOpacity={0}/>
-                </linearGradient>
+                {weeklyRegions.map((r, i) => {
+                  const [a] = GRAD_PAIRS[i % GRAD_PAIRS.length];
+                  return (
+                    <linearGradient key={`wg${i}`} id={`wg${i}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={a} stopOpacity={0.45}/>
+                      <stop offset="100%" stopColor={a} stopOpacity={0}/>
+                    </linearGradient>
+                  );
+                })}
               </defs>
               <CartesianGrid {...GRID}/>
               <XAxis dataKey="day" tick={AXIS} tickLine={false} axisLine={false}/>
-              <YAxis tick={AXIS} tickLine={false} axisLine={false} width={52}/>
+              <YAxis tick={AXIS} tickLine={false} axisLine={false} width={52} allowDecimals={false}/>
               <Tooltip contentStyle={TT} labelStyle={TTL} itemStyle={TTI}/>
-              <Area type="monotone" dataKey={droneKey} name={t("overview.drone_attacks","Drone Attacks")} stroke={C1} strokeWidth={2.5} fill="url(#wg1)" dot={false} activeDot={{ r:5,fill:C1,stroke:"#0d1117",strokeWidth:2 }}/>
-              <Area type="monotone" dataKey={mixedKey} name={t("overview.mixed","Mixed Attacks")} stroke={C2} strokeWidth={2} strokeDasharray="5 3" fill="url(#wg2)" dot={false} activeDot={{ r:4,fill:C2 }}/>
-              <Legend wrapperStyle={{ fontSize:"clamp(11px,1.3vw,13px)",color:"#5fa09a",paddingTop:8 }}/>
+              {weeklyRegions
+                .filter(r => selectedRegions?.has(r))
+                .map((r) => {
+                  const idx = weeklyRegions.indexOf(r);
+                  const [a] = GRAD_PAIRS[idx % GRAD_PAIRS.length];
+                  return (
+                    <Area
+                      key={r}
+                      type="monotone"
+                      dataKey={r}
+                      name={placeLabel(r)}
+                      stroke={a}
+                      strokeWidth={2.2}
+                      fill={`url(#wg${idx})`}
+                      dot={false}
+                      activeDot={{ r:4, fill:a, stroke:"#0d1117", strokeWidth:2 }}
+                      isAnimationActive
+                      animationDuration={500}
+                    />
+                  );
+                })}
+              <Legend wrapperStyle={{ fontSize:"clamp(11px,1.3vw,13px)",color:"var(--text-muted)",paddingTop:8 }}/>
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Row: Radar + Region bars + Donut */}
+      {/* Row: Radar | Attacks-by-Type bars | Donut.
+          minmax(260px,1fr) accommodates three columns on wide screens
+          and stacks them vertically on narrow viewports. The by-type
+          bar chart sits between the geographic donut and the regional
+          radar per request. */}
       <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"clamp(8px,1.2vw,12px)" }}>
 
-        {/* Radar */}
+        {/* Radar — Regional Threat Profile */}
         <div style={{ ...CARD }}>
           <CardShine/>
           <Tag label={t("overview.threat_profile","الاستخبارات")}/>
@@ -241,7 +365,7 @@ export function Overview() {
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={radarData}>
                 <PolarGrid stroke="rgba(1,242,207,0.07)"/>
-                <PolarAngleAxis dataKey="subject" tick={{ fill:"#3d7872",fontSize:"clamp(9px,1.1vw,12px)" }}/>
+                <PolarAngleAxis dataKey="subject" tick={{ fill:"var(--text-muted)",fontSize:"clamp(9px,1.1vw,12px)" }}/>
                 <Radar dataKey="value" name={t("overview.attacks","هجمات")} stroke={C1} fill={C1} fillOpacity={0.13} strokeWidth={2}/>
                 <Tooltip contentStyle={TT} labelStyle={TTL} itemStyle={TTI}/>
               </RadarChart>
@@ -249,56 +373,49 @@ export function Overview() {
           </div>
         </div>
 
-        {/* Region bars */}
+        {/* Attacks-by-Type vertical bars. Uses the same GRAD_PAIRS
+            palette as the Combined Attacks chart so the type colors
+            stay consistent across the dashboard. Light-mode visibility
+            is handled by the html.light .recharts-bar-rectangles
+            filter override in index.css. */}
         <div style={{ ...CARD }}>
           <CardShine/>
-          <Tag label={t("overview.by_region","المناطق")}/>
-          <CardTitle label={t("overview.attacks_per_region","الهجمات حسب المنطقة")}/>
-          <div style={{ display:"flex",flexDirection:"column",gap:"clamp(8px,1.2vw,12px)" }}>
-            {regDisp.slice(0, 5).map((r, i) => {
-              const max = Math.max(...regDisp.map(x => x.count));
-              const pct = max ? Math.round((r.count / max) * 100) : 0;
-              const [a, b] = GRAD_PAIRS[i % GRAD_PAIRS.length];
-              return (
-                <div key={r.region}>
-                  <div style={{ display:"flex",justifyContent:"space-between",fontSize:"clamp(11px,1.3vw,14px)",marginBottom:"clamp(3px,0.5vw,5px)" }}>
-                    <span style={{ color:"#5fa09a" }}>{r.region}</span>
-                    <span style={{ fontWeight:700,color:"#e0f5f2" }}>{r.count.toLocaleString()}</span>
-                  </div>
-                  <div style={{ height:"clamp(4px,0.6vw,6px)",background:"rgba(1,242,207,0.07)",borderRadius:4 }}>
-                    <div style={{ height:"100%",borderRadius:4,width:`${pct}%`,background:`linear-gradient(90deg,${a},${b})`,transition:"width 0.6s ease" }}/>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Donut with gradient */}
-        <div style={{ ...CARD }}>
-          <CardShine/>
-          <Tag label={t("overview.by_region","الجغرافي")}/>
-          <CardTitle label={t("overview.distribution","التوزيع الجغرافي")}/>
+          <Tag label={t("overview.by_type","Attacks by Type")}/>
+          <CardTitle label={t("overview.by_type","Attacks by Type")}/>
           <div style={{ direction:"ltr",height:"clamp(150px,20vw,220px)" }}>
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              {/* Use the unfiltered `types` (translated through
+                  typeLabel) instead of `typDisp` so small types
+                  (e.g., the 4 cruise_missile rows before the rebalance)
+                  are not collapsed into an "Other" bucket. With three
+                  canonical types the bucketing is never useful. */}
+              <BarChart
+                data={types.map(tt => ({ ...tt, attack_type: typeLabel(tt.attack_type) }))}
+                margin={{ top:8, right:8, left:-22, bottom:0 }}
+              >
                 <defs>
                   {GRAD_PAIRS.map(([a, b], i) => (
-                    <linearGradient key={i} id={`pg${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <linearGradient key={`tbg${i}`} id={`tbg${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
                       <stop offset="0%" stopColor={a}/><stop offset="100%" stopColor={b}/>
                     </linearGradient>
                   ))}
                 </defs>
-                <Pie data={regDisp} dataKey="count" nameKey="region" cx="50%" cy="50%" innerRadius="38%" outerRadius="68%" stroke="none" paddingAngle={2}>
-                  {regDisp.map((_, i) => <Cell key={i} fill={`url(#pg${i % GRAD_PAIRS.length})`}/>)}
-                </Pie>
+                <CartesianGrid {...GRID} vertical={false}/>
+                <XAxis dataKey="attack_type" tick={{ fill:"var(--text-muted)",fontSize:"clamp(9px,1vw,11px)" }} tickLine={false} axisLine={false} interval={0}/>
+                <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} width={36}/>
                 <Tooltip contentStyle={TT} labelStyle={TTL} itemStyle={TTI}
-                  formatter={(v: number, n: string) => [`${v.toLocaleString()} (${totalRows ? ((v/totalRows)*100).toFixed(1) : 0}%)`, n]}/>
-                <Legend wrapperStyle={{ fontSize:"clamp(9px,1.1vw,12px)",color:"#5fa09a" }} iconSize={7} iconType="circle"/>
-              </PieChart>
+                  formatter={(v: number) => [v.toLocaleString(), t("overview.attacks","Attacks")]}/>
+                <Bar dataKey="count" radius={[6,6,0,0]} maxBarSize={56}>
+                  {types.map((_, i) => <Cell key={i} fill={`url(#tbg${i % GRAD_PAIRS.length})`}/>)}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
+
+        {/* Geographic-Distribution donut removed per request. The
+            region-by-region breakdown is still available via the
+            Radar chart (left) and on the History map. */}
       </div>
 
       {/* Combined horizontal bar */}
@@ -318,8 +435,18 @@ export function Overview() {
                   ))}
                 </defs>
                 <CartesianGrid {...GRID} horizontal={false}/>
-                <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false}/>
-                <YAxis type="category" dataKey="label" tick={{ fill:"#5fa09a",fontSize:"clamp(9px,1vw,11px)" }} tickLine={false} axisLine={false} width={160}/>
+                {/* domain pins to dataMax so the axis doesn't pad to 8
+                    when the real max is 6; allowDecimals=false keeps
+                    ticks on whole-attack counts. */}
+                <XAxis
+                  type="number"
+                  tick={AXIS}
+                  tickLine={false}
+                  axisLine={false}
+                  domain={[0, (max: number) => Math.max(1, Math.ceil(max))]}
+                  allowDecimals={false}
+                />
+                <YAxis type="category" dataKey="label" tick={{ fill:"var(--text-muted)",fontSize:"clamp(9px,1vw,11px)" }} tickLine={false} axisLine={false} width={160}/>
                 <Tooltip contentStyle={TT} labelStyle={TTL} itemStyle={TTI}/>
                 <Bar dataKey="count" radius={[0,7,7,0]} maxBarSize={18}>
                   {combDisp.map((_, i) => <Cell key={i} fill={`url(#bg${i % GRAD_PAIRS.length})`}/>)}
@@ -330,37 +457,9 @@ export function Overview() {
         </div>
       )}
 
-      {/* Recent alarms table */}
-      {alarmHistory.length > 0 && (
-        <div style={{ ...CARD, padding:0 }}>
-          <CardShine/>
-          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",borderBottom:"0.5px solid rgba(1,242,207,0.08)" }}>
-            <div>
-              <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C1,opacity:0.6,marginBottom:2 }}>{t("overview.recent_events","الأحداث الأخيرة")}</div>
-              <div style={{ fontSize:"clamp(13px,1.5vw,16px)",fontWeight:700,color:"#e0f5f2" }}>{t("overview.alarm_timeline","آخر الإنذارات")}</div>
-            </div>
-          </div>
-          {/* Header */}
-          <div style={{ display:"grid",gridTemplateColumns:"110px 1fr 130px 80px",gap:8,padding:"9px 20px",background:"rgba(1,242,207,0.03)" }}>
-            {[t("live.eta","الوقت"),t("live.drone_class","الطائرة"),t("live.nearest_area","الموقع"),t("live.threat_level","الحالة")].map(h=>(
-              <div key={h} style={{ fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:"rgba(1,242,207,0.4)" }}>{h}</div>
-            ))}
-          </div>
-          {/* Rows */}
-          {alarmHistory.slice(0,5).map((a: any, i: number) => (
-            <div key={i} style={{ display:"grid",gridTemplateColumns:"110px 1fr 130px 80px",gap:8,padding:"14px 20px",borderTop:"0.5px solid rgba(1,242,207,0.05)",alignItems:"center",background:i%2===0?"rgba(1,242,207,0.012)":"transparent" }}>
-              <div style={{ fontSize:11,fontFamily:"monospace",color:"#5fa09a" }}>{a.timestamp?new Date(a.timestamp).toLocaleTimeString():"—"}</div>
-              <div style={{ fontSize:13,fontWeight:700,color:DANGER }}>{a.drone_class??"—"}</div>
-              <div style={{ fontSize:12,color:"#5fa09a" }}>{a.nearest_area??"—"}</div>
-              <div>
-                <span style={{ display:"inline-flex",alignItems:"center",padding:"3px 8px",borderRadius:20,fontSize:9,fontWeight:700,textTransform:"uppercase",background:"rgba(248,113,113,0.10)",color:DANGER,border:"0.5px solid rgba(248,113,113,0.2)" }}>
-                  {t("threat.CRITICAL","حرج")}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Recent Events / alarms table removed per request. Live alarms
+          still appear in the AlertBanner at the top of the page and on
+          the Live Detection page. */}
     </div>
   );
 }

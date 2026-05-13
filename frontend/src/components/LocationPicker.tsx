@@ -17,14 +17,38 @@ const pinIcon = new Icon({
 
 interface Props { lat: number; lon: number; onChange: (lat: number, lon: number) => void; height?: string; zoom?: number; }
 
+/** Wrap a longitude into the canonical [-180, 180] range. Defensive
+ *  guard against world-copy clicks returning a wrapped longitude that
+ *  Leaflet refuses to draw a marker at. */
+function wrapLng(lng: number): number {
+  return ((((lng + 180) % 360) + 360) % 360) - 180;
+}
+
+function isFiniteLatLng(lat: number, lng: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lng);
+}
+
 function ClickCatcher({ onPick }: { onPick: (lat: number, lon: number) => void }) {
-  useMapEvents({ click(e) { onPick(e.latlng.lat, e.latlng.lng); } });
+  useMapEvents({
+    click(e) {
+      const lat = e.latlng.lat;
+      const lng = wrapLng(e.latlng.lng);
+      if (!isFiniteLatLng(lat, lng)) return;
+      onPick(lat, lng);
+    },
+  });
   return null;
 }
 
+/** Smoothly pan the map to the new lat/lon whenever the prop changes.
+ *  Uses `panTo` so the move is animated (~350 ms slide) instead of a
+ *  hard teleport, while keeping the operator's current zoom level. */
 function Recenter({ lat, lon }: { lat: number; lon: number }) {
   const map = useMap();
-  useEffect(() => { map.setView([lat, lon]); }, [lat, lon, map]);
+  useEffect(() => {
+    if (!isFiniteLatLng(lat, lon)) return;
+    map.panTo([lat, lon], { animate: true, duration: 0.35 });
+  }, [lat, lon, map]);
   return null;
 }
 
@@ -33,12 +57,28 @@ export function LocationPicker({ lat, lon, onChange, height = "320px", zoom = 11
   const tileUrl = theme === "light"
     ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
     : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+
+  const handlePick = (newLat: number, newLon: number) => {
+    if (!isFiniteLatLng(newLat, newLon)) return;
+    onChange(newLat, newLon);
+  };
+
   return (
     <div style={{ height }} className="rounded-md overflow-hidden border border-slate-700">
-      <MapContainer center={[lat, lon]} zoom={zoom} scrollWheelZoom className="h-full w-full">
+      <MapContainer center={[lat, lon]} zoom={zoom} scrollWheelZoom worldCopyJump={false} className="h-full w-full">
         <TileLayer attribution='&copy; OpenStreetMap' url={tileUrl} />
-        <Marker position={[lat, lon]} icon={pinIcon} draggable eventHandlers={{ dragend: (e) => { const ll = e.target.getLatLng() as LatLng; onChange(ll.lat, ll.lng); } }} />
-        <ClickCatcher onPick={onChange} />
+        <Marker
+          position={[lat, lon]}
+          icon={pinIcon}
+          draggable
+          eventHandlers={{
+            dragend: (e) => {
+              const ll = e.target.getLatLng() as LatLng;
+              handlePick(ll.lat, wrapLng(ll.lng));
+            },
+          }}
+        />
+        <ClickCatcher onPick={handlePick} />
         <Recenter lat={lat} lon={lon} />
       </MapContainer>
     </div>

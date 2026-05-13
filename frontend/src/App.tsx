@@ -4,10 +4,11 @@ import { LanguageToggle } from "./components/LanguageToggle";
 import { AlarmBanner } from "./components/AlarmBanner";
 import { RoleToggle } from "./components/RoleToggle";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { AdminSignInButton } from "./components/AdminSignInButton";
 import { AlarmsProvider, useAlarmsContext } from "./contexts/AlarmsContext";
 import { RoleProvider, useRole } from "./contexts/RoleContext";
 import { ChatbotProvider } from "./contexts/ChatbotContext";
-import { ThemeProvider } from "./contexts/ThemeContext";
+import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { Overview } from "./pages/Overview";
 import { LiveDetection } from "./pages/LiveDetection";
 import { HistoryMap } from "./pages/HistoryMap";
@@ -37,7 +38,7 @@ function AdminOnly({ children }: { children: JSX.Element }) {
   const { role } = useRole();
   const { t } = useTranslation();
   if (role !== "admin") return (
-    <div style={{ background:"rgba(13,21,40,0.95)", border:`0.5px solid ${BORDER}`, borderRadius:14, padding:48, textAlign:"center", color:"#5fa09a", fontSize:15 }}>
+    <div style={{ background:"var(--bg-card)", border:"0.5px solid var(--border-subtle)", borderRadius:14, padding:48, textAlign:"center", color:"var(--text-muted)", fontSize:15 }}>
       {t("auth.admin_only")}
     </div>
   );
@@ -69,23 +70,37 @@ function NavIcon({ d }: { d: string }) {
   );
 }
 function SbLabel({ label }: { label: string }) {
-  return <div style={{ fontSize:9, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", color:"rgba(1,242,207,0.3)", padding:"14px 10px 5px" }}>{label}</div>;
+  // Theme-aware faint token — bright cyan at 30% alpha was invisible
+  // on the pale mint sidebar in light mode.
+  return <div style={{ fontSize:9, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", color:"var(--text-faint)", padding:"14px 10px 5px" }}>{label}</div>;
 }
 
 function Shell() {
   const { t, i18n } = useTranslation();
   const { role, setRole } = useRole();
+  const { theme } = useTheme();
   const isAdmin = role === "admin";
   const isAr = i18n.language === "ar";
+  const isLight = theme === "light";
+
+  // Theme-aware chrome — header / sidebar / borders read these so the
+  // dark/light toggle actually swaps the dashboard chrome instead of
+  // leaving inline dark styles overriding the CSS variables.
+  // Header + sidebar now share the same chrome tone so the top bar
+  // and side bar read as one continuous frame around the content.
+  const SIDEBAR_BG    = isLight ? "#bcd5cd"                : "#090d15";
+  const HEADER_BG     = SIDEBAR_BG;
+  const CHROME_BORDER = isLight ? "0.5px solid rgba(0,90,75,0.36)"
+                                : "0.5px solid rgba(1,242,207,0.10)";
 
   const handleSignOut = () => { localStorage.removeItem("admin_token"); setRole("viewer"); };
 
   return (
-    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:"#0d1117", color:"#e0f5f2", direction:isAr?"rtl":"ltr" }}>
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", direction:isAr?"rtl":"ltr" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
         *{box-sizing:border-box}
-        html,body{margin:0;padding:0;background:#0d1117}
+        html,body{margin:0;padding:0}
         body{font-family:${isAr?"'Tajawal'":"'Inter'"},system-ui,sans-serif}
 
         /* ── Nav ── */
@@ -104,32 +119,36 @@ function Shell() {
           ${isAr?"border-right:2.5px solid #01F2CF":"border-left:2.5px solid #01F2CF"};
         }
 
-        /* ── Cards ── */
+        /* ── Cards (theme-aware) — border thickness up to 1px and a
+              real drop shadow so every box clearly floats above the
+              page in light mode. ── */
         .card{
-          background:rgba(18,32,29,0.96);
-          border:0.5px solid rgba(1,242,207,0.10);
+          background:var(--bg-card);
+          border:1px solid var(--border-subtle);
           border-radius:16px;
           padding:clamp(16px,2.2vw,24px);
           position:relative;overflow:hidden;
+          color:var(--text-primary);
+          box-shadow:0 8px 24px -12px rgba(0,0,0,0.25),0 2px 6px -2px rgba(0,0,0,0.12);
         }
         .card::after{
           content:'';position:absolute;top:0;left:0;right:0;height:1px;
-          background:linear-gradient(90deg,transparent,rgba(1,242,207,0.18),transparent);
+          background:linear-gradient(90deg,transparent,rgba(1,242,207,0.16),transparent);
           pointer-events:none;
         }
 
-        /* ── Inputs ── */
+        /* ── Inputs (theme-aware) ── */
         .input{
-          background:rgba(10,20,17,0.8);
-          border:0.5px solid rgba(1,242,207,0.14);
+          background:var(--bg-elevated);
+          border:0.5px solid var(--border-medium);
           border-radius:11px;padding:11px 14px;
-          color:#e0f5f2;
+          color:var(--text-primary);
           font-size:${isAr?"15px":"14px"};
           width:100%;font-family:inherit;
         }
         .input:focus{outline:none;border-color:rgba(1,242,207,0.48);box-shadow:0 0 0 3px rgba(1,242,207,0.09)}
-        .input::placeholder{color:rgba(1,242,207,0.28)}
-        select.input option{background:#131f1c;color:#e0f5f2}
+        .input::placeholder{color:var(--text-faint)}
+        select.input option{background:var(--bg-card-flat);color:var(--text-primary)}
 
         /* ── Buttons ── */
         .btn-primary{
@@ -199,12 +218,21 @@ function Shell() {
         .badge-warning{background:rgba(251,191,36,0.10);color:#fbbf24;border:0.5px solid rgba(251,191,36,0.22)}
         .badge-muted{background:rgba(95,160,154,0.10);color:#5fa09a;border:0.5px solid rgba(95,160,154,0.2)}
 
-        /* ── Utilities ── */
+        /* ── Utilities (dark mode defaults) ── */
         .text-accent{color:#01F2CF}
         .text-muted{color:#5fa09a}
         .text-danger{color:#f87171}
         .text-warning{color:#fbbf24}
         .text-success{color:#01F2CF}
+        /* These inline rules are injected after index.css so they
+           shadow the html.light overrides — restate the light-mode
+           palette here so chart legends, error text, etc. stay
+           readable on white cards. */
+        html.light .text-accent{color:#009980}
+        html.light .text-muted{color:#3a7570}
+        html.light .text-danger{color:#dc2626}
+        html.light .text-warning{color:#a16207}
+        html.light .text-success{color:#03796a}
         .font-data{font-family:'JetBrains Mono',monospace}
         .scrollbar-thin::-webkit-scrollbar{width:4px}
         .scrollbar-thin::-webkit-scrollbar-thumb{background:rgba(1,242,207,0.15);border-radius:4px}
@@ -241,31 +269,40 @@ function Shell() {
         position:"sticky",top:0,zIndex:20,flexShrink:0,
         display:"flex",alignItems:"center",justifyContent:"space-between",
         padding:"0 24px",height:62,
-        background:"rgba(9,13,21,0.97)",backdropFilter:"blur(20px)",
-        borderBottom:"0.5px solid rgba(1,242,207,0.10)",
+        background:HEADER_BG,backdropFilter:"blur(20px)",
+        borderBottom:CHROME_BORDER,
       }}>
         <div style={{ display:"flex",alignItems:"center",gap:12 }}>
-          {/* Logo icon */}
+          {/* Brand logo — uses the real /public/logo.svg with the
+              cyan→mint→sky gradient baked in. The tile background
+              switches per theme so the gradient logo always has a
+              contrasting surface to read against: deep navy in dark
+              mode, near-white in light mode (otherwise the mint logo
+              blended into the mint header). */}
           <div style={{
-            width:38,height:38,borderRadius:11,flexShrink:0,
-            background:"linear-gradient(135deg,#01F2CF,#03DA9A 50%,#03B3DA)",
+            width:42,height:42,borderRadius:12,flexShrink:0,
             display:"flex",alignItems:"center",justifyContent:"center",
-            boxShadow:"0 0 20px rgba(1,242,207,0.35)",
+            background: isLight ? "#0b2422" : "rgba(1,242,207,0.06)",
+            border: isLight ? "0.5px solid rgba(0,90,75,0.45)" : "0.5px solid rgba(1,242,207,0.22)",
+            boxShadow: isLight ? "0 2px 8px rgba(11,36,34,0.20)" : "0 0 20px rgba(1,242,207,0.18)",
           }}>
-            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#0a1410" strokeWidth={2.4}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
-            </svg>
+            <img src="/logo.svg" alt="رقيب" width="30" height="30" style={{ display:"block" }}/>
           </div>
           {/* Title */}
           <div>
-            <div style={{
-              fontSize:20,fontWeight:800,lineHeight:1.1,
-              background:"linear-gradient(90deg,#01F2CF,#03DA9A 50%,#03B3DA)",
-              WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",
-            }}>
+            {/* Brand title — gradient on dark chrome, solid dark on
+                the lighter chrome of light mode. The brand gradient
+                (cyan→mint→sky) blended into the mint header in light
+                mode; switching to solid #0b2422 gives a strong,
+                unambiguous title there. */}
+            <div style={
+              isLight
+                ? { fontSize:20, fontWeight:800, lineHeight:1.1, color:"#0b2422" }
+                : { fontSize:20, fontWeight:800, lineHeight:1.1, background:"linear-gradient(90deg,#01F2CF,#03DA9A 50%,#03B3DA)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }
+            }>
               رقيب
             </div>
-            <div style={{ fontSize:11,color:"rgba(1,242,207,0.4)",letterSpacing:"0.04em",marginTop:1 }}>
+            <div style={{ fontSize:11,color:"var(--text-primary)",letterSpacing:"0.04em",marginTop:1,opacity:0.85 }}>
               {isAr?"منظومة الدفاع ضد المسيّرات":"Counter-UAS Defense System"}
             </div>
           </div>
@@ -273,15 +310,21 @@ function Shell() {
           <div style={{ position:"relative",display:"flex",alignItems:"center",justifyContent:"center",marginInlineStart:4 }}>
             <style>{`
               @keyframes livePing{0%,100%{transform:scale(0.8);opacity:0.5}50%{transform:scale(2.5);opacity:0}}
-              .live-ping{position:absolute;width:18px;height:18px;border-radius:50%;background:rgba(1,242,207,0.2);animation:livePing 1.8s ease-in-out infinite}
-              .live-dot{width:8px;height:8px;border-radius:50%;background:#01F2CF;box-shadow:0 0 10px rgba(1,242,207,0.8);z-index:1;position:relative}
+              /* Crimson live-indicator dot — universal "operational /
+                 streaming" red. Reads against both the mint light-mode
+                 chrome and the navy dark-mode chrome, unlike the cyan
+                 which got lost on the mint chrome. */
+              .live-ping{position:absolute;width:18px;height:18px;border-radius:50%;background:rgba(239,68,68,0.25);animation:livePing 1.8s ease-in-out infinite}
+              .live-dot{width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,0.85);z-index:1;position:relative}
             `}</style>
             <span className="live-ping"/>
             <span className="live-dot"/>
           </div>
         </div>
+        {/* Header only carries the role indicator now. Theme + language
+            toggles live in the sidebar bottom (see below) so the header
+            stays minimal. */}
         <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-          <ThemeToggle/>
           <RoleToggle/>
         </div>
       </header>
@@ -292,8 +335,8 @@ function Shell() {
         {/* Sidebar */}
         <aside style={{
           width:188,flexShrink:0,display:"flex",flexDirection:"column",
-          background:"#090d15",
-          borderInlineEnd:"0.5px solid rgba(1,242,207,0.10)",
+          background:SIDEBAR_BG,
+          borderInlineEnd:CHROME_BORDER,
           position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto",
         }}>
           <nav style={{ flex:1,padding:"8px 10px" }}>
@@ -321,10 +364,22 @@ function Shell() {
             )}
           </nav>
 
-          {/* Bottom controls */}
-          <div style={{ padding:"12px 10px 16px",borderTop:"0.5px solid rgba(1,242,207,0.10)",display:"flex",flexDirection:"column",gap:8 }}>
-            <LanguageToggle/>
-            {isAdmin&&(
+          {/* Bottom controls — language and theme toggle sit side-by-
+              side. LanguageToggle takes the row's leading width, the
+              theme button is a fixed-size circle on the trailing side. */}
+          <div style={{ padding:"12px 10px 16px",borderTop:CHROME_BORDER,display:"flex",flexDirection:"column",gap:8 }}>
+            {/* Two equal pills — language on one side, theme on the
+                other. Each takes 50% of the row so they read as a
+                matched pair. */}
+            <div style={{ display:"flex",alignItems:"stretch",gap:8 }}>
+              <div style={{ flex:1 }}><LanguageToggle/></div>
+              <div style={{ flex:1 }}><ThemeToggle/></div>
+            </div>
+            {/* Sign-In (viewer) or Sign-Out (admin) — same slot, same
+                size, same shape. The Operator gets a gradient-accent
+                button to upgrade to Admin; the Admin gets a gradient-
+                red button to downgrade back to Viewer. */}
+            {isAdmin ? (
               <button onClick={handleSignOut} style={{
                 width:"100%",padding:"10px 12px",borderRadius:11,
                 background:"linear-gradient(135deg,#f87171,#dc2626)",
@@ -337,6 +392,8 @@ function Shell() {
                 </svg>
                 {t("auth.sign_out")}
               </button>
+            ) : (
+              <AdminSignInButton/>
             )}
           </div>
         </aside>

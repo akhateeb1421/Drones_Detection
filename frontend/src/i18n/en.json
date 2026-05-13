@@ -8,12 +8,13 @@
     "live": "Live Detection",
     "history": "History Map",
     "analysis": "Analysis",
-    "chatbot": "Chatbot",
+    "chatbot": "Sanad",
     "admin": "Admin",
     "cameras": "Cameras",
     "areas": "Sensitive Areas",
     "placement": "Camera Placement",
-    "drones": "Drones"
+    "drones": "Drones",
+    "about": "About"
   },
   "common": {
     "language": "Language",
@@ -25,6 +26,7 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "delete_confirm": "Delete?",
+    "confirm_delete": "Are you sure?",
     "edit": "Edit",
     "add": "Add",
     "approve": "Approve",
@@ -40,12 +42,27 @@
   "overview": {
     "total_attacks": "Total Attacks",
     "regions": "Regions Affected",
-    "by_region": "Distribution by Region",
+    "drone_attacks": "Drone Attacks",
+    "recent_alarms": "Active Alarms",
+    "location_points": "records",
+    "by_region": "Geographic",
     "by_type": "Attacks by Type",
-    "combined": "Combined Attacks",
+    "combined": "Combined",
     "recent_threats": "Recent Threats",
     "hover_hint": "Hover a slice for details",
-    "points_events": "{{rows}} location points across {{events}} events"
+    "points_events": "{{rows}} location points across {{events}} events",
+    "attack_vector": "Attack Vector",
+    "weekly_trend": "Weekly Attack Pattern",
+    "threat_profile": "Intelligence",
+    "region_radar": "Most Affected Regions",
+    "attacks_per_region": "Attacks by Region",
+    "distribution": "Geographic Distribution",
+    "combined_attacks_today": "Combined Attacks",
+    "recent_events": "Recent Events",
+    "alarm_timeline": "Alarm Timeline",
+    "attacks": "Attacks",
+    "critical_threat": "Critical Threat",
+    "mixed": "Mixed"
   },
   "live": {
     "title": "Live Detection",
@@ -85,7 +102,27 @@
     "btn_countered": "Countered",
     "btn_hit": "Hit target",
     "outcome_countered": "Countered",
-    "outcome_hit": "Hit target"
+    "outcome_hit": "Hit target",
+    "weather": "Weather",
+    "weather_wind": "Wind speed",
+    "weather_temp": "Temperature",
+    "weather_condition": "Condition",
+    "weather_status_optimal": "Optimal",
+    "weather_status_degraded": "Degraded",
+    "weather_status_poor": "Poor",
+    "weather_caption_optimal": "Optimal detection conditions",
+    "weather_caption_degraded": "Reduced visibility — verify detections",
+    "weather_caption_poor": "Poor visibility — EO unreliable",
+    "weather_cond_clear": "Clear",
+    "weather_cond_mostly_clear": "Mostly clear",
+    "weather_cond_partly_cloudy": "Partly cloudy",
+    "weather_cond_cloudy": "Cloudy",
+    "weather_cond_fog": "Fog",
+    "weather_cond_drizzle": "Drizzle",
+    "weather_cond_rain": "Rain",
+    "weather_cond_snow": "Snow",
+    "weather_cond_storm": "Thunderstorm",
+    "weather_cond_unknown": "Unknown"
   },
   "history": {
     "title": "Historical Attacks Map",
@@ -100,27 +137,64 @@
   "analysis": {
     "title": "Analysis",
     "timeline": "Timeline",
+    "timeline_sub": "Monthly attack counts",
     "by_region": "By region",
     "by_type": "By type",
     "risk": "Risk assessment",
-    "forecast": "Attack forecast",
+    "forecast": "Attack Forecast",
+    "attack_forecast": "Attack Forecast",
     "horizon": "Horizon (days)",
+    "horizon_days": "Forecast days",
     "forecast_help": "Predicts daily attack count per region for the next {{days}} days.",
-    "count": "Attacks"
+    "count": "Attacks",
+    "historical": "Historical",
+    "next": "Next",
+    "days": "days",
+    "year_label": "1Y",
+    "year_horizon": "Full year"
   },
   "chatbot": {
-    "title": "AI Assistant",
+    "title": "Sanad",
     "placeholder": "Ask a question...",
     "send": "Send",
     "clear": "Clear conversation",
     "api": "API",
     "local": "Local",
-    "api_hint": "Cloud — Gemini Flash. Free, fast, high-quality. Requires internet.",
-    "local_hint": "On-device — Qwen2.5-3B + drone-QA LoRA. Slower, runs offline."
+    "api_hint": "Cloud model — Gemini Flash. Free, fast, high-quality. Requires internet.",
+    "local_hint": "Local model — Qwen2.5-3B + drone-QA LoRA. Slower, runs offline."
+  },
+  "cameras": {
+    "add": "Add Camera",
+    "active": "Active",
+    "inactive": "Off",
+    "name_en": "Name (English)",
+    "name_ar": "Name (Arabic)",
+    "stream_url": "Stream URL",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "heading": "Heading (deg)",
+    "altitude": "Altitude (m)",
+    "distance": "Target Distance (m)",
+    "fov_h": "Horizontal FOV",
+    "fov_v": "Vertical FOV",
+    "sensor_w": "Sensor Width (px)",
+    "enabled": "Enabled",
+    "col_name": "Name",
+    "col_stream": "Stream",
+    "col_latlon": "Lat / Lon",
+    "col_heading": "Heading",
+    "col_enabled": "Active",
+    "pick_on_map": "Pick on map",
+    "show_map": "Show map",
+    "hide_map": "Hide map",
+    "map_hint": "Click or drag the marker to set coordinates.",
+    "name_required": "Name is required."
   },
   "admin": {
     "token_label": "Admin token",
     "token_save": "Save token",
+    "save_token": "Save token",
+    "token_note": "Stored locally and sent as X-Admin-Token on writes.",
     "token_help": "Stored locally in your browser and sent as X-Admin-Token on writes.",
     "cameras_title": "Camera management",
     "areas_title": "Sensitive areas",
@@ -142,7 +216,8 @@
       "hide_map": "Hide map",
       "pick_hint": "Click or drag the marker to set latitude/longitude.",
       "name_en": "Name (English)",
-      "name_ar": "Name (Arabic)"
+      "name_ar": "Name (Arabic)",
+      "name_required": "Name is required."
     },
     "table": {
       "name": "Name",
@@ -159,9 +234,9 @@
   },
   "placement": {
     "title": "Suggested camera placements & headings",
-    "radius": "Radius",
-    "fov": "FOV",
-    "range": "Assumed range",
+    "radius": "Attack distance",
+    "fov": "Camera FOV",
+    "range": "Early-detection range",
     "recompute": "Recompute",
     "map": "Map",
     "suggestions": "Suggestions",
@@ -169,9 +244,9 @@
     "heading": "Heading",
     "attacks": "Attacks",
     "details": "Details",
-    "clusters": "Hotspots",
+    "clusters": "Risk areas",
     "forward": "Forward offset",
-    "early_warning": "Early warning",
+    "early_warning": "Camera offset",
     "summary_counts": "{{area}} area · {{forward}} forward",
     "kind_area": "area",
     "kind_forward": "forward",
@@ -257,6 +332,15 @@
     "MEDIUM": "MEDIUM",
     "LOW": "LOW"
   },
+  "days": {
+    "Sun": "Sun",
+    "Mon": "Mon",
+    "Tue": "Tue",
+    "Wed": "Wed",
+    "Thu": "Thu",
+    "Fri": "Fri",
+    "Sat": "Sat"
+  },
   "auth": {
     "role_admin": "Admin",
     "role_viewer": "Operator",
@@ -265,7 +349,8 @@
     "sign_out": "Sign out",
     "token_required": "Token is required",
     "admin_only": "This page is admin-only.",
-    "invalid_token": "Invalid token"
+    "invalid_token": "Invalid token",
+    "token_invalid": "Token rejected — check the value and try again."
   },
   "theme": {
     "switch_to_light": "Switch to light mode",
@@ -304,7 +389,7 @@
     "orlan": {
       "name": "Orlan-10",
       "tagline": "Russian medium-range reconnaissance UAV",
-      "summary": "Catapult-launched, parachute-recovered ISR drone. Carries EO/IR cameras for artillery spotting and signals collection; widely used as the eyes of Russian artillery. Built around commercial off-the-shelf components.",
+      "summary": "Catapult-launched, parachute-recovered ISR drone. Carries optical and thermal cameras for artillery spotting and signals collection; widely used as the eyes of Russian artillery. Built around commercial off-the-shelf components.",
       "values": {
         "role": "Reconnaissance & artillery spotting",
         "origin": "Russia (Special Technology Center, St. Petersburg)",
@@ -312,7 +397,7 @@
         "speed": "90–150 km/h",
         "range": "~120 km radio link · 600 km autonomous",
         "wingspan": "3.1 m",
-        "payload": "EO/IR camera, SIGINT, up to 5 kg",
+        "payload": "Daylight camera, thermal camera, radio beacon",
         "counter": "EW jamming (control + GNSS), MANPADS, mobile AAA, anti-UAV nets, cyber takeover via spoofed GPS"
       }
     }

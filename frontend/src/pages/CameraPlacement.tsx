@@ -118,7 +118,7 @@ export function CameraPlacementPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl font-semibold gradient-text">{t("placement.title")}</h1>
+        <h1 className="text-xl font-semibold">{t("placement.title")}</h1>
         <div className="text-xs text-muted">
           {t("placement.summary_counts", { area: counts.area, forward: counts.forward })}
         </div>
@@ -226,19 +226,22 @@ export function CameraPlacementPage() {
                     });
                 return (
                   <tr key={i} className="align-top">
-                    <td className="py-2 pe-3">
+                    <td className="text-start py-2 pe-3">
                       <div className="font-medium">{s.name}</div>
                       <div className="text-xs text-muted">
                         {s.kind === "area" ? t("placement.kind_area") : t("placement.kind_forward")}
                       </div>
                     </td>
-                    <td className="pe-3 whitespace-nowrap" dir="ltr">
-                      <span className="font-data">{s.heading_deg}°</span>
+                    <td className="text-start pe-3 whitespace-nowrap">
+                      {/* Only the digit string needs LTR override; the
+                          compass-direction label is translated text
+                          and follows the parent direction (RTL in ar). */}
+                      <span className="font-data" dir="ltr">{s.heading_deg}°</span>
                       <span className="text-muted text-xs ms-1">
                         {t(`compass.${s.heading_label}`, { defaultValue: s.heading_label })}
                       </span>
                     </td>
-                    <td className="text-xs leading-relaxed">{rationale}</td>
+                    <td className="text-start text-xs leading-relaxed">{rationale}</td>
                   </tr>
                 );
               })}

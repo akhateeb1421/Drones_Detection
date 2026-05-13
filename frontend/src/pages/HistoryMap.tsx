@@ -55,7 +55,7 @@ export function HistoryMap() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold gradient-text">{t("history.title")}</h1>
+      <h1 className="text-xl font-semibold">{t("history.title")}</h1>
       <div className="card grid grid-cols-1 gap-3 md:grid-cols-5">
         <div>
           <div className="label">{t("history.date_from")}</div>
@@ -79,7 +79,11 @@ export function HistoryMap() {
             {types.map((tt) => <option key={tt} value={tt}>{typeLabel(tt)}</option>)}
           </select>
         </div>
-        <div className="flex items-end">
+        <div>
+          {/* Invisible label spacer so the search button aligns with
+              the inputs above. Without this the button sat ~14 px
+              lower because the other cells reserve label height. */}
+          <div className="label" aria-hidden style={{ visibility: "hidden" }}>&nbsp;</div>
           <button onClick={fetchData} className="btn-primary w-full">{t("common.search")}</button>
         </div>
       </div>

@@ -8,10 +8,52 @@
    Accent: #01F2CF → #03DA9A → #03B3DA
 ══════════════════════════════════════════════ */
 
+/* Theme tokens. Inline styles in pages use var(--token) so the dark/
+   light toggle actually changes them — CSS classes alone can't beat
+   inline `style={{}}` props. */
+:root {
+  --bg-app:         #0d1117;
+  --bg-card:        linear-gradient(160deg, rgba(14,22,40,0.97) 0%, rgba(10,15,28,0.98) 100%);
+  --bg-card-flat:   #0e1628;
+  --bg-elevated:    rgba(8, 14, 26, 0.8);
+  --text-primary:   #e0f5f2;
+  --text-secondary: #b8e0db;
+  --text-muted:     #5fa09a;
+  --text-faint:     #3d7872;
+  --border-subtle:  rgba(1, 242, 207, 0.10);
+  --border-medium:  rgba(1, 242, 207, 0.22);
+}
+html.light {
+  /* Page is a clearly tinted teal-mint; cards stay near-white with a
+     visible border + shadow so they unambiguously float above the
+     page. Pure-white cards on a pale-mint page weren't readable as
+     "boxes" — the difference is intentionally larger now. */
+  --bg-app:         #a9c9c1;
+  --bg-card:        #ffffff;
+  --bg-card-flat:   #ffffff;
+  --bg-elevated:    #f0f7f5;
+  --text-primary:   #0b2422;
+  --text-secondary: #1f4541;
+  --text-muted:     #3a7570;
+  --text-faint:     #5e857f;
+  --border-subtle:  rgba(0, 90, 75, 0.36);
+  --border-medium:  rgba(0, 90, 75, 0.55);
+}
+
+/* Light-mode card lift — adds a real shadow so every box visibly
+   floats above the deeper page. Dark mode keeps the muted shadow from
+   the base .card rule. */
+html.light .card {
+  box-shadow:
+    0 1px 0 rgba(11,36,34,0.04),
+    0 6px 18px -6px rgba(11,36,34,0.18),
+    0 14px 36px -16px rgba(11,36,34,0.20) !important;
+}
+
 html, body, #root {
   height: 100%;
-  background-color: #0d1117 !important;
-  color: #e0f5f2;
+  background-color: var(--bg-app) !important;
+  color: var(--text-primary);
 }
 
 body {
@@ -31,10 +73,22 @@ body {
 #root { position: relative; overflow-x: hidden; }
 
 /* ── Leaflet ── */
+/* `isolation: isolate` on .leaflet-container creates a private stacking
+   context so the map can't poke through dashboard chrome. DO NOT add a
+   `.leaflet-pane { z-index: auto }` override here — Leaflet's own CSS
+   gives each pane a specific z-index (tile=2, overlay=4, marker=6,
+   popup=8) and overriding them with `auto` causes markers to fall
+   behind tiles after any pane re-layout (which happens on click,
+   drag, and zoom animations). That manifested as the LocationPicker
+   marker "disappearing" whenever the operator clicked west/north/etc. */
 .leaflet-container { background: #08101a !important; position: relative; z-index: 0; isolation: isolate; }
-.leaflet-pane { z-index: auto; }
-.leaflet-top, .leaflet-bottom { z-index: 1; }
+.leaflet-top, .leaflet-bottom { z-index: 1000; }
 .leaflet-tile { filter: saturate(0.6) brightness(0.75) hue-rotate(140deg); }
+/* Leaflet popups always render on a white bubble — force dark text
+   regardless of theme so the popup body never inherits a light
+   --text-primary (invisible-on-white in dark mode). */
+.leaflet-popup-content { color: #0b2422 !important; }
+.leaflet-popup-content strong { color: #0b2422 !important; }
 
 /* ── Typography ── */
 .tabular { font-variant-numeric: tabular-nums; }
@@ -142,19 +196,31 @@ body {
 .card-interactive:hover { transform: translateY(-2px); border-color: rgba(1,242,207,0.22); }
 .card-accent { @apply card; border-color: rgba(1,242,207,0.20); }
 
-/* ── Inputs ── */
+/* ── Inputs — theme-aware so date pickers, text fields, and the
+       `from / to` filters on the History map stay readable when the
+       user switches to light mode. ── */
 .input {
   @apply w-full rounded-xl transition-all duration-150;
   padding: 12px 16px;
-  background: rgba(8, 14, 26, 0.8);
-  border: 0.5px solid rgba(1,242,207,0.14);
-  color: #e0f5f2;
+  background: var(--bg-elevated);
+  border: 0.5px solid var(--border-medium);
+  color: var(--text-primary);
   font-size: 15px;
   font-family: inherit;
 }
-.input::placeholder { color: rgba(1,242,207,0.28); }
+.input::placeholder { color: var(--text-faint); }
 .input:focus { outline: none; border-color: rgba(1,242,207,0.48); box-shadow: 0 0 0 3px rgba(1,242,207,0.09); }
-select.input option { background: #0d1117; color: #e0f5f2; }
+select.input option { background: var(--bg-card-flat); color: var(--text-primary); }
+/* Make the browser-rendered calendar icon on <input type="date"> visible
+   on a dark background; flip its luminance back in light mode. */
+input[type="date"], input[type="datetime-local"], input[type="time"] {
+  color-scheme: dark;
+}
+html.light input[type="date"],
+html.light input[type="datetime-local"],
+html.light input[type="time"] {
+  color-scheme: light;
+}
 
 /* ── Labels ── */
 .label {
@@ -247,6 +313,18 @@ select.input option { background: #0d1117; color: #e0f5f2; }
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
+/* ── Gradient utilities (used by toggles, headings, accent CTAs) ── */
+.gradient-accent {
+  background: linear-gradient(135deg, #01F2CF 0%, #03DA9A 50%, #03B3DA 100%);
+}
+.gradient-text {
+  background: linear-gradient(90deg, #01F2CF 0%, #03DA9A 50%, #03B3DA 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.text-bg { color: #0a1410; }
+
 /* ── Color overrides ── */
 .text-accent    { color: #01F2CF; }
 .text-slate-100 { color: #e0f5f2; }
@@ -267,7 +345,9 @@ select.input option { background: #0d1117; color: #e0f5f2; }
 
 .border-slate-800 { border-color: rgba(1,242,207,0.10) !important; }
 .border-slate-700 { border-color: rgba(1,242,207,0.18) !important; }
-.divide-slate-800 > * + * { border-color: rgba(1,242,207,0.07) !important; }
+/* Divider between table rows — was barely visible at 0.07; bumped so
+   the operator can scan rows easily in both modes. */
+.divide-slate-800 > * + * { border-color: rgba(1,242,207,0.18) !important; }
 
 .bg-success { background: linear-gradient(135deg, #01F2CF, #03DA9A) !important; color: #0a1410 !important; }
 .bg-danger  { background: linear-gradient(135deg, #f87171, #dc2626) !important; }
@@ -296,3 +376,146 @@ html.light .nav-item:hover { background: rgba(1,160,140,0.06); color: #0b2422; }
 html.light .nav-item.active { background: linear-gradient(135deg, rgba(1,160,140,0.14), rgba(3,140,180,0.06)); color: #009980; }
 html.light .text-accent { color: #009980 !important; }
 html.light .text-muted  { color: #3a7570 !important; }
+html.light .text-success { color: #03796a !important; }
+html.light .text-warning { color: #a16207 !important; }
+html.light .text-danger  { color: #dc2626 !important; }
+
+/* Slate-100 was missing — the Live Detection layer-toggle "active"
+   state and the assistant chat bubble were rendering near-white text
+   on light cards. Plus the explicit text-slate-100 for completeness. */
+html.light .text-slate-100 { color: #0b2422 !important; }
+
+/* Table headers (admin lists) — the bright cyan-on-cyan was ~3:1.
+   Drop opacity and use the theme-aware muted token. */
+html.light .table-header-row { color: var(--text-muted) !important; }
+
+/* Badge text in light mode — bright dark-theme colors on light fills
+   become illegible. Darken each to a tone that survives WCAG AA on
+   the pale card. */
+html.light .badge-accent  { color: #03796a !important; background: rgba(0,153,128,0.10) !important; border-color: rgba(0,153,128,0.28) !important; }
+html.light .badge-danger  { color: #b91c1c !important; background: rgba(220,38,38,0.10) !important; border-color: rgba(220,38,38,0.30) !important; }
+html.light .badge-warning { color: #a16207 !important; background: rgba(245,158,11,0.12) !important; border-color: rgba(245,158,11,0.32) !important; }
+html.light .badge-muted   { color: #3a7570 !important; background: rgba(58,117,112,0.08) !important; border-color: rgba(58,117,112,0.24) !important; }
+
+/* Page-title `text-white` we added earlier would otherwise vanish on the
+   pale light-mode background. Reroute it through the theme token. */
+html.light .text-white { color: var(--text-primary) !important; }
+
+/* Tailwind slate utilities that some merged pages used — keep readable. */
+html.light .text-slate-200 { color: #1f4541 !important; }
+html.light .text-slate-300 { color: #2d5450 !important; }
+html.light .text-slate-400 { color: #3a7570 !important; }
+html.light .text-slate-500 { color: #587b76 !important; }
+
+/* Tailwind `hover:bg-slate-800` is overridden to dark navy at the base
+   rule — but on light mode that makes a dark-on-dark icon on hover.
+   Give it a subtle tinted hover instead so dark-icon text stays
+   readable. ThemeToggle, Drones tabs, etc. */
+html.light .hover\:bg-slate-800:hover,
+html.light .hover\:bg-slate-700:hover {
+  background-color: rgba(11,36,34,0.08) !important;
+}
+
+/* `.btn-ghost` (Chatbot "Clear conversation", admin sign-in button,
+   etc.) hardcodes a dark backdrop + light-cyan text in App.tsx.
+   Restore it to a light-mode button so both the panel and the label
+   read clearly against the bright page. */
+html.light .btn-ghost {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-medium) !important;
+}
+html.light .btn-ghost:hover {
+  background: rgba(11,36,34,0.06) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-medium) !important;
+}
+
+/* Table-row dividers in light mode — the dark-mode 0.18 cyan is too
+   pale on white cards; use a teal-green at higher alpha. */
+html.light .divide-slate-800 > * + * { border-color: rgba(0,90,75,0.22) !important; }
+
+/* ── Charts in light mode ──
+   The brand cyan/mint/sky palette is designed for dark backgrounds.
+   On the white card the Radar's polar grid (7% cyan) is invisible,
+   the radar fill (13% bright cyan) is invisible, and the Combined
+   Attacks bar gradients (bright cyan→sky) wash out. Force visible
+   strokes / fills via CSS targeted at recharts internals. */
+html.light .recharts-polar-grid path,
+html.light .recharts-polar-grid line {
+  stroke: rgba(0,90,75,0.32) !important;
+}
+html.light .recharts-radar-polygon {
+  stroke: #00956d !important;
+  stroke-width: 2 !important;
+  fill: #00956d !important;
+  fill-opacity: 0.20 !important;
+}
+/* Darken the gradient-filled bars in the Combined Attacks chart so
+   the bright cyan→sky strip survives on a white card. Saturate
+   compensates for the brightness drop. */
+html.light .recharts-bar-rectangles path,
+html.light .recharts-bar-rectangle path {
+  filter: saturate(1.4) brightness(0.62);
+}
+/* Same for the Area chart fills (weekly trend) so they're visible. */
+html.light .recharts-area-area {
+  fill-opacity: 0.55 !important;
+}
+html.light .recharts-area-curve {
+  stroke-width: 2.5 !important;
+}
+/* Cartesian grid lines in charts — invisible at 0.05 alpha on white. */
+html.light .recharts-cartesian-grid line {
+  stroke: rgba(0,90,75,0.18) !important;
+}
+
+/* ── Chrome readability in light mode ──
+   Header and sidebar share the same deeper-mint bg now, so text on
+   them needs to read as dark, not the muted-teal that was tuned for
+   the page-bg cards. Force every text token inside the header / aside
+   to use the high-contrast primary text colour. Brand colours used as
+   text inside the chrome get darkened to match. */
+html.light .gradient-text,
+html.light header .gradient-text,
+html.light header h1,
+html.light header h2,
+html.light header h3 {
+  /* In light mode the brand cyan→mint→sky gradient on text reads
+     low-contrast on the white card / mint chrome. Switch the
+     gradient-clip to a solid #0b2422 (deep teal-black) so any
+     element styled with `.gradient-text` reads as a strong dark
+     heading in light mode. We achieve "solid" via a same-color
+     gradient so the underlying background-clip:text rule still
+     works without changing the property cascade. */
+  background: linear-gradient(90deg, #0b2422 0%, #0b2422 100%) !important;
+  color: #0b2422 !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+}
+html.light header,
+html.light aside {
+  color: #0b2422;
+}
+html.light aside .nav-item        { color: rgba(11,36,34,0.62) !important; }
+html.light aside .nav-item:hover  { color: #0b2422 !important; }
+html.light aside .nav-item.active { color: #00505a !important; background: rgba(0,90,75,0.14) !important; }
+html.light aside .nav-item.active::before { background: linear-gradient(180deg,#006e74,#003a55) !important; }
+/* Sidebar group labels (SbLabel "General", "Intelligence", "Admin") —
+   the inline color:var(--text-faint) reads OK but on the deeper mint
+   sidebar bg we want stronger so the group separators are obvious. */
+html.light aside > nav > div[style*="uppercase"] {
+  color: rgba(11,36,34,0.55) !important;
+}
+
+/* ── Table headings (admin Cameras / Areas / Live Detection) ──
+   In light mode the bright-cyan-at-45%-opacity used as the `th` text
+   colour collapsed to invisible on the new elevated-table-header bg.
+   Force a dark teal so the column labels read clearly. */
+html.light .table-header-row,
+html.light thead th,
+html.light thead {
+  color: #1f4541 !important;
+}

@@ -16,11 +16,12 @@ export function LanguageToggle() {
       onClick={toggle}
       style={{
         width:"100%",
-        padding:"10px 12px",
+        height:40,
+        padding:"0 12px",
         borderRadius:11,
         background:"rgba(1,242,207,0.07)",
-        border:"0.5px solid rgba(1,242,207,0.18)",
-        color:"#e0f5f2",
+        border:"0.5px solid var(--border-medium)",
+        color:"var(--text-primary)",
         fontSize: isAr ? 14 : 13,
         fontWeight:700,
         cursor:"pointer",
@@ -32,11 +33,16 @@ export function LanguageToggle() {
         letterSpacing:"0.02em",
         transition:"all 0.15s",
       }}
-      onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(1,242,207,0.12)";(e.currentTarget as HTMLButtonElement).style.color="#01F2CF"}}
-      onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(1,242,207,0.07)";(e.currentTarget as HTMLButtonElement).style.color="#e0f5f2"}}
+      // On hover, keep text using --text-primary (deep teal in light,
+      // off-white in dark). Earlier bright cyan #01F2CF on the pale
+      // mint sidebar in light mode = 1.5:1 — hover made the label
+      // vanish. Only the background lifts on hover now.
+      onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(1,242,207,0.18)";}}
+      onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(1,242,207,0.07)";}}
     >
-      {/* Earth icon — no Japanese characters */}
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#01F2CF" strokeWidth={2}>
+      {/* Globe icon — uses currentColor so the stroke follows the
+          theme-aware text color set on the parent button. */}
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
         <circle cx="12" cy="12" r="10"/>
         <path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>
       </svg>

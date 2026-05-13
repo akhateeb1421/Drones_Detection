@@ -18,18 +18,61 @@ export function AreasAdmin() {
   const bilingualName = useBilingualName();
   const [items, setItems] = useState<Area[]>([]);
   const [draft, setDraft] = useState({ ...blank });
+  // null = creating new; number = editing that row.
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = () => Areas.list().then(setItems).catch((e) => setError(String(e)));
   useEffect(() => { load(); }, []);
 
+  const startEdit = (a: Area) => {
+    setEditingId(a.id);
+    setDraft({
+      name: a.name,
+      name_ar: a.name_ar ?? "",
+      latitude: a.latitude,
+      longitude: a.longitude,
+      priority: a.priority,
+    });
+    setError(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setDraft({ ...blank });
+    setError(null);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    // Required-field guard. HTML `required` already blocks an empty
+    // submit but doesn't catch whitespace-only ("   ") and can be
+    // bypassed via DevTools, so we re-check here. Backend now
+    // enforces the same rule via Pydantic min_length=1 + strip.
+    const trimmedName = draft.name.trim();
+    if (!trimmedName) {
+      setError(t("admin.fields.name_required", "Name is required."));
+      return;
+    }
+
     try {
-      // Backend treats empty Arabic name as null.
-      const payload = { ...draft, name_ar: draft.name_ar || null };
-      await Areas.create(payload);
+      // Backend treats empty Arabic name as null. Strip both names so
+      // a stray space doesn't become the canonical value.
+      const payload = {
+        ...draft,
+        name: trimmedName,
+        name_ar: draft.name_ar?.trim() || null,
+      };
+      if (editingId !== null) {
+        await Areas.update(editingId, payload);
+        setEditingId(null);
+      } else {
+        await Areas.create(payload);
+      }
       setDraft({ ...blank });
       load();
     } catch (e: unknown) {
@@ -41,6 +84,7 @@ export function AreasAdmin() {
     if (!confirm(t("common.delete_confirm"))) return;
     try {
       await Areas.remove(id);
+      if (editingId === id) cancelEdit();
       load();
     } catch (e: unknown) {
       setError(String((e as Error)?.message ?? e));
@@ -49,12 +93,15 @@ export function AreasAdmin() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold gradient-text">{t("admin.areas_title")}</h1>
+      <h1 className="text-xl font-semibold">{t("admin.areas_title")}</h1>
       {error && <div className="card text-danger">{error}</div>}
 
       <form onSubmit={submit} className="card grid grid-cols-1 gap-3 md:grid-cols-4">
         <div>
-          <div className="label">{t("admin.fields.name_en")}</div>
+          <div className="label">
+            {t("admin.fields.name_en")}
+            <span style={{ color: "#f87171", marginInlineStart: 4 }}>*</span>
+          </div>
           <input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
         </div>
         <div>
@@ -77,7 +124,14 @@ export function AreasAdmin() {
           <button type="button" onClick={() => setShowMap((v) => !v)} className="btn-ghost">
             {showMap ? t("admin.fields.hide_map") : t("admin.fields.show_map")}
           </button>
-          <button type="submit" className="btn-primary">{t("common.add")}</button>
+          {editingId !== null && (
+            <button type="button" onClick={cancelEdit} className="btn-ghost">
+              {t("common.cancel")}
+            </button>
+          )}
+          <button type="submit" className="btn-primary">
+            {editingId !== null ? t("common.save","Save changes") : t("common.add")}
+          </button>
         </div>
         {showMap && (
           <div className="md:col-span-4">
@@ -105,11 +159,20 @@ export function AreasAdmin() {
           <tbody className="divide-y divide-slate-800">
             {items.map((a) => (
               <tr key={a.id}>
-                <td className="py-2 text-start font-data" dir="ltr">{a.id}</td>
+                <td className="py-2 text-start font-data"><span dir="ltr">{a.id}</span></td>
                 <td className="text-start">{a.name_ar ? bilingualName(a) : placeLabel(a.name)}</td>
-                <td className="text-start font-data whitespace-nowrap" dir="ltr">{a.latitude.toFixed(4)}, {a.longitude.toFixed(4)}</td>
-                <td className="text-start font-data" dir="ltr">{a.priority}</td>
-                <td className="text-end"><button onClick={() => remove(a.id)} className="btn-danger">{t("common.delete")}</button></td>
+                <td className="text-start font-data whitespace-nowrap"><span dir="ltr">{a.latitude.toFixed(4)}, {a.longitude.toFixed(4)}</span></td>
+                <td className="text-start font-data"><span dir="ltr">{a.priority}</span></td>
+                <td className="text-end">
+                  <div style={{ display:"inline-flex", gap:6 }}>
+                    <button onClick={() => startEdit(a)} className="btn-primary text-xs">
+                      {t("common.edit","Edit")}
+                    </button>
+                    <button onClick={() => remove(a.id)} className="btn-danger">
+                      {t("common.delete")}
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

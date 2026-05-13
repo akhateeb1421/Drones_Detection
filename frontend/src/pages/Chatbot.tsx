@@ -51,7 +51,7 @@ export function Chatbot() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold gradient-text">{t("chatbot.title")}</h1>
+          <h1 className="text-xl font-semibold">{t("chatbot.title")}</h1>
           <BackendToggle value={backend} onChange={setBackend} disabled={busy} t={t} />
         </div>
         <button onClick={clear} className="btn-ghost">{t("chatbot.clear")}</button>
@@ -66,10 +66,32 @@ export function Chatbot() {
             {history.map((m, i) => (
               <div
                 key={i}
-                className={[
-                  "max-w-[85%] rounded-md px-3 py-2 text-sm whitespace-pre-wrap",
-                  m.role === "user" ? "ms-auto bg-accent2 text-white" : "bg-slate-800 text-slate-100",
-                ].join(" ")}
+                className="max-w-[85%] rounded-md px-3 py-2 text-sm whitespace-pre-wrap"
+                style={
+                  m.role === "user"
+                    ? {
+                        // User bubble — bright cyan→sky gradient, dark
+                        // text. Eye-catching, leading-edge anchored.
+                        marginInlineStart: "auto",
+                        background: "linear-gradient(135deg,#01F2CF,#03B3DA)",
+                        color: "#0a1410",
+                        fontWeight: 600,
+                        border: "1px solid var(--border-medium)",
+                      }
+                    : {
+                        // Assistant bubble — also a LIGHT box in both
+                        // modes, but a calmer pearl mint-tinted off-
+                        // white instead of a saturated brand gradient.
+                        // Reads as light against the dark chat card,
+                        // and as slightly tinted against the white
+                        // light-mode card. Always dark text on top.
+                        background:
+                          "linear-gradient(135deg, #e8f5f1 0%, #d4e8e2 100%)",
+                        color: "#0b2422",
+                        border: "1px solid rgba(11,36,34,0.10)",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.18)",
+                      }
+                }
               >
                 {m.content}
               </div>
@@ -99,9 +121,9 @@ export function Chatbot() {
   );
 }
 
-// Compact pill toggle that lets the user pick the API or Local chat
-// backend. The active option uses the gradient accent; the inactive one
-// is muted. Disabled while a reply is in flight.
+// Pill-group toggle matching the Analysis horizon selector design.
+// Subtle outer track, gradient pill on the active option, muted text
+// on inactive. Same shape and behavior on both Drones-types and here.
 function BackendToggle({
   value,
   onChange,
@@ -111,49 +133,49 @@ function BackendToggle({
   value: ChatBackend;
   onChange: (b: ChatBackend) => void;
   disabled: boolean;
-  // Loose any-typed t to keep the file from importing TFunction generics.
   t: (k: string) => string;
 }) {
-  const base =
-    "px-3 py-1 text-xs font-semibold rounded-full transition-colors duration-150";
+  const OPTIONS: { key: ChatBackend; labelKey: string; hintKey: string }[] = [
+    { key: "api",   labelKey: "chatbot.api",   hintKey: "chatbot.api_hint" },
+    { key: "local", labelKey: "chatbot.local", hintKey: "chatbot.local_hint" },
+  ];
   return (
     <div
       role="tablist"
       aria-label="chatbot backend"
-      className="inline-flex gap-1 rounded-full border border-accent/25 bg-panel-2/40 p-1"
+      style={{
+        display: "flex", gap: 3, padding: 3,
+        background: "var(--bg-elevated)",
+        border: "1px solid var(--border-subtle)",
+        borderRadius: 10,
+      }}
     >
-      <button
-        role="tab"
-        aria-selected={value === "api"}
-        disabled={disabled}
-        onClick={() => onChange("api")}
-        className={[
-          base,
-          value === "api"
-            ? "gradient-accent text-bg shadow-sm"
-            : "text-muted hover:text-white",
-          disabled ? "cursor-not-allowed opacity-60" : "",
-        ].join(" ")}
-        title={t("chatbot.api_hint")}
-      >
-        {t("chatbot.api")}
-      </button>
-      <button
-        role="tab"
-        aria-selected={value === "local"}
-        disabled={disabled}
-        onClick={() => onChange("local")}
-        className={[
-          base,
-          value === "local"
-            ? "gradient-accent text-bg shadow-sm"
-            : "text-muted hover:text-white",
-          disabled ? "cursor-not-allowed opacity-60" : "",
-        ].join(" ")}
-        title={t("chatbot.local_hint")}
-      >
-        {t("chatbot.local")}
-      </button>
+      {OPTIONS.map((o) => {
+        const isActive = value === o.key;
+        return (
+          <button
+            key={o.key}
+            role="tab"
+            aria-selected={isActive}
+            disabled={disabled}
+            onClick={() => onChange(o.key)}
+            title={t(o.hintKey)}
+            style={{
+              padding: "6px 14px", borderRadius: 8, border: "none",
+              cursor: disabled ? "not-allowed" : "pointer",
+              opacity: disabled ? 0.6 : 1,
+              fontFamily: "inherit", fontSize: 12, fontWeight: 700,
+              transition: "all 0.15s",
+              background: isActive
+                ? "linear-gradient(135deg,#01F2CF,#03B3DA)"
+                : "transparent",
+              color: isActive ? "#0a1410" : "var(--text-muted)",
+            }}
+          >
+            {t(o.labelKey)}
+          </button>
+        );
+      })}
     </div>
   );
 }

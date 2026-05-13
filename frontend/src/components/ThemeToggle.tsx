@@ -16,7 +16,29 @@ export function ThemeToggle() {
       onClick={toggle}
       title={aria}
       aria-label={aria}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 text-slate-200 hover:bg-slate-800"
+      // Mirror LanguageToggle's pill design — same border radius,
+      // border color, background tint, padding, height — so the two
+      // sidebar-bottom controls read as a matched pair instead of a
+      // pill + an orphan circle.
+      style={{
+        // Same dimensions and styling as LanguageToggle so the two
+        // pills look identical side-by-side in the sidebar bottom.
+        width: "100%",
+        height: 40,
+        padding: "0 12px",
+        borderRadius: 11,
+        background: "rgba(1,242,207,0.07)",
+        border: "0.5px solid var(--border-medium)",
+        color: "var(--text-primary)",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "inherit",
+        transition: "all 0.15s",
+      }}
+      onMouseEnter={(e)=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(1,242,207,0.12)";}}
+      onMouseLeave={(e)=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(1,242,207,0.07)";}}
     >
       {isDark ? (
         // Sun glyph (means: click to go light)
