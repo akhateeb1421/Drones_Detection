@@ -91,8 +91,15 @@ def _heuristic_forecast(history: pd.DataFrame, region: str, days: int) -> list[F
         # near-zero forecast rather than dividing-by-zero downstream.
         today = datetime.now(timezone.utc).date()
         return [
-            ForecastPoint(region=region, forecast_date=today + timedelta(days=i),
-                          expected_count=0.0, lower=0.0, upper=0.0)
+            ForecastPoint(
+                region=region,
+                forecast_date=today + timedelta(days=i),
+                expected_count=0.0,
+                date=today + timedelta(days=i),
+                predicted_count=0.0,
+                lower=0.0,
+                upper=0.0,
+            )
             for i in range(1, days + 1)
         ]
 
@@ -137,4 +144,86 @@ def _heuristic_forecast(history: pd.DataFrame, region: str, days: int) -> list[F
     points: list[ForecastPoint] = []
     for i in range(1, days + 1):
         d = today + timedelta(days=i)
-        di_doy = flo
+        di_doy = float(d.timetuple().tm_yday)
+        di_dow = float(d.weekday())
+
+        annual = a_year * math.cos(2 * math.pi * di_doy / 365.0) \
+               + b_year * math.sin(2 * math.pi * di_doy / 365.0)
+        weekly = a_week * math.cos(2 * math.pi * di_dow / 7.0) \
+               + b_week * math.sin(2 * math.pi * di_dow / 7.0)
+        trend  = slope * i
+        noise  = float(rng.normal(0.0, sigma))
+
+        yhat = max(0.0, daily_mean + annual + weekly + trend + noise)
+
+        # Confidence band scales with both the deterministic seasonality
+        # and the noise floor — wider when seasonality is far from
+        # baseline, never collapses to a flat line.
+        spread = max(daily_mean * 0.30, abs(annual + weekly) * 0.6, 2 * sigma)
+
+        ec = round(float(yhat), 3)
+        points.append(
+            ForecastPoint(
+                region=region,
+                forecast_date=d,
+                expected_count=ec,
+                # Aliases for the new Analysis.tsx, which reads p.date /
+                # p.predicted_count first and falls back to the old names.
+                date=d,
+                predicted_count=ec,
+                lower=round(float(max(0.0, yhat - spread)), 3),
+                upper=round(float(yhat + spread), 3),
+            )
+        )
+    return points
+
+
+def forecast(db: Session, region: str | None, days: int = 30) -> list[ForecastPoint]:
+    history = _load_history(db, None)
+    if history.empty:
+        return []
+    regions = [region] if region else sorted(history["region"].dropna().unique().tolist())
+
+    out: list[ForecastPoint] = []
+    for r in regions:
+        artifact = ARTIFACTS_DIR / f"prophet_{_slug(r)}.pkl"
+        model = None
+        if artifact.exists():
+            try:
+                model = joblib.load(artifact)
+            except Exception:  # noqa: BLE001
+                log.exception("Failed to load Prophet artifact for region=%s", r)
+                model = None
+
+        if model is None:
+            out.extend(_heuristic_forecast(history, r, days))
+            continue
+
+        try:
+            future = model.make_future_dataframe(periods=days, freq="D", include_history=False)
+            preds = model.predict(future)
+            for _, row in preds.iterrows():
+                ds: datetime = row["ds"].to_pydatetime() if hasattr(row["ds"], "to_pydatetime") else row["ds"]
+                forecast_date: date = ds.date() if hasattr(ds, "date") else ds
+                ec = float(max(row.get("yhat", 0.0), 0.0))
+                out.append(
+                    ForecastPoint(
+                        region=r,
+                        forecast_date=forecast_date,
+                        expected_count=ec,
+                        # Aliases so the new frontend reads `date` / `predicted_count`.
+                        date=forecast_date,
+                        predicted_count=ec,
+                        lower=float(max(row.get("yhat_lower", 0.0), 0.0)),
+                        upper=float(max(row.get("yhat_upper", 0.0), 0.0)),
+                    )
+                )
+        except Exception:  # noqa: BLE001
+            log.exception("Prophet inference failed for region=%s; using heuristic.", r)
+            out.extend(_heuristic_forecast(history, r, days))
+
+    return out
+
+
+def _slug(s: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in s).strip("_").lower()

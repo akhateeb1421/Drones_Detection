@@ -272,4 +272,22 @@ def normalize_real_for_db(real_df: pd.DataFrame, seed: int = 1234) -> pd.DataFra
                 lat, lon = base_lat, base_lon
             else:
                 lat, lon = coords
-            d_la
+            d_lat, d_lon = _jitter(rng)
+            out_rows.append(
+                {
+                    "occurred_at": row["attack_date"],
+                    "attack_type": attack_type,
+                    "target_location": place.strip(),
+                    "region": _region_for(place, region_str or None),
+                    "latitude": round(lat + d_lat, 6),
+                    "longitude": round(lon + d_lon, 6),
+                    "source": "historical",
+                }
+            )
+
+    out = pd.DataFrame(out_rows)
+    log.info(
+        "Normalized %d CSV rows (of which %d were combined) into %d location rows (jitter=%.3f deg).",
+        len(df), split_count, len(out), _JITTER_DEG,
+    )
+    return out

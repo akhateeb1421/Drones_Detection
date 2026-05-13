@@ -97,9 +97,19 @@ export type ForecastPoint = {
   expected_count: number;
   lower: number;
   upper: number;
+  // Aliases for the new Analysis page — same values, different keys.
+  // Optional so older consumers that only set forecast_date/expected_count
+  // still satisfy the type.
+  date?: string;
+  predicted_count?: number;
 };
 
-export type TimelinePoint = { period: string; count: number };
+export type TimelinePoint = {
+  period: string;
+  count: number;
+  // Alias of `period`. Optional for backwards compat.
+  date?: string;
+};
 export type RegionStat = { region: string; count: number };
 export type TypeStat = { attack_type: string; count: number };
 
@@ -125,6 +135,10 @@ export const Cameras = {
     api.post<Camera>("/cameras", body).then((r) => r.data),
   update: (id: number, body: Partial<Camera>) =>
     api.patch<Camera>(`/cameras/${id}`, body).then((r) => r.data),
+  // `delete` is the canonical name now; `remove` kept as an alias so any
+  // older call site (and JS interop callers who can't use the reserved
+  // word) keeps working. Both hit DELETE /cameras/{id}.
+  delete: (id: number) => api.delete(`/cameras/${id}`).then((r) => r.data),
   remove: (id: number) => api.delete(`/cameras/${id}`).then((r) => r.data),
 };
 

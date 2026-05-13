@@ -126,4 +126,13 @@ def timeline(
     if date_to is not None:
         stmt = stmt.where(Attack.occurred_at <= date_to)
     rows = db.execute(stmt).all()
-    return [TimelinePoint(period=p.isoformat() if p else "", count=int(c)) for p, c in rows]
+    # `period` stays for backwards compatibility; `date` is the alias the
+    # new Analysis.tsx prefers. Same string in both fields.
+    return [
+        TimelinePoint(
+            period=p.isoformat() if p else "",
+            date=p.isoformat() if p else "",
+            count=int(c),
+        )
+        for p, c in rows
+    ]

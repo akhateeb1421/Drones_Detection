@@ -83,4 +83,13 @@ def main() -> None:
                     target_location=row["target_location"],
                     region=row["region"],
                     latitude=row["latitude"],
-            
+                    longitude=row["longitude"],
+                    source="synthetic",
+                )
+            )
+        db.commit()
+        log.info("Inserted %d synthetic rows into attacks.", len(synth))
+
+
+if __name__ == "__main__":
+    main()

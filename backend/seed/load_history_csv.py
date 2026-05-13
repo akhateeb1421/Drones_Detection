@@ -107,4 +107,101 @@ EXTRA_HISTORICAL_ROWS = [
      "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
      "latitude": 28.4544, "longitude": 45.9678},
     {"incident_id": 1109, "attack_date": "2026-04-22", "attack_type": "Drones",
-     "target_location": "Hafr Al-Batin", "region": "Hafr Al-B
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4490, "longitude": 45.9711},
+    {"incident_id": 1110, "attack_date": "2026-05-01", "attack_type": "Drone",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4517, "longitude": 45.9703},
+    {"incident_id": 1111, "attack_date": "2026-05-09", "attack_type": "Drones",
+     "target_location": "Hafr Al-Batin", "region": "Hafr Al-Batin",
+     "latitude": 28.4502, "longitude": 45.9719},
+
+    # --- Al-Jouf: similarly thin, mirror of the same fix. ---
+    {"incident_id": 1200, "attack_date": "2025-12-03", "attack_type": "Drone",
+     "target_location": "Al-Jouf", "region": "Al-Jouf",
+     "latitude": 29.7858, "longitude": 40.2128},
+    {"incident_id": 1201, "attack_date": "2026-01-15", "attack_type": "Drones",
+     "target_location": "Al-Jouf", "region": "Al-Jouf",
+     "latitude": 29.7892, "longitude": 40.2105},
+    {"incident_id": 1202, "attack_date": "2026-02-11", "attack_type": "Drone",
+     "target_location": "Al-Jouf", "region": "Al-Jouf",
+     "latitude": 29.7820, "longitude": 40.2155},
+    {"incident_id": 1203, "attack_date": "2026-03-08", "attack_type": "Cruise Missile",
+     "target_location": "Al-Jouf", "region": "Al-Jouf",
+     "latitude": 29.7905, "longitude": 40.2098},
+    {"incident_id": 1204, "attack_date": "2026-04-14", "attack_type": "Drone",
+     "target_location": "Al-Jouf", "region": "Al-Jouf",
+     "latitude": 29.7850, "longitude": 40.2140},
+    {"incident_id": 1205, "attack_date": "2026-05-03", "attack_type": "Drones",
+     "target_location": "Al-Jouf", "region": "Al-Jouf",
+     "latitude": 29.7875, "longitude": 40.2118},
+]
+
+
+log = logging.getLogger(__name__)
+
+
+def seed_areas(db) -> None:
+    existing = {a.name: a for a in db.execute(select(SensitiveArea)).scalars().all()}
+    for entry in DEFAULT_AREAS:
+        if entry["name"] in existing:
+            # Backfill name_ar on rows that pre-date the bilingual column.
+            row = existing[entry["name"]]
+            if not row.name_ar and entry.get("name_ar"):
+                row.name_ar = entry["name_ar"]
+            continue
+        db.add(SensitiveArea(**entry))
+    db.commit()
+
+
+def main() -> None:
+    configure_logging()
+    if not CSV_PATH.exists():
+        raise SystemExit(f"CSV not found at {CSV_PATH}")
+
+    df = pd.read_csv(CSV_PATH)
+    log.info("Loaded %d rows from %s", len(df), CSV_PATH)
+
+    if EXTRA_HISTORICAL_ROWS:
+        extra_df = pd.DataFrame(EXTRA_HISTORICAL_ROWS)
+        df = pd.concat([df, extra_df], ignore_index=True)
+        log.info("Appended %d extra hand-curated rows.", len(extra_df))
+
+    norm = normalize_real_for_db(df)
+
+    inserted = 0
+    skipped = 0
+    with SessionLocal() as db:
+        seed_areas(db)
+        for _, row in norm.iterrows():
+            exists = db.execute(
+                select(Attack.id).where(
+                    Attack.occurred_at == row["occurred_at"],
+                    Attack.latitude == row["latitude"],
+                    Attack.longitude == row["longitude"],
+                    Attack.attack_type == row["attack_type"],
+                    Attack.source == "historical",
+                )
+            ).first()
+            if exists:
+                skipped += 1
+                continue
+            db.add(
+                Attack(
+                    occurred_at=row["occurred_at"].to_pydatetime() if hasattr(row["occurred_at"], "to_pydatetime") else row["occurred_at"],
+                    attack_type=row["attack_type"],
+                    target_location=row["target_location"],
+                    region=row["region"],
+                    latitude=row["latitude"],
+                    longitude=row["longitude"],
+                    source=row["source"],
+                )
+            )
+            inserted += 1
+        db.commit()
+
+    log.info("Inserted %d historical rows; skipped %d duplicates.", inserted, skipped)
+
+
+if __name__ == "__main__":
+    main()
