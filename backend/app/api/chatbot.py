@@ -25,3 +25,32 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)) -> ChatOut:
         backend=backend,
     )
     return ChatOut(answer=answer, model=model)
+
+
+@router.get("/debug-context")
+def debug_context(
+    role: str = "viewer",
+    language: str = "ar",
+    db: Session = Depends(get_db),
+) -> dict:
+    """Return the exact text block the chat service would send to the LLM.
+
+    Hit `/chat/debug-context?role=viewer&language=ar` to see what data
+    is actually in front of the model. If Al-Jouf June 2025 doesn\'t
+    appear in the per-(region,month) table here, the chatbot is right
+    to say "no record" — the rows aren\'t reaching the prompt. The
+    fix would then be in `_build_viewer_context` / the DB, not the
+    chatbot.
+    """
+    role = role if role in {"admin", "viewer"} else "viewer"
+    if role == "admin":
+        text = chatbot._build_context(db, language)
+    else:
+        text = chatbot._build_viewer_context(db)
+    return {
+        "role": role,
+        "language": language,
+        "chars": len(text),
+        "context": text,
+    }
+

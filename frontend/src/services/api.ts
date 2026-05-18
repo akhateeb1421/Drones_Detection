@@ -219,7 +219,7 @@ export const Predictions = {
 // the ~1–2 min cold-start tax — give it up to 15 min. The Anthropic API
 // path is fast; cap it tighter so a stuck request fails clearly.
 const CHAT_TIMEOUT_LOCAL_MS = 15 * 60 * 1000;
-const CHAT_TIMEOUT_API_MS = 90 * 1000;
+const CHAT_TIMEOUT_API_MS = 180 * 1000;  // 3 min — gives Gemini headroom over the SDK's 45 s server-side cap.
 
 export type ChatBackend = "api" | "local";
 

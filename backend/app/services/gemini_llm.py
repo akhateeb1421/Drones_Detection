@@ -55,25 +55,44 @@ def generate(messages: Iterable[dict]) -> str:
     if not chat_msgs or chat_msgs[-1]["role"] != "user":
         raise ValueError("gemini_llm.generate: expected the last message to be user-role.")
 
-    client = genai.Client(api_key=settings.google_api_key)
+    # Explicit short timeout. The SDK default lets a hung request sit
+    # past the frontend's 90 s axios timeout, leaving the operator with
+    # an opaque error. 45 s is generous for Gemini Flash on a healthy
+    # connection; if it times out, that's a real network/quota problem
+    # the operator should see, not buffered silently.
+    client = genai.Client(
+        api_key=settings.google_api_key,
+        http_options=types.HttpOptions(timeout=45_000),  # ms
+    )
+    sys_chars = sum(len(s) for s in system_chunks)
     log.info(
         "Calling Gemini %s (system=%d chars, msgs=%d)",
-        settings.gemini_model,
-        sum(len(s) for s in system_chunks),
-        len(chat_msgs),
+        settings.gemini_model, sys_chars, len(chat_msgs),
     )
 
+    # Disable Gemini 2.5's internal "thinking" pass. Without this, every
+    # call burns several seconds of reasoning tokens before any output
+    # token appears — on a system prompt this large that pushes total
+    # latency past 45 s and the request hits the SDK timeout. For 2.0
+    # and 1.5 models thinking_config is silently ignored, so this is
+    # safe across the board.
     config = types.GenerateContentConfig(
         system_instruction="\n\n".join(system_chunks) if system_chunks else None,
         max_output_tokens=settings.gemini_max_tokens,
         temperature=0.3,
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
     )
 
+    import time
+    t0 = time.time()
     resp = client.models.generate_content(
         model=settings.gemini_model,
         contents=chat_msgs,
         config=config,
     )
+    dt = time.time() - t0
+    out = (resp.text or "").strip()
+    log.info("Gemini call took %.2fs, %d output chars", dt, len(out))
 
     # `.text` concatenates all text parts of the first candidate.
-    return (resp.text or "").strip()
+    return out

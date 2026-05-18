@@ -1,0 +1,171 @@
+﻿=== REGION NAME MAP (English DB value <-> Arabic) ===
+Use this table to translate Arabic place names in the user's
+question into the canonical English region names that appear
+in 'Counts by region' and the per-(region,month) table below.
+These pairs are TRANSLATIONS, not aliases â they refer to the
+same region. The 'no inventing aliases' rule does NOT apply to
+translations listed here.
+english | arabic
+- Riyadh | Ø§ÙØ±ÙØ§Ø¶
+- Eastern Region | Ø§ÙÙÙØ·ÙØ© Ø§ÙØ´Ø±ÙÙØ©
+- Al-Kharj | Ø§ÙØ®Ø±Ø¬
+- Al-Jouf | Ø§ÙØ¬ÙÙ
+- Hafr Al-Batin | Ø­ÙØ± Ø§ÙØ¨Ø§Ø·Ù
+- Yanbu | ÙÙØ¨Ø¹
+
+=== SYSTEM TOTALS ===
+Total cameras configured: 1
+Total sensitive areas configured: 19
+
+=== AGGREGATE STATISTICS ===
+Total attack records: 3118
+[INTERNAL] Available date range: 2024-11-20 to 2026-05-20
+Counts by region: {'Eastern Region': 964, 'Riyadh': 591, 'Al-Kharj': 479, 'Hafr Al-Batin': 415, 'Al-Jouf': 338, 'Yanbu': 330, 'test': 1}
+Counts by attack type: {'drone': 2494, 'cruise_missile': 313, 'ballistic_missile': 311}
+Counts by month (full range): {'2024-11': 7, '2024-12': 27, '2025-01': 38, '2025-02': 94, '2025-03': 573, '2025-04': 411, '2025-05': 39, '2025-06': 113, '2025-07': 147, '2025-08': 130, '2025-09': 125, '2025-10': 139, '2025-11': 19, '2025-12': 35, '2026-01': 40, '2026-02': 68, '2026-03': 632, '2026-04': 444, '2026-05': 37}
+Counts by weekday: {'Saturday': 600, 'Wednesday': 570, 'Monday': 465, 'Sunday': 443, 'Thursday': 393, 'Friday': 331, 'Tuesday': 316}
+
+Per-region per-year attack counts (only non-zero):
+region | year | attacks
+- Al-Jouf | 2024 | 3
+- Al-Kharj | 2024 | 7
+- Eastern Region | 2024 | 8
+- Hafr Al-Batin | 2024 | 6
+- Riyadh | 2024 | 6
+- Yanbu | 2024 | 4
+- Al-Jouf | 2025 | 197
+- Al-Kharj | 2025 | 283
+- Eastern Region | 2025 | 584
+- Hafr Al-Batin | 2025 | 247
+- Riyadh | 2025 | 357
+- Yanbu | 2025 | 195
+- Al-Jouf | 2026 | 138
+- Al-Kharj | 2026 | 189
+- Eastern Region | 2026 | 372
+- Hafr Al-Batin | 2026 | 162
+- Riyadh | 2026 | 228
+- Yanbu | 2026 | 131
+- test | 2026 | 1
+
+Per-region per-month attack counts (only non-zero):
+region | month | attacks
+- Al-Kharj | 2024-11 | 1
+- Eastern Region | 2024-11 | 1
+- Hafr Al-Batin | 2024-11 | 2
+- Riyadh | 2024-11 | 2
+- Yanbu | 2024-11 | 1
+- Al-Jouf | 2024-12 | 3
+- Al-Kharj | 2024-12 | 6
+- Eastern Region | 2024-12 | 7
+- Hafr Al-Batin | 2024-12 | 4
+- Riyadh | 2024-12 | 4
+- Yanbu | 2024-12 | 3
+- Al-Jouf | 2025-01 | 3
+- Al-Kharj | 2025-01 | 8
+- Eastern Region | 2025-01 | 14
+- Hafr Al-Batin | 2025-01 | 3
+- Riyadh | 2025-01 | 7
+- Yanbu | 2025-01 | 3
+- Al-Jouf | 2025-02 | 12
+- Al-Kharj | 2025-02 | 12
+- Eastern Region | 2025-02 | 32
+- Hafr Al-Batin | 2025-02 | 11
+- Riyadh | 2025-02 | 20
+- Yanbu | 2025-02 | 7
+- Al-Jouf | 2025-03 | 64
+- Al-Kharj | 2025-03 | 78
+- Eastern Region | 2025-03 | 192
+- Hafr Al-Batin | 2025-03 | 70
+- Riyadh | 2025-03 | 111
+- Yanbu | 2025-03 | 58
+- Al-Jouf | 2025-04 | 46
+- Al-Kharj | 2025-04 | 72
+- Eastern Region | 2025-04 | 108
+- Hafr Al-Batin | 2025-04 | 57
+- Riyadh | 2025-04 | 83
+- Yanbu | 2025-04 | 45
+- Al-Jouf | 2025-05 | 2
+- Al-Kharj | 2025-05 | 7
+- Eastern Region | 2025-05 | 14
+- Hafr Al-Batin | 2025-05 | 4
+- Riyadh | 2025-05 | 7
+- Yanbu | 2025-05 | 5
+- Al-Jouf | 2025-06 | 17
+- Al-Kharj | 2025-06 | 12
+- Eastern Region | 2025-06 | 32
+- Hafr Al-Batin | 2025-06 | 15
+- Riyadh | 2025-06 | 22
+- Yanbu | 2025-06 | 15
+- Al-Jouf | 2025-07 | 12
+- Al-Kharj | 2025-07 | 27
+- Eastern Region | 2025-07 | 51
+- Hafr Al-Batin | 2025-07 | 15
+- Riyadh | 2025-07 | 27
+- Yanbu | 2025-07 | 15
+- Al-Jouf | 2025-08 | 15
+- Al-Kharj | 2025-08 | 19
+- Eastern Region | 2025-08 | 45
+- Hafr Al-Batin | 2025-08 | 17
+- Riyadh | 2025-08 | 22
+- Yanbu | 2025-08 | 12
+- Al-Jouf | 2025-09 | 15
+- Al-Kharj | 2025-09 | 16
+- Eastern Region | 2025-09 | 37
+- Hafr Al-Batin | 2025-09 | 20
+- Riyadh | 2025-09 | 21
+- Yanbu | 2025-09 | 16
+- Al-Jouf | 2025-10 | 7
+- Al-Kharj | 2025-10 | 24
+- Eastern Region | 2025-10 | 44
+- Hafr Al-Batin | 2025-10 | 21
+- Riyadh | 2025-10 | 31
+- Yanbu | 2025-10 | 12
+- Al-Jouf | 2025-11 | 1
+- Al-Kharj | 2025-11 | 3
+- Eastern Region | 2025-11 | 4
+- Hafr Al-Batin | 2025-11 | 6
+- Riyadh | 2025-11 | 1
+- Yanbu | 2025-11 | 4
+- Al-Jouf | 2025-12 | 3
+- Al-Kharj | 2025-12 | 5
+- Eastern Region | 2025-12 | 11
+- Hafr Al-Batin | 2025-12 | 8
+- Riyadh | 2025-12 | 5
+- Yanbu | 2025-12 | 3
+- Al-Jouf | 2026-01 | 2
+- Al-Kharj | 2026-01 | 8
+- Eastern Region | 2026-01 | 16
+- Hafr Al-Batin | 2026-01 | 7
+- Riyadh | 2026-01 | 5
+- Yanbu | 2026-01 | 2
+- Al-Jouf | 2026-02 | 8
+- Al-Kharj | 2026-02 | 7
+- Eastern Region | 2026-02 | 19
+- Hafr Al-Batin | 2026-02 | 10
+- Riyadh | 2026-02 | 13
+- Yanbu | 2026-02 | 11
+- Al-Jouf | 2026-03 | 68
+- Al-Kharj | 2026-03 | 103
+- Eastern Region | 2026-03 | 198
+- Hafr Al-Batin | 2026-03 | 77
+- Riyadh | 2026-03 | 118
+- Yanbu | 2026-03 | 68
+- Al-Jouf | 2026-04 | 56
+- Al-Kharj | 2026-04 | 65
+- Eastern Region | 2026-04 | 129
+- Hafr Al-Batin | 2026-04 | 62
+- Riyadh | 2026-04 | 87
+- Yanbu | 2026-04 | 45
+- Al-Jouf | 2026-05 | 4
+- Al-Kharj | 2026-05 | 6
+- Eastern Region | 2026-05 | 10
+- Hafr Al-Batin | 2026-05 | 6
+- Riyadh | 2026-05 | 5
+- Yanbu | 2026-05 | 5
+- test | 2026-05 | 1
+Any (region, month) pair NOT listed above has zero attacks â answer 'no attacks on record', NOT a refusal.
+
+=== LIVE ACTIVITY (last 24h) ===
+Detections in the last 24h: 7
+Drone class breakdown: {'dji': 7}
+Average speed (m/s): 84.03; max: 154.43

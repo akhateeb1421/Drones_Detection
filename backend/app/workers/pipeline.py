@@ -89,7 +89,14 @@ async def _run_camera(camera_id: int) -> None:
         is_remote = False
 
     skip = max(settings.inference_frame_skip, 1)
+    every_n = max(settings.inference_every_n_frames, 1)
     frame_counter = 0
+    # Decoupled-overlay state. `last_enriched` is the most recent set of
+    # detections from a YOLO run; we reuse it as the overlay for every
+    # source frame between inferences so display fps tracks the camera
+    # source rather than the (much slower) CPU YOLO loop.
+    last_enriched: list[dict] = []
+    last_frame_idx = 0
     loop = asyncio.get_running_loop()
 
     try:
@@ -101,77 +108,96 @@ async def _run_camera(camera_id: int) -> None:
             if frame is None:
                 continue
 
-            # Run YOLO + tracker in a worker thread so the event loop stays free.
-            async with _executor_lock:  # serialize CPU access if multiple cams contend
-                output = await loop.run_in_executor(None, pipeline.step, frame, tracker_cfg)
+            # Run YOLO + tracker + DB persistence only every Nth frame.
+            # The other frames still get decoded, overlaid with the last
+            # known boxes, and pushed to the WebSocket — so the operator
+            # sees a smooth video instead of a stuttering 5 fps slideshow.
+            do_inference = (frame_counter % every_n == 0)
 
-            # Enrich with ETA + nearest area.
-            with SessionLocal() as db:
-                areas = load_areas(db)
-                enriched: list[dict] = []
-                threats: list[dict] = []
-                for det in output.detections:
-                    near = nearest(
-                        det["lat"],
-                        det["lon"],
-                        det["speed_mps"],
-                        det["confidence"],
-                        areas,
-                        angle_deg=det.get("angle_deg"),
-                    )
-                    det = dict(det)
-                    det["nearest_area"] = near.name
-                    det["dist_m"] = near.distance_m if near.distance_m != float("inf") else None
-                    det["eta_s"] = near.eta_s
+            if do_inference:
+                async with _executor_lock:  # serialize CPU access if multiple cams contend
+                    output = await loop.run_in_executor(None, pipeline.step, frame, tracker_cfg)
+                last_frame_idx = output.frame_idx
 
-                    # Crop the bbox out of the current frame for the
-                    # pending-approvals thumbnail. JPEG-encode in memory;
-                    # _persist decides whether to actually save to disk
-                    # (only when this is the best frame for the track).
-                    x1, y1, x2, y2 = det["bbox"]
-                    pad = 12
-                    fh, fw = frame.shape[:2]
-                    cx1, cy1 = max(0, x1 - pad), max(0, y1 - pad)
-                    cx2, cy2 = min(fw, x2 + pad), min(fh, y2 + pad)
-                    if cx2 > cx1 and cy2 > cy1:
-                        crop = frame[cy1:cy2, cx1:cx2]
-                        ok_t, buf_t = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-                        det["_thumb_bytes"] = bytes(buf_t) if ok_t else None
-                    enriched.append(det)
-
-                    threat = alarms_svc.evaluate(
-                        det["drone_class"],
-                        det["confidence"],
-                        det["eta_s"],
-                        det["nearest_area"],
-                        det["speed_mps"],
-                    )
-                    # Tagged on the detection so _persist can stamp the track
-                    # row's alarm_fired_at and the dashboard can reconcile
-                    # CRITICAL badges with real alarms.
-                    det["_threat_fired"] = bool(threat.is_threat)
-                    if threat.is_threat:
-                        threats.append(
-                            {
-                                "camera_id": camera_id,
-                                "track_id": det["track_id"],
-                                "drone_class": det["drone_class"],
-                                "confidence": det["confidence"],
-                                "lat": det["lat"],
-                                "lon": det["lon"],
-                                "nearest_area": det["nearest_area"],
-                                "eta_s": det["eta_s"],
-                                "score": threat.score,
-                                "reasons": threat.reasons,
-                                "ts": datetime.now(timezone.utc).isoformat(),
-                            }
+                # Enrich with ETA + nearest area.
+                with SessionLocal() as db:
+                    areas = load_areas(db)
+                    enriched: list[dict] = []
+                    threats: list[dict] = []
+                    for det in output.detections:
+                        near = nearest(
+                            det["lat"],
+                            det["lon"],
+                            det["speed_mps"],
+                            det["confidence"],
+                            areas,
+                            angle_deg=det.get("angle_deg"),
                         )
+                        det = dict(det)
+                        det["nearest_area"] = near.name
+                        det["dist_m"] = near.distance_m if near.distance_m != float("inf") else None
+                        det["eta_s"] = near.eta_s
 
-                # Persist detections + track summaries.
-                _persist(db, camera_id, output.frame_idx, enriched)
+                        # Crop the bbox out of the current frame for the
+                        # pending-approvals thumbnail. JPEG-encode in memory;
+                        # _persist decides whether to actually save to disk
+                        # (only when this is the best frame for the track).
+                        x1, y1, x2, y2 = det["bbox"]
+                        pad = 12
+                        fh, fw = frame.shape[:2]
+                        cx1, cy1 = max(0, x1 - pad), max(0, y1 - pad)
+                        cx2, cy2 = min(fw, x2 + pad), min(fh, y2 + pad)
+                        if cx2 > cx1 and cy2 > cy1:
+                            crop = frame[cy1:cy2, cx1:cx2]
+                            ok_t, buf_t = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                            det["_thumb_bytes"] = bytes(buf_t) if ok_t else None
+                        enriched.append(det)
 
-            # Build annotated JPEG for the live preview.
-            annotated = overlay(frame, enriched)
+                        threat = alarms_svc.evaluate(
+                            det["drone_class"],
+                            det["confidence"],
+                            det["eta_s"],
+                            det["nearest_area"],
+                            det["speed_mps"],
+                        )
+                        # Tagged on the detection so _persist can stamp the track
+                        # row's alarm_fired_at and the dashboard can reconcile
+                        # CRITICAL badges with real alarms.
+                        det["_threat_fired"] = bool(threat.is_threat)
+                        if threat.is_threat:
+                            threats.append(
+                                {
+                                    "camera_id": camera_id,
+                                    "track_id": det["track_id"],
+                                    "drone_class": det["drone_class"],
+                                    "confidence": det["confidence"],
+                                    "lat": det["lat"],
+                                    "lon": det["lon"],
+                                    "nearest_area": det["nearest_area"],
+                                    "eta_s": det["eta_s"],
+                                    "score": threat.score,
+                                    "reasons": threat.reasons,
+                                    "ts": datetime.now(timezone.utc).isoformat(),
+                                }
+                            )
+
+                    # Persist detections + track summaries.
+                    _persist(db, camera_id, output.frame_idx, enriched)
+
+                # Stash the fresh detections so the next (every_n - 1)
+                # display-only frames can overlay them.
+                last_enriched = enriched
+
+                # Threats are bus-published only when a fresh inference
+                # actually fires one — never re-broadcast stale threats.
+                for t in threats:
+                    await frame_bus.publish("alarms", t)
+
+            # Build annotated JPEG for the live preview, reusing
+            # `last_enriched` whether or not we just ran YOLO. On the
+            # very first frame (before any inference has happened),
+            # this overlays nothing, which is the correct behavior.
+            annotated = overlay(frame, last_enriched)
             ok, buf = cv2.imencode(".jpg", annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             if not ok:
                 continue
@@ -180,14 +206,12 @@ async def _run_camera(camera_id: int) -> None:
             meta = {
                 "type": "frame",
                 "camera_id": camera_id,
-                "frame_idx": output.frame_idx,
+                "frame_idx": last_frame_idx,
                 "ts": datetime.now(timezone.utc).isoformat(),
-                "detections": [_serialize_det(d) for d in enriched],
+                "detections": [_serialize_det(d) for d in last_enriched],
                 "remote": is_remote,
             }
             await frame_bus.publish(f"cam:{camera_id}", {"jpeg": jpeg_out, "meta": meta})
-            for t in threats:
-                await frame_bus.publish("alarms", t)
 
     except asyncio.CancelledError:
         log.info("Camera %s worker cancelled.", camera_id)

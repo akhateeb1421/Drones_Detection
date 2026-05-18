@@ -34,7 +34,11 @@ class Settings(BaseSettings):
 
     # YOLO + tracker
     yolo_weights: str = "../models/best.pt"
-    yolo_imgsz: int = 640
+    # Smaller input = faster CPU inference. 416 is a good drone-demo
+    # default (~2x faster than 640, recall stays high for typical
+    # quadcopter/Shahed bounding-box sizes). Bump back to 640 only if
+    # the model is missing distant targets.
+    yolo_imgsz: int = 416
     yolo_conf: float = 0.50
     # Looser threshold reserved for hostile classes (DJI / Shahed /
     # Orlan / generic drone). YOLO is asked to emit detections down to
@@ -48,7 +52,17 @@ class Settings(BaseSettings):
     tracker_cfg: str = "../scripts/bytetrack_drone.yaml"
 
     # Pipeline
-    inference_frame_skip: int = 2
+    # Drop every Nth source frame at the very start of the loop. Keep
+    # this at 1 — display fps no longer depends on inference fps thanks
+    # to the decoupled-overlay path in pipeline.py. Raising it just
+    # throws away frames the WebSocket could have shipped.
+    inference_frame_skip: int = 1
+    # Run YOLO + tracker once every N decoded frames. Frames between
+    # YOLO runs are still published to the WebSocket but reuse the
+    # last set of detection boxes as their overlay — so display fps
+    # ~= source fps and inference fps ~= source_fps / N. N=2 keeps
+    # box drift to one source-frame interval (~40 ms at 25 fps).
+    inference_every_n_frames: int = 2
     inference_queue_max: int = 2
     # Confidence floor used by alarms.evaluate to award the
     # `high_confidence` bonus. Lower than the frontend's display
