@@ -163,7 +163,13 @@ def _enrich_output(
 # CPU. Keying on geometry means switching the clip's location re-analyses
 # the first time, but switching BACK to a previously-seen location is
 # instant. Lost on uvicorn restart (re-computed on next access).
-_clip_cache: dict[tuple, list[list[dict]]] = {}
+# Cached recorded-clip analysis, keyed by geometry. Value holds the clip's
+# native fps plus a list of (annotated_jpeg_bytes, serialized_dets) — one per
+# frame. The JPEG is pre-encoded ONCE here so the replay loop does zero
+# decode/encode work and the playback-speed sleep alone governs the frame
+# rate (otherwise per-frame decode+encode dominates and the speed knob is a
+# no-op).
+_clip_cache: dict[tuple, dict] = {}
 
 
 async def _publish_clip_progress(camera_id: int, done: int, total: int) -> None:
@@ -206,10 +212,10 @@ async def _run_recorded_clip(
     loop = asyncio.get_running_loop()
     settings = get_settings()
 
-    frames_dets = _clip_cache.get(geo_key)
+    cached = _clip_cache.get(geo_key)
 
     # ── Phase 1: pre-compute (only on cache miss) ──────────────────────
-    if frames_dets is None:
+    if cached is None:
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             cap.release()
@@ -230,7 +236,11 @@ async def _run_recorded_clip(
             "Recorded clip cam=%s: pre-computing detections over ~%d frames "
             "(one-time; cached per location).", camera_id, total_hint,
         )
-        computed: list[list[dict]] = []
+        # Each entry: (annotated_jpeg_bytes, serialized_dets). Encoding the
+        # overlay HERE — where we already decode every frame for YOLO — means
+        # the replay loop never touches the video file or the JPEG encoder,
+        # so the playback-speed sleep alone controls the frame rate.
+        computed: list[tuple[bytes, list[dict]]] = []
         detect_frames = 0
         try:
             while True:
@@ -243,35 +253,40 @@ async def _run_recorded_clip(
                     detect_frames += 1
                     with SessionLocal() as db:
                         _persist(db, camera_id, output.frame_idx, enriched)
-                computed.append([_serialize_det(d) for d in enriched])
+                sdets = [_serialize_det(d) for d in enriched]
+                annotated = overlay(frame, sdets)
+                ok2, buf = cv2.imencode(".jpg", annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+                jpeg_bytes = bytes(buf) if ok2 else b""
+                computed.append((jpeg_bytes, sdets))
                 if len(computed) % 15 == 0:
                     await _publish_clip_progress(camera_id, len(computed), total_hint)
         finally:
             cap.release()
-        frames_dets = computed
-        _clip_cache[geo_key] = frames_dets
+        cached = {"fps": pipeline.fps, "frames": computed}
+        _clip_cache[geo_key] = cached
         log.info(
             "Recorded clip cam=%s: pre-compute done — %d frames, %d with detections.",
-            camera_id, len(frames_dets), detect_frames,
+            camera_id, len(computed), detect_frames,
         )
     else:
-        log.info("Recorded clip cam=%s: using cached detections (%d frames).", camera_id, len(frames_dets))
+        log.info(
+            "Recorded clip cam=%s: using cached frames (%d).",
+            camera_id, len(cached["frames"]),
+        )
 
-    total = len(frames_dets)
+    frames = cached["frames"]
+    clip_fps = cached["fps"]
+    total = len(frames)
     if total == 0:
         log.error("Recorded clip cam=%s: no frames decoded; nothing to replay.", camera_id)
         return
 
-    # ── Phase 2: smooth replay at native fps ───────────────────────────
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Could not reopen recorded clip '{video_path}' for replay.")
-    fps_native = cap.get(cv2.CAP_PROP_FPS) or 0.0
-    fps_play = max(5.0, min(fps_native or 30.0, 60.0))
-    # Speed up ONLY the dashboard replay — detection pre-compute above ran
-    # at native fps, so the cached km/h speed and predicted path already
-    # reflect the real drone. We just ship the frames faster by shortening
-    # the inter-frame delay by the playback multiplier (1.5x default).
+    # ── Phase 2: smooth replay from cached frames ──────────────────────
+    # No VideoCapture, no per-frame decode/encode here — we only ship the
+    # pre-encoded JPEG bytes and sleep. That makes the playback-speed knob
+    # actually control the rate (decode+encode previously dominated the loop
+    # and swamped the sleep, so 0.5x and 2.0x looked identical).
+    fps_play = max(5.0, min(clip_fps or 30.0, 60.0))
     playback_speed = max(0.1, settings.recorded_clip_playback_speed)
     frame_dt = 1.0 / (fps_play * playback_speed)
     log.info(
@@ -279,38 +294,28 @@ async def _run_recorded_clip(
         camera_id, playback_speed, fps_play, fps_play * playback_speed,
     )
     idx = 0
-    try:
-        while True:
-            # Pause gate (operator stop button) — keeps the clip frozen at
-            # the current frame instead of advancing in the background.
-            while camera_id in _paused_cameras:
-                await asyncio.sleep(0.2)
-            ok, frame = cap.read()
-            if not ok or idx >= total:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                idx = 0
-                ok, frame = cap.read()
-                if not ok:
-                    await asyncio.sleep(0.1)
-                    continue
-            dets = frames_dets[idx] if idx < total else []
-            idx += 1
-            annotated = overlay(frame, dets)
-            ok2, buf = cv2.imencode(".jpg", annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
-            if not ok2:
-                continue
-            meta = {
-                "type": "frame",
-                "camera_id": camera_id,
-                "frame_idx": idx,
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "detections": dets,
-                "remote": False,
-            }
-            await frame_bus.publish(f"cam:{camera_id}", {"jpeg": bytes(buf), "meta": meta})
+    while True:
+        # Pause gate (operator stop button) — keeps the clip frozen at the
+        # current frame instead of advancing in the background.
+        while camera_id in _paused_cameras:
+            await asyncio.sleep(0.2)
+        if idx >= total:
+            idx = 0
+        jpeg_bytes, dets = frames[idx]
+        idx += 1
+        if not jpeg_bytes:
             await asyncio.sleep(frame_dt)
-    finally:
-        cap.release()
+            continue
+        meta = {
+            "type": "frame",
+            "camera_id": camera_id,
+            "frame_idx": idx,
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "detections": dets,
+            "remote": False,
+        }
+        await frame_bus.publish(f"cam:{camera_id}", {"jpeg": jpeg_bytes, "meta": meta})
+        await asyncio.sleep(frame_dt)
 
 
 async def _run_camera(camera_id: int) -> None:
@@ -807,4 +812,84 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
     db.commit()
 
 
-async def startup_pipeline() -> None
+async def startup_pipeline() -> None:
+    """Spawn one worker task per enabled camera at app startup."""
+    with SessionLocal() as db:
+        cams = list(db.execute(select(Camera).where(Camera.enabled.is_(True))).scalars().all())
+    for cam in cams:
+        if cam.id in _tasks:
+            continue
+        _tasks[cam.id] = asyncio.create_task(_run_camera(cam.id), name=f"cam-{cam.id}")
+    log.info("Started pipeline workers: %s", list(_tasks.keys()))
+
+
+async def shutdown_pipeline() -> None:
+    for tid, task in list(_tasks.items()):
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
+        del _tasks[tid]
+
+
+async def ensure_worker(camera_id: int) -> None:
+    """Spawn a worker for `camera_id` if one isn\'t already running.
+
+    Used by the cameras API (create / update / recorded-clip bootstrap)
+    so newly-added cameras start producing frames immediately instead
+    of waiting for the next uvicorn restart. Idempotent.
+    """
+    existing = _tasks.get(camera_id)
+    if existing is not None and not existing.done():
+        return  # already running
+    log.info("Spawning pipeline worker for camera %s (ensure_worker).", camera_id)
+    _tasks[camera_id] = asyncio.create_task(
+        _run_camera(camera_id), name=f"cam-{camera_id}"
+    )
+
+
+async def pause_worker(camera_id: int) -> None:
+    """Stop the worker for ``camera_id`` from pulling new frames.
+
+    The worker keeps its source iterator open (cv2.VideoCapture stays at
+    its current position for file-based sources, so a resume picks up
+    where the operator paused), but stops consuming and stops publishing
+    to the WebSocket. Idempotent.
+    """
+    if camera_id in _paused_cameras:
+        return
+    _paused_cameras.add(camera_id)
+    log.info("Paused worker for camera %s.", camera_id)
+
+
+async def resume_worker(camera_id: int) -> None:
+    """Resume a previously-paused worker. Idempotent."""
+    if camera_id not in _paused_cameras:
+        return
+    _paused_cameras.discard(camera_id)
+    log.info("Resumed worker for camera %s.", camera_id)
+
+
+def is_paused(camera_id: int) -> bool:
+    """Whether the worker for ``camera_id`` is currently paused."""
+    return camera_id in _paused_cameras
+
+
+async def restart_worker(camera_id: int) -> None:
+    """Cancel + respawn the worker for `camera_id`. Used when the
+    camera\'s geo or stream_url changes — the worker snapshots config
+    at startup, so a restart is the cheapest way to pick up the new
+    settings (geo, stream_url, weights, imgsz, clip fps)."""
+    existing = _tasks.pop(camera_id, None)
+    if existing is not None:
+        existing.cancel()
+        try:
+            await existing
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
+    log.info("Restarting pipeline worker for camera %s.", camera_id)
+    _tasks[camera_id] = asyncio.create_task(
+        _run_camera(camera_id), name=f"cam-{camera_id}"
+    )
+
