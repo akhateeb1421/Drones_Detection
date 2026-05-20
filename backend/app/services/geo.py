@@ -97,4 +97,32 @@ def pixel_speed_to_mps(
     The previous version divided by the CONFIGURED ``cam.sensor_w_px``
     (e.g. 1280) instead of the real frame width. Whenever the decoded
     video resolution differed from that constant, the speed was silently
-    mis-scaled (and it was inconsis
+    mis-scaled (and it was inconsistent with the pixel→world projection,
+    which always used the real frame width). Using ``frame_w`` here makes
+    the two consistent and the speed correctly scaled.
+    """
+    meters_per_px = (
+        2 * cam.assumed_target_distance_m * math.tan(math.radians(cam.fov_h_deg / 2))
+    ) / max(frame_w, 1)
+    return px_delta_per_frame * meters_per_px * fps
+
+
+def angle_to_compass(angle_deg: float) -> str:
+    """Map a heading (0=N, 90=E, ...) to one of 8 compass labels."""
+    idx = int((angle_deg + 22.5) / 45) % 8
+    return COMPASS[idx]
+
+
+def project_path(
+    lat: float,
+    lon: float,
+    speed_mps: float,
+    angle_deg: float,
+    seconds_ahead: float = 60.0,
+) -> tuple[float, float]:
+    """Straight-line projection of a track's future position."""
+    distance_m = max(speed_mps, 0.0) * seconds_ahead
+    bearing_rad = math.radians(angle_deg % 360.0)
+    d_north = distance_m * math.cos(bearing_rad)
+    d_east = distance_m * math.sin(bearing_rad)
+    return offset_meters(lat, lon, d_north, d_east)

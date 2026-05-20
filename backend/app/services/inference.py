@@ -337,4 +337,24 @@ def class_names() -> dict[int, str]:
     return dict(model.names)
 
 
-def overlay(fra
+def overlay(frame_bgr: np.ndarray, detections: Iterable[dict]) -> np.ndarray:
+    """Draw boxes + labels on a frame for the live preview JPEG."""
+    import cv2  # type: ignore[import-untyped]
+
+    frame = frame_bgr.copy()
+    color_for = {
+        "shahed": (0, 0, 255),
+        "orlan-10": (0, 140, 255),
+        "dji": (0, 200, 255),
+        "airplane": (255, 180, 0),
+        "bird": (0, 255, 100),
+        "helicopter": (255, 0, 200),
+    }
+    for d in detections:
+        x1, y1, x2, y2 = d["bbox"]
+        color = color_for.get(d["drone_class"].lower(), (0, 200, 255))
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        label = f"#{d['track_id']} {d['drone_class']} {d['confidence']:.0%}"
+        cv2.putText(frame, label, (x1, max(y1 - 6, 12)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3)
+        cv2.putText(frame, label, (x1, max(y1 - 6, 12)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+    return frame

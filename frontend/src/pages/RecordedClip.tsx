@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Cameras, Camera, Detections, Track, Areas, Area, trackThumbUrl } from "../services/api";
 import { useLiveStream } from "../hooks/useLiveStream";
@@ -36,6 +36,15 @@ function projectPath(lat: number, lon: number, speed: number, angleDeg: number, 
 }
 
 const PREDICT_HORIZON_S = 60;
+
+// ETA display as minutes:seconds (e.g. 83s -> "1:23", 8s -> "0:08").
+function fmtEta(seconds: number | null | undefined): string {
+  if (seconds == null || !isFinite(seconds)) return "—";
+  const s = Math.max(0, Math.round(seconds));
+  const m = Math.floor(s / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return `${m}:${ss}`;
+}
 
 const HOSTILE_CLASSES = new Set([
   "shahed", "shahed_136", "shahed-136", "shahed136",
@@ -207,6 +216,19 @@ export function RecordedClip() {
     return () => clearInterval(i);
   }, []);
 
+  // Running mean of speed PER track, used only by the video-box speed
+  // readout (the user asked that box to show the average, not the live
+  // instantaneous value). Keyed by the same merged track key. Startup
+  // frames where the velocity window hasn't filled report ~0 speed, so we
+  // only fold in samples above a small floor to keep the mean honest. The
+  // map persists across renders via a ref; the map+predicted line keep
+  // using the instantaneous speedMps from the snapshot, untouched.
+  const speedAccRef = useRef<Map<number, { sum: number; count: number }>>(new Map());
+  // Running mean of ETA PER track, same idea as the speed average above —
+  // shown only in the video-box ETA readout. The threat-tier badge and the
+  // pending table keep using the live / min ETA, untouched.
+  const etaAccRef = useRef<Map<number, { sum: number; count: number }>>(new Map());
+
   // Update per-track snapshots from every incoming WS frame's detections.
   useEffect(() => {
     const dets = meta?.detections;
@@ -216,6 +238,18 @@ export function RecordedClip() {
       const now = Date.now();
       for (const d of dets) {
         const key = d.linked_track_id ?? d.track_id;
+        if (typeof d.speed_mps === "number" && d.speed_mps > 0.1) {
+          const acc = speedAccRef.current.get(key) ?? { sum: 0, count: 0 };
+          acc.sum += d.speed_mps;
+          acc.count += 1;
+          speedAccRef.current.set(key, acc);
+        }
+        if (typeof d.eta_s === "number" && isFinite(d.eta_s) && d.eta_s > 0) {
+          const acc = etaAccRef.current.get(key) ?? { sum: 0, count: 0 };
+          acc.sum += d.eta_s;
+          acc.count += 1;
+          etaAccRef.current.set(key, acc);
+        }
         next.set(key, {
           trackId: key,
           droneClass: String(d.drone_class ?? "unknown"),
@@ -258,6 +292,23 @@ export function RecordedClip() {
     if (hostile.length === 0) return null;
     return hostile.reduce<Snapshot>((acc, s) => (s.lastSeenMs > acc.lastSeenMs ? s : acc), hostile[0]);
   }, [tracks, tick]);
+
+  // Average speed (m/s) of the focused track over its tracked lifetime —
+  // shown ONLY in the video-box readout below. Falls back to the live
+  // instantaneous value before enough samples accumulate.
+  const focusedAvgSpeedMps = useMemo(() => {
+    if (!focused) return 0;
+    const acc = speedAccRef.current.get(focused.trackId);
+    return acc && acc.count > 0 ? acc.sum / acc.count : focused.speedMps;
+  }, [focused, tick]);
+
+  // Average ETA (seconds) of the focused track — shown ONLY in the
+  // video-box readout. Falls back to the live ETA before samples accrue.
+  const focusedAvgEtaS = useMemo(() => {
+    if (!focused) return null;
+    const acc = etaAccRef.current.get(focused.trackId);
+    return acc && acc.count > 0 ? acc.sum / acc.count : focused.etaS;
+  }, [focused, tick]);
 
   const focusedIsHostile = focused != null;
 
@@ -519,12 +570,12 @@ export function RecordedClip() {
                     <div><span className="label inline">{t("live.track_id")}</span> <span className="font-data" dir="ltr">#{focused.trackId}</span></div>
                     <div><span className="label inline">{t("live.drone_class")}</span> {classLabel(focused.droneClass)}</div>
                     <div><span className="label inline">{t("live.confidence")}</span> <span className="font-data">{(focused.confidence * 100).toFixed(0)}%</span></div>
-                    <div><span className="label inline">{t("live.speed")}</span> <span className="font-data" dir="ltr">{(focused.speedMps * 3.6).toFixed(0)} km/h</span></div>
+                    <div><span className="label inline">{t("live.speed")}</span> <span className="font-data" dir="ltr">{(focusedAvgSpeedMps * 3.6).toFixed(0)} km/h</span></div>
                     <div><span className="label inline">{t("live.direction")}</span> {focused.direction}</div>
                     <div><span className="label inline">{t("live.nearest_area")}</span> {placeLabel(focused.nearestArea)}</div>
                     <div><span className="label inline">{t("live.lat")}</span> <span className="font-data" dir="ltr">{focused.lat.toFixed(5)}</span></div>
                     <div><span className="label inline">{t("live.lon")}</span> <span className="font-data" dir="ltr">{focused.lon.toFixed(5)}</span></div>
-                    <div><span className="label inline">{t("live.eta")}</span> <span className="font-data" dir="ltr">{focused.etaS !== null ? `${focused.etaS.toFixed(1)}s` : "—"}</span></div>
+                    <div><span className="label inline">{t("live.eta")}</span> <span className="font-data" dir="ltr">{fmtEta(focusedAvgEtaS)}</span></div>
                     <div className="col-span-2 mt-1 flex items-center gap-2">
                       <span className="label inline">{t("live.threat_level")}</span>
                       {(() => {
@@ -682,7 +733,14 @@ export function RecordedClip() {
                   <td className="text-start">{placeLabel(p.nearest_area)}</td>
                   <td className="text-start font-data">
                     <span dir="ltr">
-                      {p.min_eta_s !== null ? `${p.min_eta_s?.toFixed(1)}s` : "—"}
+                      {(() => {
+                        // Match the video-box ETA: use the same per-track
+                        // running average while the track is live; fall back
+                        // to the persisted ETA for historical rows.
+                        const acc = etaAccRef.current.get(p.track_id);
+                        const v = acc && acc.count > 0 ? acc.sum / acc.count : p.min_eta_s;
+                        return fmtEta(v);
+                      })()}
                     </span>
                   </td>
                   <td className="text-start">

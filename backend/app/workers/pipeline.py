@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -240,7 +241,16 @@ async def _run_recorded_clip(
         # overlay HERE — where we already decode every frame for YOLO — means
         # the replay loop never touches the video file or the JPEG encoder,
         # so the playback-speed sleep alone controls the frame rate.
-        computed: list[tuple[bytes, list[dict]]] = []
+        # Each frame: (annotated_jpeg_bytes, serialized_dets, threats). The
+        # threats are kept so Phase 2 can RAISE THE ALARM during replay — the
+        # live loop publishes them to the "alarms" channel, but the recorded
+        # clip used to discard them, so the recorded clip never alarmed.
+        computed: list[tuple[bytes, list[dict], list[dict]]] = []
+        # Enriched detections per detected frame, kept so we can (re)persist
+        # the pending-approval rows on EVERY worker start — see the persist
+        # pass below. Holds the thumbnail bytes too (~tens of KB per detected
+        # frame, a handful of frames per clip — negligible memory).
+        persist_pass: list[tuple[int, list[dict]]] = []
         detect_frames = 0
         try:
             while True:
@@ -248,21 +258,20 @@ async def _run_recorded_clip(
                 if not ok:
                     break
                 output = await loop.run_in_executor(None, pipeline.step, frame, tracker_cfg)
-                enriched, _threats = _enrich_output(camera_id, output, frame, areas_local)
+                enriched, threats = _enrich_output(camera_id, output, frame, areas_local)
                 if enriched:
                     detect_frames += 1
-                    with SessionLocal() as db:
-                        _persist(db, camera_id, output.frame_idx, enriched)
+                    persist_pass.append((output.frame_idx, enriched))
                 sdets = [_serialize_det(d) for d in enriched]
                 annotated = overlay(frame, sdets)
                 ok2, buf = cv2.imencode(".jpg", annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
                 jpeg_bytes = bytes(buf) if ok2 else b""
-                computed.append((jpeg_bytes, sdets))
+                computed.append((jpeg_bytes, sdets, threats))
                 if len(computed) % 15 == 0:
                     await _publish_clip_progress(camera_id, len(computed), total_hint)
         finally:
             cap.release()
-        cached = {"fps": pipeline.fps, "frames": computed}
+        cached = {"fps": pipeline.fps, "frames": computed, "persist": persist_pass}
         _clip_cache[geo_key] = cached
         log.info(
             "Recorded clip cam=%s: pre-compute done — %d frames, %d with detections.",
@@ -281,6 +290,24 @@ async def _run_recorded_clip(
         log.error("Recorded clip cam=%s: no frames decoded; nothing to replay.", camera_id)
         return
 
+    # ── Persist pass: runs on EVERY worker start (cache miss OR hit) ────
+    # _persist used to run only inside Phase 1, so re-opening a cached clip
+    # left the pending-approvals queue empty even though the boxes replayed
+    # fine. Persisting from the cached enriched detections here guarantees
+    # the queue is populated whenever the clip is opened. _persist upserts,
+    # so re-runs are idempotent (an already-approved/rejected track is only
+    # flipped back to pending after a >60s gap — see the REUSED branch).
+    persist_list = cached.get("persist", [])
+    if persist_list:
+        with SessionLocal() as db:
+            for fidx, enriched in persist_list:
+                if enriched:
+                    _persist(db, camera_id, fidx, enriched)
+        log.info(
+            "Recorded clip cam=%s: persisted %d detected frame(s) to pending queue.",
+            camera_id, len(persist_list),
+        )
+
     # ── Phase 2: smooth replay from cached frames ──────────────────────
     # No VideoCapture, no per-frame decode/encode here — we only ship the
     # pre-encoded JPEG bytes and sleep. That makes the playback-speed knob
@@ -294,6 +321,12 @@ async def _run_recorded_clip(
         camera_id, playback_speed, fps_play, fps_play * playback_speed,
     )
     idx = 0
+    # Per-track alarm throttle so replaying the drone over many consecutive
+    # frames doesn't spam the "alarms" channel — fire at most once every
+    # ALARM_THROTTLE_S per track (matches how rarely the live loop emits,
+    # which runs inference every N frames). The frontend dedups by track too.
+    ALARM_THROTTLE_S = 3.0
+    last_alarm: dict[int, float] = {}
     while True:
         # Pause gate (operator stop button) — keeps the clip frozen at the
         # current frame instead of advancing in the background.
@@ -301,7 +334,7 @@ async def _run_recorded_clip(
             await asyncio.sleep(0.2)
         if idx >= total:
             idx = 0
-        jpeg_bytes, dets = frames[idx]
+        jpeg_bytes, dets, threats = frames[idx]
         idx += 1
         if not jpeg_bytes:
             await asyncio.sleep(frame_dt)
@@ -315,6 +348,17 @@ async def _run_recorded_clip(
             "remote": False,
         }
         await frame_bus.publish(f"cam:{camera_id}", {"jpeg": jpeg_bytes, "meta": meta})
+        # Raise the alarm during playback, when the drone actually appears on
+        # screen — re-stamped to "now" and throttled per track. This is the
+        # recorded-clip equivalent of the live loop's threat publish.
+        if threats:
+            now_mono = time.monotonic()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for thr in threats:
+                tid = thr.get("track_id")
+                if now_mono - last_alarm.get(tid, 0.0) >= ALARM_THROTTLE_S:
+                    last_alarm[tid] = now_mono
+                    await frame_bus.publish("alarms", {**thr, "ts": now_iso})
         await asyncio.sleep(frame_dt)
 
 
@@ -406,8 +450,19 @@ async def _run_camera(camera_id: int) -> None:
     # the clip's location re-analyses the first time but is instant on
     # return. See _run_recorded_clip for the full rationale.
     if is_file_source:
+        # Include the clip file's size + mtime so REPLACING the file at the
+        # same path (e.g. swapping in a new shahed.mp4) invalidates the cache
+        # and forces a fresh re-analysis. Without this the cache is keyed on
+        # the path alone, so a new clip at the old path silently replays the
+        # previous analysis — stale boxes AND no new pending-approval rows
+        # (Phase 1, the only place we persist, never re-runs).
+        try:
+            _st = Path(stream_url).stat()
+            file_sig = (int(_st.st_size), int(_st.st_mtime))
+        except OSError:
+            file_sig = (0, 0)
         geo_key = (
-            stream_url,
+            stream_url, file_sig,
             round(geo.latitude, 6), round(geo.longitude, 6),
             round(geo.heading_deg, 2), round(geo.altitude_m, 2),
             round(geo.fov_h_deg, 2), round(geo.fov_v_deg, 2),

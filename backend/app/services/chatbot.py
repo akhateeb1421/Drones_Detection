@@ -261,6 +261,26 @@ def _extract_query_context(text: str) -> tuple[str | None, int | None, int | Non
                 month = m_num
                 break
 
+    # Relative date phrases resolved against TODAY, so "الشهر الماضي"
+    # (last month), "هذا الشهر", "العام الماضي" etc. work without the
+    # user typing an explicit month/year. Only fills axes the explicit
+    # parsing above didn't already set.
+    if month is None and year is None:
+        now = datetime.now(timezone.utc)
+        if (any(p in msg for p in ("الشهر الماضي", "الشهر الفائت", "الشهر المنصرم"))
+                or "last month" in msg_lower):
+            prev = now.replace(day=1) - timedelta(days=1)
+            month, year = prev.month, prev.year
+        elif (any(p in msg for p in ("هذا الشهر", "الشهر الحالي", "الشهر الجاري"))
+                or "this month" in msg_lower):
+            month, year = now.month, now.year
+        elif (any(p in msg for p in ("العام الماضي", "السنة الماضية", "العام الفائت", "السنة الفائتة"))
+                or "last year" in msg_lower):
+            year = now.year - 1
+        elif (any(p in msg for p in ("هذا العام", "هذه السنة", "العام الحالي", "السنة الحالية"))
+                or "this year" in msg_lower):
+            year = now.year
+
     type_intent = (
         "نوع" in msg
         or "أنواع" in msg
@@ -548,6 +568,85 @@ def _resolve_attack_query(
         " Report this number directly; do not re-derive it from any table."
     )
 
+
+# Keywords that signal the user wants a FORECAST / outlook for the
+# future, not a count of past attacks. Routed to `_resolve_forecast_query`
+# which calls the forecaster service for the next 7 days.
+FORECAST_KEYWORDS_AR = (
+    "توقع", "توقعات", "المتوقع", "نتوقع", "متوقع",
+    "الأسبوع القادم", "الاسبوع القادم", "الأسبوع المقبل", "الاسبوع المقبل",
+    "الشهر القادم", "الشهر المقبل", "الأيام القادمة", "الايام القادمة",
+    "القادمة", "المقبلة", "المستقبل", "مستقبل",
+)
+FORECAST_KEYWORDS_EN = (
+    "forecast", "predict", "prediction", "predicted", "expected", "expect",
+    "next week", "next month", "upcoming", "outlook", "coming days", "future",
+)
+
+
+def _resolve_forecast_query(db: Session, message: str) -> str | None:
+    """Pre-compute a 7-day forecast grounded fact for outlook questions.
+
+    The chat context only carries PAST attacks, so any "what's expected
+    next week" question used to fall through to "not available". Here we
+    call the same forecaster the Analysis page uses, sum the expected
+    counts over the next 7 days (optionally for a single region/segment
+    the user named), and hand the model one authoritative line.
+    """
+    msg = message or ""
+    low = msg.lower()
+    if not (any(k in msg for k in FORECAST_KEYWORDS_AR)
+            or any(k in low for k in FORECAST_KEYWORDS_EN)):
+        return None
+
+    # Non-Saudi place still wins — let the attack resolver emit the scope
+    # refusal rather than forecasting an out-of-scope city.
+    if _detect_non_saudi_place(msg):
+        return None
+
+    try:
+        from app.services import forecaster
+        points = forecaster.forecast(db, None, days=7)
+    except Exception:  # noqa: BLE001
+        log.exception("Forecast resolver failed.")
+        return None
+    if not points:
+        return None
+
+    # Optional region / macro-segment filter from the same message.
+    region, _y, _m, _ti, _tf, _tr = _extract_query_context(msg)
+    segment = _detect_saudi_segment(msg)
+    allowed: set[str] | None = None
+    scope_label = "all regions"
+    if segment:
+        seg_name, seg_regions = segment
+        allowed = set(seg_regions)
+        scope_label = f"segment {seg_name}"
+    elif region:
+        allowed = {region}
+        scope_label = f"region {region}"
+
+    by_region: dict[str, float] = {}
+    total = 0.0
+    for p in points:
+        if allowed is not None and p.region not in allowed:
+            continue
+        ec = float(p.expected_count or 0.0)
+        by_region[p.region] = by_region.get(p.region, 0.0) + ec
+        total += ec
+    if not by_region:
+        return None
+
+    breakdown = "; ".join(
+        f"{r}≈{c:.0f}" for r, c in sorted(by_region.items(), key=lambda kv: -kv[1])
+    )
+    return (
+        f"GROUNDED FACT (7-day forecast, {scope_label}): expected roughly "
+        f"{total:.0f} attack(s) over the next 7 days. By region: {breakdown}. "
+        "These are MODEL ESTIMATES (not certainties) — phrase them as "
+        "expectations/توقعات, not facts. When replying in Arabic use the "
+        "REGION NAME MAP for region names. Do not say 'unavailable'."
+    )
 
 
 SYSTEM_AR = """[تجاوز الهوية — قاعدة مطلقة]
@@ -936,6 +1035,8 @@ async def ask(
             "powers Sanad. Reply with this exact text (do NOT add other "
             f"text): {_backend_description(chosen, language)}"
         )
+    elif (forecast_fact := _resolve_forecast_query(db, message)) is not None:
+        grounded = forecast_fact
     else:
         grounded = _resolve_attack_query(message, _attacks_df(db), history)
     fact_block = ""
