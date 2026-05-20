@@ -1,7 +1,73 @@
-import { CircleMarker, MapContainer, Marker, Polygon, Polyline, Popup, TileLayer } from "react-leaflet";
-import { Icon, LatLngExpression } from "leaflet";
+import { CircleMarker, MapContainer, Marker, Polygon, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { Icon, LatLngBoundsExpression, LatLngExpression, latLngBounds } from "leaflet";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../contexts/ThemeContext";
+
+/* ── MapViewController ────────────────────────────────────────────────
+ * Leaflet's MapContainer ignores `center` / `zoom` prop changes after
+ * the first render — those are construction-time options, not reactive
+ * bindings. To re-fit the map when an upstream state change demands a
+ * new viewport (e.g. a hostile drone got detected and we want to zoom
+ * to the camera + predicted path), we use the `useMap` hook from
+ * react-leaflet and fit the bounds ourselves.
+ *
+ * We use ``fitBounds`` with ``animate: false`` rather than the animated
+ * ``flyToBounds``. The animated version is driven by
+ * requestAnimationFrame, which the browser PAUSES while the tab is in
+ * the background. If the operator switched tabs during the fly, the
+ * animation froze mid-transform and the SVG overlay pane (where the
+ * predicted-path polyline lives) was left positioned off-screen — the
+ * line "disappeared". An instant fit has no animation to interrupt.
+ *
+ * ``redrawNonce`` is bumped by the parent whenever the tab becomes
+ * visible again; on that signal we cancel any in-flight animation
+ * (``map.stop()``) and force a size/viewport recompute
+ * (``invalidateSize``). The parent ALSO remounts every vector overlay
+ * (see the keyed Fragment in DroneMap), so the polyline is re-added to
+ * a freshly-recomputed map.
+ * ─────────────────────────────────────────────────────────────────── */
+function MapViewController({
+  bounds,
+  maxZoom = 13,
+  redrawNonce = 0,
+}: {
+  bounds: LatLngExpression[] | null;
+  maxZoom?: number;
+  redrawNonce?: number;
+}) {
+  const map = useMap();
+  const lastKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!bounds || bounds.length === 0) return;
+    const key = JSON.stringify(bounds);
+    if (key === lastKeyRef.current) return;
+    lastKeyRef.current = key;
+    const lb = latLngBounds(bounds as LatLngBoundsExpression);
+    map.fitBounds(lb, {
+      padding: [40, 40],
+      maxZoom,
+      animate: false,
+    });
+  }, [bounds, maxZoom, map]);
+
+  // Driven by the parent's visibility-change nonce. On tab return:
+  //   1. ``map.stop()`` cancels any animation that was frozen while the
+  //      tab was hidden (defensive — we use fitBounds now, but a queued
+  //      pan/zoom could still be mid-flight).
+  //   2. ``invalidateSize`` recomputes the container dimensions and
+  //      re-aligns the layer panes.
+  // The double rAF makes sure layout has settled before we measure.
+  useEffect(() => {
+    if (redrawNonce === 0) return;
+    map.stop();
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => map.invalidateSize()),
+    );
+    return () => cancelAnimationFrame(raf);
+  }, [redrawNonce, map]);
+  return null;
+}
 
 const SENSITIVE_PIN = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
@@ -28,6 +94,15 @@ interface Props {
   cameras?: CameraMarker[];
   predictedPath?: LatLngExpression[] | null;
   interceptPoint?: InterceptMarker | null;
+  /** When set, the map flies to fit these points. Used by LiveDetection
+   *  to zoom onto the camera + drone + predicted-path-end whenever a
+   *  hostile drone is being tracked. Pass `null` (or omit) to leave the
+   *  viewport alone. */
+  focusBounds?: LatLngExpression[] | null;
+  /** Upper bound on the zoom level used by `focusBounds`. Defaults to 13
+   *  so a tightly-clustered camera + drone pair doesn't zoom past street
+   *  level and lose the predicted-path context. */
+  focusMaxZoom?: number;
 }
 
 function offset(lat: number, lon: number, bearing_deg: number, distance_m: number): [number, number] {
@@ -56,9 +131,36 @@ export function DroneMap({
   cameras = [],
   predictedPath = null,
   interceptPoint = null,
+  focusBounds = null,
+  focusMaxZoom = 13,
 }: Props) {
   const { t } = useTranslation();
   const { theme } = useTheme();
+
+  // Bumped each time the tab becomes visible again. Used to (a) trigger
+  // the invalidateSize/stop logic in MapViewController and (b) remount
+  // every vector overlay via the keyed Fragment below. Remounting forces
+  // react-leaflet to remove the stale Leaflet layers and add fresh ones
+  // to the (just-recomputed) map — which is what actually brings the
+  // predicted-path polyline back after a tab switch. ``invalidateSize``
+  // alone recomputes the container size but does NOT re-add SVG paths
+  // that Leaflet left in a stale overlay-pane transform.
+  const [redrawNonce, setRedrawNonce] = useState(0);
+  useEffect(() => {
+    const onVisible = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      setRedrawNonce((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, []);
+
   const tileUrl = theme === "light"
     ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
     : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
@@ -75,45 +177,55 @@ export function DroneMap({
   const interceptColor = "#a78bfa";
   return (
     <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="h-full w-full rounded-md">
+      <MapViewController bounds={focusBounds} maxZoom={focusMaxZoom} redrawNonce={redrawNonce} />
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' url={tileUrl} />
-      {sensitiveAreas.map((a) => (
-        <Marker key={a.name} position={[a.lat, a.lon]} icon={sensitiveIcon}>
-          <Popup><strong>{a.name}</strong></Popup>
-        </Marker>
-      ))}
-      {cameras.flatMap((cam) => {
-        const cone = fovCone(cam);
-        const tip = offset(cam.lat, cam.lon, cam.heading_deg, cam.distance_m);
-        const camColor = cam.threatActive ? camThreat : camNormal;
-        return [
-          <Polygon key={`cam-cone-${cam.id}`} positions={cone} pathOptions={{ color: camColor, fillColor: camColor, fillOpacity: cam.threatActive ? 0.22 : 0.12, weight: 1.5, dashArray: "4 6" }} />,
-          <Polyline key={`cam-axis-${cam.id}`} positions={[[cam.lat, cam.lon], tip]} pathOptions={{ color: camColor, weight: 2 }} />,
-          <CircleMarker key={`cam-pin-${cam.id}`} center={[cam.lat, cam.lon]} radius={cam.threatActive ? 9 : 7} pathOptions={{ color: camColor, fillColor: camPinFill, fillOpacity: 1, weight: 2 }}>
-            <Popup>
-              <strong>{cam.name}</strong>{cam.threatActive ? ` — ${t("live.cam_threat")}` : ""}<br />
-              {t("live.cam_heading")}: <span dir="ltr">{cam.heading_deg}°</span><br />
-              {t("live.cam_fov")}: <span dir="ltr">{cam.fov_h_deg}°</span><br />
-              {t("live.cam_range")}: <span dir="ltr">{cam.distance_m} m</span>
-            </Popup>
-          </CircleMarker>,
-        ];
-      })}
-      {markers.map((m) => (
-        <CircleMarker key={m.id} center={[m.lat, m.lon]} radius={m.radius ?? 6} pathOptions={{ color: m.color, fillColor: m.color, fillOpacity: 0.6 }}>
-          <Popup>{m.label}</Popup>
-        </CircleMarker>
-      ))}
-      {predictedPath && predictedPath.length >= 2 && (
-        <Polyline positions={predictedPath} pathOptions={{ color: "#03B3DA", dashArray: "6 8", weight: 3 }} />
-      )}
-      {interceptPoint && (
-        <>
-          <CircleMarker center={[interceptPoint.lat, interceptPoint.lon]} radius={11} pathOptions={{ color: interceptColor, fillColor: interceptColor, fillOpacity: 0.25, weight: 2 }}>
-            <Popup><strong>{t("live.intercept_point")}</strong><br />{interceptPoint.label}</Popup>
+      {/* All vector overlays live under a keyed Fragment. When the tab
+          becomes visible again, `redrawNonce` changes, the Fragment
+          remounts, and react-leaflet re-adds every layer to the map —
+          guaranteeing the predicted-path polyline (and everything else)
+          is drawn fresh against the recomputed viewport. The TileLayer
+          is intentionally OUTSIDE this Fragment so tiles aren't re-fetched
+          (which would flash the basemap). */}
+      <Fragment key={redrawNonce}>
+        {sensitiveAreas.map((a) => (
+          <Marker key={a.name} position={[a.lat, a.lon]} icon={sensitiveIcon}>
+            <Popup><strong>{a.name}</strong></Popup>
+          </Marker>
+        ))}
+        {cameras.flatMap((cam) => {
+          const cone = fovCone(cam);
+          const tip = offset(cam.lat, cam.lon, cam.heading_deg, cam.distance_m);
+          const camColor = cam.threatActive ? camThreat : camNormal;
+          return [
+            <Polygon key={`cam-cone-${cam.id}`} positions={cone} pathOptions={{ color: camColor, fillColor: camColor, fillOpacity: cam.threatActive ? 0.22 : 0.12, weight: 1.5, dashArray: "4 6" }} />,
+            <Polyline key={`cam-axis-${cam.id}`} positions={[[cam.lat, cam.lon], tip]} pathOptions={{ color: camColor, weight: 2 }} />,
+            <CircleMarker key={`cam-pin-${cam.id}`} center={[cam.lat, cam.lon]} radius={cam.threatActive ? 9 : 7} pathOptions={{ color: camColor, fillColor: camPinFill, fillOpacity: 1, weight: 2 }}>
+              <Popup>
+                <strong>{cam.name}</strong>{cam.threatActive ? ` — ${t("live.cam_threat")}` : ""}<br />
+                {t("live.cam_heading")}: <span dir="ltr">{cam.heading_deg}°</span><br />
+                {t("live.cam_fov")}: <span dir="ltr">{cam.fov_h_deg}°</span><br />
+                {t("live.cam_range")}: <span dir="ltr">{cam.distance_m} m</span>
+              </Popup>
+            </CircleMarker>,
+          ];
+        })}
+        {markers.map((m) => (
+          <CircleMarker key={m.id} center={[m.lat, m.lon]} radius={m.radius ?? 6} pathOptions={{ color: m.color, fillColor: m.color, fillOpacity: 0.6 }}>
+            <Popup>{m.label}</Popup>
           </CircleMarker>
-          <CircleMarker center={[interceptPoint.lat, interceptPoint.lon]} radius={3} pathOptions={{ color: interceptColor, fillColor: interceptColor, fillOpacity: 1, weight: 1 }} />
-        </>
-      )}
+        ))}
+        {predictedPath && predictedPath.length >= 2 && (
+          <Polyline positions={predictedPath} pathOptions={{ color: "#03B3DA", dashArray: "6 8", weight: 3 }} />
+        )}
+        {interceptPoint && (
+          <>
+            <CircleMarker center={[interceptPoint.lat, interceptPoint.lon]} radius={11} pathOptions={{ color: interceptColor, fillColor: interceptColor, fillOpacity: 0.25, weight: 2 }}>
+              <Popup><strong>{t("live.intercept_point")}</strong><br />{interceptPoint.label}</Popup>
+            </CircleMarker>
+            <CircleMarker center={[interceptPoint.lat, interceptPoint.lon]} radius={3} pathOptions={{ color: interceptColor, fillColor: interceptColor, fillOpacity: 1, weight: 1 }} />
+          </>
+        )}
+      </Fragment>
     </MapContainer>
   );
 }

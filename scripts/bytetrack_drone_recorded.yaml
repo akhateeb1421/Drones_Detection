@@ -1,0 +1,19 @@
+# ByteTrack config for the RECORDED CLIP only (file sources).
+#
+# The bundled demo drone enters as a tiny distant speck whose detection
+# confidence sits well below the live tracker's 0.35 new-track gate. With
+# the strict live thresholds ByteTrack never opens a track for it, so the
+# pipeline emits no box (it only outputs detections that have a track id)
+# and persists no row (empty pending-approvals). The recorded clip plays
+# clean sky footage where false positives are unlikely, so we drop the
+# thresholds far enough that those faint frames can start a track.
+#
+# Live cameras keep the strict scripts/bytetrack_drone.yaml to avoid
+# becoming trigger-happy on a noisy webcam feed.
+tracker_type: bytetrack
+track_high_thresh: 0.10
+track_low_thresh: 0.01
+new_track_thresh: 0.05
+track_buffer: 300
+match_thresh: 0.8
+fuse_score: True

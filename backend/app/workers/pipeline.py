@@ -12,6 +12,7 @@ frames are dropped, never queued.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,7 +36,28 @@ log = logging.getLogger(__name__)
 
 
 _tasks: dict[int, asyncio.Task] = {}
-_executor_lock = asyncio.Lock()
+
+# Set of camera IDs the operator has explicitly paused. The per-camera worker
+# loop checks this BEFORE pulling the next frame from its source iterator, so
+# for file-based sources (recorded clip) cv2.VideoCapture stays at its current
+# byte position — when the operator resumes, the clip continues from where it
+# left off instead of having silently advanced through the entire video in the
+# background. The flag is set/cleared via the public ``pause_worker`` /
+# ``resume_worker`` helpers below, which are called from the cameras API.
+_paused_cameras: set[int] = set()
+
+# NOTE on concurrency: an earlier version of this file used a module-level
+# ``_executor_lock = asyncio.Lock()`` to serialise every YOLO call across
+# every camera. That was necessary back when ``services/inference.py`` held
+# a single global model — two cameras hitting ``model.track(persist=True)``
+# on the same instance would corrupt each other's ByteTrack state. The lock
+# fixed correctness at the cost of starving multi-camera workloads: whichever
+# camera re-queued first kept monopolising the mutex.
+#
+# Each ``TrackingPipeline`` now owns its own YOLO model, so there is no shared
+# mutable state to protect. We dispatch inference to the default executor
+# without any application-level coordination; PyTorch's internal BLAS/OpenMP
+# pool handles fair CPU sharing across concurrent calls.
 
 
 def _camera_geo(cam: Camera) -> CameraGeo:
@@ -56,6 +78,241 @@ def _decode(jpeg: bytes) -> np.ndarray | None:
     return cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
 
+def _enrich_output(
+    camera_id: int,
+    output,
+    infer_frame: np.ndarray,
+    areas_local,
+) -> tuple[list[dict], list[dict]]:
+    """Attach nearest-area / distance / ETA / threat-flag / thumbnail
+    bytes onto each raw detection produced by ``pipeline.step``.
+
+    Pure CPU work — no DB access, no awaits — so it can be called inline
+    from the live worker, the recorded-clip pre-compute pass, or inside
+    an executor without coordination. Returns ``(enriched, threats)``.
+    """
+    enriched_local: list[dict] = []
+    threats_local: list[dict] = []
+    for det in output.detections:
+        near = nearest(
+            det["lat"], det["lon"],
+            det["speed_mps"], det["confidence"],
+            areas_local,
+            angle_deg=det.get("angle_deg"),
+        )
+        det = dict(det)
+        det["nearest_area"] = near.name
+        det["dist_m"] = near.distance_m if near.distance_m != float("inf") else None
+        det["eta_s"] = near.eta_s
+
+        x1, y1, x2, y2 = det["bbox"]
+        pad = 12
+        fh, fw = infer_frame.shape[:2]
+        cx1, cy1 = max(0, x1 - pad), max(0, y1 - pad)
+        cx2, cy2 = min(fw, x2 + pad), min(fh, y2 + pad)
+        thumb_bytes: bytes | None = None
+        if cx2 > cx1 and cy2 > cy1:
+            crop = infer_frame[cy1:cy2, cx1:cx2]
+            ok_t, buf_t = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+            if ok_t:
+                thumb_bytes = bytes(buf_t)
+        if not thumb_bytes:
+            h, w = infer_frame.shape[:2]
+            scale = 160.0 / max(h, w) if max(h, w) > 160 else 1.0
+            if scale < 1.0:
+                small = cv2.resize(
+                    infer_frame, (int(w * scale), int(h * scale)),
+                    interpolation=cv2.INTER_AREA,
+                )
+            else:
+                small = infer_frame
+            ok_f, buf_f = cv2.imencode(".jpg", small, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+            if ok_f:
+                thumb_bytes = bytes(buf_f)
+        det["_thumb_bytes"] = thumb_bytes
+        enriched_local.append(det)
+
+        threat = alarms_svc.evaluate(
+            det["drone_class"], det["confidence"],
+            det["eta_s"], det["nearest_area"], det["speed_mps"],
+        )
+        det["_threat_fired"] = bool(threat.is_threat)
+        if threat.is_threat:
+            threats_local.append({
+                "camera_id": camera_id,
+                "track_id": det["track_id"],
+                "drone_class": det["drone_class"],
+                "confidence": det["confidence"],
+                "lat": det["lat"],
+                "lon": det["lon"],
+                "nearest_area": det["nearest_area"],
+                "eta_s": det["eta_s"],
+                "score": threat.score,
+                "reasons": threat.reasons,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            })
+    return enriched_local, threats_local
+
+
+# In-memory cache of pre-computed recorded-clip detections, keyed by
+# (video, geometry, model, imgsz). A recorded clip is a FIXED file, so its
+# per-frame detections never change for a given camera geometry — we run
+# YOLO over every frame ONCE and replay the cached results at full native
+# fps. This is what makes the recorded clip detect the drone on (almost)
+# every frame instead of the ~1-in-12 the live decoupled path manages on
+# CPU. Keying on geometry means switching the clip's location re-analyses
+# the first time, but switching BACK to a previously-seen location is
+# instant. Lost on uvicorn restart (re-computed on next access).
+_clip_cache: dict[tuple, list[list[dict]]] = {}
+
+
+async def _publish_clip_progress(camera_id: int, done: int, total: int) -> None:
+    """Push a placeholder 'Analyzing clip… N%' frame to the WebSocket so
+    the operator sees progress instead of a frozen 'loading' spinner while
+    the one-time pre-compute pass runs."""
+    img = np.full((360, 640, 3), (34, 26, 20), dtype=np.uint8)  # dark teal-navy (BGR)
+    pct = int(done / total * 100) if total else 0
+    msg = f"Analyzing clip... {pct}%" if total else f"Analyzing clip... {done}"
+    # Brand cyan #01F2CF -> BGR (207, 242, 1).
+    cv2.putText(img, msg, (110, 195), cv2.FONT_HERSHEY_SIMPLEX, 0.95, (207, 242, 1), 2)
+    ok, buf = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    if not ok:
+        return
+    meta = {
+        "type": "frame", "camera_id": camera_id, "frame_idx": 0,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "detections": [], "remote": False,
+    }
+    await frame_bus.publish(f"cam:{camera_id}", {"jpeg": bytes(buf), "meta": meta})
+
+
+async def _run_recorded_clip(
+    camera_id: int,
+    video_path: str,
+    pipeline: TrackingPipeline,
+    tracker_cfg: str,
+    geo_key: tuple,
+) -> None:
+    """Pre-compute detections for a recorded clip ONCE (every frame), then
+    loop the video at native fps overlaying the cached detections.
+
+    Why not the live decoupled path? On CPU, YOLO at imgsz=640 runs ~2
+    inferences/sec while the clip plays at ~25 fps, so the live path only
+    samples ~8% of frames — the drone is detected in a handful of frames
+    per loop, sometimes none. A recorded clip is a fixed file, so we can
+    afford to analyse every frame once and then replay smoothly with a
+    detection on every frame the model can see the drone.
+    """
+    loop = asyncio.get_running_loop()
+    settings = get_settings()
+
+    frames_dets = _clip_cache.get(geo_key)
+
+    # ── Phase 1: pre-compute (only on cache miss) ──────────────────────
+    if frames_dets is None:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            cap.release()
+            raise RuntimeError(f"Could not open recorded clip '{video_path}' for pre-compute.")
+        total_hint = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        # Use the clip's REAL frame rate for the per-frame→per-second speed
+        # conversion. The pipeline was constructed with a 25 fps default;
+        # pre-compute walks every frame in order so the history points are
+        # exactly one clip-frame apart, and the true fps is what makes the
+        # m/s figure correct. Clamp to a sane range so a corrupt header
+        # can't blow up the speed.
+        clip_fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+        pipeline.fps = max(1.0, min(clip_fps or 25.0, 120.0))
+        log.info("Recorded clip cam=%s: clip fps=%.2f (used for speed).", camera_id, pipeline.fps)
+        with SessionLocal() as db:
+            areas_local = load_areas(db)
+        log.info(
+            "Recorded clip cam=%s: pre-computing detections over ~%d frames "
+            "(one-time; cached per location).", camera_id, total_hint,
+        )
+        computed: list[list[dict]] = []
+        detect_frames = 0
+        try:
+            while True:
+                ok, frame = cap.read()
+                if not ok:
+                    break
+                output = await loop.run_in_executor(None, pipeline.step, frame, tracker_cfg)
+                enriched, _threats = _enrich_output(camera_id, output, frame, areas_local)
+                if enriched:
+                    detect_frames += 1
+                    with SessionLocal() as db:
+                        _persist(db, camera_id, output.frame_idx, enriched)
+                computed.append([_serialize_det(d) for d in enriched])
+                if len(computed) % 15 == 0:
+                    await _publish_clip_progress(camera_id, len(computed), total_hint)
+        finally:
+            cap.release()
+        frames_dets = computed
+        _clip_cache[geo_key] = frames_dets
+        log.info(
+            "Recorded clip cam=%s: pre-compute done — %d frames, %d with detections.",
+            camera_id, len(frames_dets), detect_frames,
+        )
+    else:
+        log.info("Recorded clip cam=%s: using cached detections (%d frames).", camera_id, len(frames_dets))
+
+    total = len(frames_dets)
+    if total == 0:
+        log.error("Recorded clip cam=%s: no frames decoded; nothing to replay.", camera_id)
+        return
+
+    # ── Phase 2: smooth replay at native fps ───────────────────────────
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Could not reopen recorded clip '{video_path}' for replay.")
+    fps_native = cap.get(cv2.CAP_PROP_FPS) or 0.0
+    fps_play = max(5.0, min(fps_native or 30.0, 60.0))
+    # Speed up ONLY the dashboard replay — detection pre-compute above ran
+    # at native fps, so the cached km/h speed and predicted path already
+    # reflect the real drone. We just ship the frames faster by shortening
+    # the inter-frame delay by the playback multiplier (1.5x default).
+    playback_speed = max(0.1, settings.recorded_clip_playback_speed)
+    frame_dt = 1.0 / (fps_play * playback_speed)
+    log.info(
+        "Recorded clip cam=%s: replaying at %.2fx (%.1f fps native -> %.1f display fps).",
+        camera_id, playback_speed, fps_play, fps_play * playback_speed,
+    )
+    idx = 0
+    try:
+        while True:
+            # Pause gate (operator stop button) — keeps the clip frozen at
+            # the current frame instead of advancing in the background.
+            while camera_id in _paused_cameras:
+                await asyncio.sleep(0.2)
+            ok, frame = cap.read()
+            if not ok or idx >= total:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                idx = 0
+                ok, frame = cap.read()
+                if not ok:
+                    await asyncio.sleep(0.1)
+                    continue
+            dets = frames_dets[idx] if idx < total else []
+            idx += 1
+            annotated = overlay(frame, dets)
+            ok2, buf = cv2.imencode(".jpg", annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+            if not ok2:
+                continue
+            meta = {
+                "type": "frame",
+                "camera_id": camera_id,
+                "frame_idx": idx,
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "detections": dets,
+                "remote": False,
+            }
+            await frame_bus.publish(f"cam:{camera_id}", {"jpeg": bytes(buf), "meta": meta})
+            await asyncio.sleep(frame_dt)
+    finally:
+        cap.release()
+
+
 async def _run_camera(camera_id: int) -> None:
     settings = get_settings()
     tracker_cfg = str(Path(settings.tracker_cfg).resolve())
@@ -70,37 +327,172 @@ async def _run_camera(camera_id: int) -> None:
         stream_url = cam.stream_url
         cam_name = cam.name
 
-    pipeline = TrackingPipeline(geo, fps=25.0)
-    log.info("Starting worker for camera %s (%s) @ %s", camera_id, cam_name, stream_url)
-
-    # Decide source based on the stream_url scheme:
-    #   http://... or https://...   -> remote MJPEG stream (e.g. Pi)
-    #   webcam:N or just N          -> local webcam device index N
-    #   anything else               -> local video file (looped for demo)
+    # Decide source AND model weights AND inference resolution based on
+    # the stream_url scheme:
+    #   http://... or https://...   -> remote MJPEG stream (e.g. Pi)   [live]
+    #   webcam:N or just N          -> local webcam device index N     [live]
+    #   anything else               -> local video file (looped demo)  [video]
+    #
+    # Live cameras typically show a large, close drone (phone screen,
+    # indoor demo), so we run YOLO at imgsz=416 to roughly halve the
+    # per-frame latency — that drops detection lag from ~1-2 s to
+    # ~0.5 s on CPU. The recorded clip shows small, distant drones
+    # (~20-40 px), so we keep it at 640 to preserve recall.
+    # The weights loader falls back to `settings.yolo_weights` if the
+    # per-source file is missing.
+    is_file_source = False
     if stream_url.startswith(("http://", "https://")):
         source_iter = stream_jpegs(stream_url)
         is_remote = True
+        weights_for_camera = settings.yolo_weights_live
+        imgsz_for_camera = settings.yolo_imgsz_live
     elif stream_url.startswith("webcam:") or stream_url.strip().isdigit():
         device_index = int(stream_url.split(":", 1)[1] if ":" in stream_url else stream_url)
         source_iter = read_webcam_as_mjpeg(device_index)
         is_remote = False
+        weights_for_camera = settings.yolo_weights_live
+        imgsz_for_camera = settings.yolo_imgsz_live
     else:
         source_iter = read_local_video_as_mjpeg(stream_url)
         is_remote = False
+        weights_for_camera = settings.yolo_weights_video
+        imgsz_for_camera = settings.yolo_imgsz_video
+        is_file_source = True
+        # The bundled demo drone enters as a tiny distant speck whose
+        # confidence sits below the live tracker's 0.35 new-track gate, so
+        # ByteTrack never opens a track for it (no track id -> no box, no
+        # persisted row, empty pending-approvals). The recorded clip plays
+        # clean sky footage where false positives are unlikely, so it gets
+        # its own much more sensitive tracker config that lets faint
+        # detections start tracks. Live cameras keep the strict default.
+        tracker_cfg = str(Path(settings.tracker_cfg_video).resolve())
+        # The recorded clip copies its geometry from a long-range
+        # surveillance camera, whose multi-kilometre assumed distance
+        # makes the demo footage's drone read at hundreds of km/h. Speed
+        # scales linearly with the assumed distance, so override it with
+        # the dedicated, tunable recorded-clip distance for a realistic
+        # readout (CameraGeo is frozen, hence dataclasses.replace).
+        geo = dataclasses.replace(
+            geo, assumed_target_distance_m=settings.recorded_clip_distance_m
+        )
+
+    pipeline = TrackingPipeline(
+        geo,
+        fps=25.0,
+        weights_path=weights_for_camera,
+        imgsz=imgsz_for_camera,
+        # Recorded clip gets the more sensitive hostile floor (clean sky,
+        # tiny distant drone); live cameras keep the global 0.15 default.
+        conf_hostile=settings.yolo_conf_video if is_file_source else None,
+        # Test-time augmentation only for the recorded clip — it pre-computes
+        # once and caches, so the ~3x inference cost is paid a single time and
+        # never touches live latency. Raises recall on the side-profile-vs-sky
+        # frames the single-pass model misses.
+        augment=is_file_source,
+    )
+    log.info(
+        "Starting worker for camera %s (%s) @ %s [weights=%s imgsz=%s]",
+        camera_id, cam_name, stream_url, weights_for_camera, imgsz_for_camera,
+    )
+
+    # File sources (recorded clip): pre-compute every frame once, then
+    # replay smoothly. This is its own self-contained path — it does NOT
+    # use the decoupled live loop below. Keyed on geometry so changing
+    # the clip's location re-analyses the first time but is instant on
+    # return. See _run_recorded_clip for the full rationale.
+    if is_file_source:
+        geo_key = (
+            stream_url,
+            round(geo.latitude, 6), round(geo.longitude, 6),
+            round(geo.heading_deg, 2), round(geo.altitude_m, 2),
+            round(geo.fov_h_deg, 2), round(geo.fov_v_deg, 2),
+            int(geo.sensor_w_px), round(geo.assumed_target_distance_m, 2),
+            weights_for_camera, imgsz_for_camera, tracker_cfg,
+        )
+        try:
+            await _run_recorded_clip(camera_id, stream_url, pipeline, tracker_cfg, geo_key)
+        except asyncio.CancelledError:
+            log.info("Camera %s (recorded clip) worker cancelled.", camera_id)
+            raise
+        except Exception:  # noqa: BLE001
+            log.exception("Camera %s (recorded clip) worker crashed.", camera_id)
+        return
+    # All source types share the same downstream flow: decoupled overlay,
+    # background YOLO task, and the HOLD_FRAMES sticky-box behaviour below.
+    # Multi-camera setups are now correctness-safe at the model level — each
+    # ``TrackingPipeline`` constructed below owns its own YOLO instance — so
+    # this loop intentionally does NOT serialise inference across cameras.
+    # See the module-level NOTE near ``_tasks`` for the rationale.
 
     skip = max(settings.inference_frame_skip, 1)
     every_n = max(settings.inference_every_n_frames, 1)
     frame_counter = 0
-    # Decoupled-overlay state. `last_enriched` is the most recent set of
-    # detections from a YOLO run; we reuse it as the overlay for every
-    # source frame between inferences so display fps tracks the camera
-    # source rather than the (much slower) CPU YOLO loop.
+    # Truly-decoupled overlay state. `last_enriched` is updated by a
+    # background coroutine (`_inference_pass`) so the main display
+    # loop NEVER awaits YOLO. Without this, the await on the executor
+    # used to drop display fps to inference fps every Nth frame; with
+    # the background pattern, display fps == source fps regardless of
+    # how slow YOLO is on CPU.
     last_enriched: list[dict] = []
     last_frame_idx = 0
+    # Sticky-overlay hold-over: when a YOLO pass returns detections we
+    # latch them into `last_enriched` and stamp `last_detection_frame`.
+    # Subsequent passes that return ZERO detections do NOT immediately
+    # clear `last_enriched` — they only clear it once the hold window
+    # has expired. Without this, sporadic per-frame YOLO misses (very
+    # common with the stock 416/640 weights on a 1080p clip where the
+    # drone occupies <30 px) make the boxes flicker on for one frame
+    # and then disappear for many, which the operator perceives as
+    # "no detection boxes at all" even though the DB rows + thumbnails
+    # prove inference is landing.
+    #
+    # 25 frames ≈ 1 s of playback at 25 fps — enough to bridge the
+    # gap between two non-adjacent successful detections without
+    # leaving the box on screen so long that it visibly lags the
+    # drone's actual position.
+    HOLD_FRAMES = 25
+    last_detection_frame = -10_000
+    inference_task: asyncio.Task | None = None
     loop = asyncio.get_running_loop()
 
+    async def _inference_pass(infer_frame, fc):
+        """Background YOLO + enrich + persist for a single frame.
+        Returns (enriched, threats, frame_idx) so the main loop can
+        harvest the result without ever awaiting inline.
+
+        No application-level lock here: each ``pipeline`` is the only
+        thing that ever touches its own YOLO model + tracker state, so
+        concurrent calls from other cameras' inference passes don't need
+        coordination. CPU contention is handled by PyTorch internally.
+        """
+        output = await loop.run_in_executor(
+            None, pipeline.step, infer_frame, tracker_cfg
+        )
+        with SessionLocal() as db:
+            areas_local = load_areas(db)
+            enriched_local, threats_local = _enrich_output(
+                camera_id, output, infer_frame, areas_local
+            )
+            _persist(db, camera_id, output.frame_idx, enriched_local)
+        return enriched_local, threats_local, output.frame_idx
+
+    # Convert the source iterator to an explicit async-iter so we can
+    # gate `__anext__()` on the pause flag. With a plain ``async for`` we
+    # could only pause AFTER pulling a frame — which would still advance
+    # cv2.VideoCapture and drain the file. By checking the flag BEFORE
+    # pulling, the underlying capture stays at its current position and
+    # the clip resumes from exactly where the operator paused it.
+    source_aiter = source_iter.__aiter__()
     try:
-        async for jpeg in source_iter:
+        while True:
+            # Pause gate. Idle-loop with a short sleep so resuming is
+            # snappy (~200 ms latency) without busy-spinning the CPU.
+            while camera_id in _paused_cameras:
+                await asyncio.sleep(0.2)
+            try:
+                jpeg = await source_aiter.__anext__()
+            except StopAsyncIteration:
+                break
             frame_counter += 1
             if frame_counter % skip != 0:
                 continue
@@ -108,90 +500,52 @@ async def _run_camera(camera_id: int) -> None:
             if frame is None:
                 continue
 
-            # Run YOLO + tracker + DB persistence only every Nth frame.
-            # The other frames still get decoded, overlaid with the last
-            # known boxes, and pushed to the WebSocket — so the operator
-            # sees a smooth video instead of a stuttering 5 fps slideshow.
-            do_inference = (frame_counter % every_n == 0)
+            # Harvest a completed inference (non-blocking). The display
+            # loop never waits for YOLO — when the background task
+            # finishes, we pick up its result on whichever frame is
+            # being processed next.
+            if inference_task is not None and inference_task.done():
+                try:
+                    enriched_r, threats_r, fidx_r = inference_task.result()
+                    last_frame_idx = fidx_r
+                    if enriched_r:
+                        # Fresh detections — latch them and stamp the
+                        # hold-over watermark so they stay on screen
+                        # even if the next few YOLO passes miss.
+                        last_enriched = enriched_r
+                        last_detection_frame = frame_counter
+                        log.info(
+                            "YOLO pass: cam=%s frame=%s -> %d detection(s) %s",
+                            camera_id, fidx_r, len(enriched_r),
+                            [f"{d['drone_class']}:{d['confidence']:.2f}" for d in enriched_r],
+                        )
+                    else:
+                        # YOLO returned nothing. Only blank the overlay
+                        # if the hold window has expired; otherwise
+                        # keep drawing the previous boxes.
+                        if frame_counter - last_detection_frame > HOLD_FRAMES:
+                            last_enriched = []
+                    for t in threats_r:
+                        await frame_bus.publish("alarms", t)
+                except Exception:  # noqa: BLE001
+                    log.exception("Background YOLO task failed.")
+                inference_task = None
 
+            # Launch a new inference task only when (a) the cadence
+            # says so AND (b) no inference is already in flight. The
+            # second condition naturally throttles YOLO to whatever
+            # rate CPU can sustain — if YOLO is slow, frames just
+            # skip inference and reuse last_enriched, but display fps
+            # stays at source fps.
+            do_inference = (frame_counter % every_n == 0) and inference_task is None
             if do_inference:
-                async with _executor_lock:  # serialize CPU access if multiple cams contend
-                    output = await loop.run_in_executor(None, pipeline.step, frame, tracker_cfg)
-                last_frame_idx = output.frame_idx
+                # Copy the frame so the inference task has its own
+                # buffer (the main loop will overwrite `frame` on the
+                # next iteration of source_iter).
+                inference_task = asyncio.create_task(
+                    _inference_pass(frame.copy(), frame_counter)
+                )
 
-                # Enrich with ETA + nearest area.
-                with SessionLocal() as db:
-                    areas = load_areas(db)
-                    enriched: list[dict] = []
-                    threats: list[dict] = []
-                    for det in output.detections:
-                        near = nearest(
-                            det["lat"],
-                            det["lon"],
-                            det["speed_mps"],
-                            det["confidence"],
-                            areas,
-                            angle_deg=det.get("angle_deg"),
-                        )
-                        det = dict(det)
-                        det["nearest_area"] = near.name
-                        det["dist_m"] = near.distance_m if near.distance_m != float("inf") else None
-                        det["eta_s"] = near.eta_s
-
-                        # Crop the bbox out of the current frame for the
-                        # pending-approvals thumbnail. JPEG-encode in memory;
-                        # _persist decides whether to actually save to disk
-                        # (only when this is the best frame for the track).
-                        x1, y1, x2, y2 = det["bbox"]
-                        pad = 12
-                        fh, fw = frame.shape[:2]
-                        cx1, cy1 = max(0, x1 - pad), max(0, y1 - pad)
-                        cx2, cy2 = min(fw, x2 + pad), min(fh, y2 + pad)
-                        if cx2 > cx1 and cy2 > cy1:
-                            crop = frame[cy1:cy2, cx1:cx2]
-                            ok_t, buf_t = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-                            det["_thumb_bytes"] = bytes(buf_t) if ok_t else None
-                        enriched.append(det)
-
-                        threat = alarms_svc.evaluate(
-                            det["drone_class"],
-                            det["confidence"],
-                            det["eta_s"],
-                            det["nearest_area"],
-                            det["speed_mps"],
-                        )
-                        # Tagged on the detection so _persist can stamp the track
-                        # row's alarm_fired_at and the dashboard can reconcile
-                        # CRITICAL badges with real alarms.
-                        det["_threat_fired"] = bool(threat.is_threat)
-                        if threat.is_threat:
-                            threats.append(
-                                {
-                                    "camera_id": camera_id,
-                                    "track_id": det["track_id"],
-                                    "drone_class": det["drone_class"],
-                                    "confidence": det["confidence"],
-                                    "lat": det["lat"],
-                                    "lon": det["lon"],
-                                    "nearest_area": det["nearest_area"],
-                                    "eta_s": det["eta_s"],
-                                    "score": threat.score,
-                                    "reasons": threat.reasons,
-                                    "ts": datetime.now(timezone.utc).isoformat(),
-                                }
-                            )
-
-                    # Persist detections + track summaries.
-                    _persist(db, camera_id, output.frame_idx, enriched)
-
-                # Stash the fresh detections so the next (every_n - 1)
-                # display-only frames can overlay them.
-                last_enriched = enriched
-
-                # Threats are bus-published only when a fresh inference
-                # actually fires one — never re-broadcast stale threats.
-                for t in threats:
-                    await frame_bus.publish("alarms", t)
 
             # Build annotated JPEG for the live preview, reusing
             # `last_enriched` whether or not we just ran YOLO. On the
@@ -232,14 +586,62 @@ def _serialize_det(d: dict) -> dict:
 
 
 def _save_thumbnail(camera_id: int, track_id: int, jpeg_bytes: bytes) -> str | None:
-    """Write a track's thumbnail JPEG to disk; return the relative path."""
+    """Write a track's thumbnail JPEG to disk ATOMICALLY; return the relative path.
+
+    The previous implementation used Path.write_bytes() which opens the
+    destination, writes in chunks, then closes. The dashboard polls
+    /detections/tracks every 2 s and the browser fetches each thumbnail
+    in a separate HTTP request — if the pipeline happened to be mid-
+    rewrite (every higher-confidence frame re-saves the same file),
+    the browser could receive a half-written JPEG, trigger the <img>
+    onError handler, and the row's image would disappear.
+
+    The fix: write to a hidden temp file in the same directory, then
+    `os.replace()` to swap it into place. os.replace is atomic on
+    POSIX and on Windows (Windows >= XP) — a concurrent reader either
+    sees the OLD complete file or the NEW complete file, never a
+    partial one.
+    """
     try:
+        import os
         from app.core.config import get_settings
         thumb_dir = Path(get_settings().thumbnail_dir).resolve()
         thumb_dir.mkdir(parents=True, exist_ok=True)
         rel = f"cam_{camera_id}_track_{track_id}.jpg"
         full = thumb_dir / rel
-        full.write_bytes(jpeg_bytes)
+        log.info(
+            "THUMB save start: cam=%s track=%s bytes=%d -> %s",
+            camera_id, track_id, len(jpeg_bytes), full,
+        )
+        tmp = full.with_name(f".{full.name}.tmp")
+        tmp.write_bytes(jpeg_bytes)
+        log.info(
+            "THUMB tmp written: exists=%s path=%s",
+            tmp.exists(), tmp,
+        )
+        os.replace(tmp, full)
+        log.info(
+            "THUMB after os.replace: full.exists()=%s",
+            full.exists(),
+        )
+        # Belt-and-braces: confirm the file actually landed. On Windows
+        # with OneDrive Files-On-Demand + Storage Sense, brand-new
+        # files in synced folders can be evicted from local disk
+        # moments after creation, even though os.replace() returned
+        # success. If we don\'t verify here, the DB row gets a
+        # thumbnail_path pointing at a file that won\'t be on disk
+        # the next time the API reads it. Returning None keeps the
+        # column NULL so the frontend renders the placeholder dash
+        # rather than a broken-image row.
+        if not full.exists():
+            log.error(
+                "Thumbnail %s vanished immediately after rename. This is "
+                "almost always OneDrive / Storage Sense de-localizing the "
+                "file. Set THUMBNAIL_DIR in backend/.env to a non-synced "
+                "path (e.g. %%LOCALAPPDATA%%/capstone-thumbnails).",
+                full,
+            )
+            return None
         return rel
     except Exception:  # noqa: BLE001
         log.exception("Failed to save thumbnail for cam=%s track=%s", camera_id, track_id)
@@ -339,9 +741,43 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
                 track.outcome = None
                 track.alarm_fired_at = None
                 track.first_seen_at = now
+                # CRITICAL: also reset thumbnail_path and max_confidence
+                # so the next frame's _save_thumbnail call actually
+                # fires. Without this, an ID reused from a previous
+                # uvicorn session keeps pointing at the OLD (possibly
+                # missing) thumbnail file, and the "if
+                # track.thumbnail_path is None" backfill check below
+                # never triggers — so the row sits in pending forever
+                # with a broken-image placeholder.
+                track.thumbnail_path = None
+                track.max_confidence = None
             track.last_seen_at = now
             track.voted_class = det["drone_class"]
-            # New high-water confidence -> overwrite the saved thumbnail.
+            # Save a fresh thumbnail when the DB path is either None OR
+            # points at a file that no longer exists on disk (left over
+            # from a previous run after OneDrive deleted it, a cleared
+            # cache, a moved thumbnail_dir, etc.). The on-disk check
+            # protects against the exact bug we just chased: TRACK
+            # REUSED would reset status to pending but leave a stale
+            # thumbnail_path, so this branch never fired and the row
+            # rendered the dash placeholder forever.
+            needs_thumb = track.thumbnail_path is None
+            if not needs_thumb and track.thumbnail_path:
+                try:
+                    from app.core.config import get_settings as _gs
+                    _td = Path(_gs().thumbnail_dir).resolve()
+                    if not (_td / track.thumbnail_path).exists():
+                        needs_thumb = True
+                except Exception:  # noqa: BLE001
+                    pass
+            if needs_thumb and det.get("_thumb_bytes"):
+                first_thumb = _save_thumbnail(
+                    camera_id, det["track_id"], det["_thumb_bytes"]
+                )
+                if first_thumb:
+                    track.thumbnail_path = first_thumb
+            # New high-water confidence -> overwrite the saved thumbnail
+            # with the better frame.
             if track.max_confidence is None or det["confidence"] > track.max_confidence:
                 track.max_confidence = float(det["confidence"])
                 if det.get("_thumb_bytes"):
@@ -371,22 +807,4 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
     db.commit()
 
 
-async def startup_pipeline() -> None:
-    """Spawn one worker task per enabled camera at app startup."""
-    with SessionLocal() as db:
-        cams = list(db.execute(select(Camera).where(Camera.enabled.is_(True))).scalars().all())
-    for cam in cams:
-        if cam.id in _tasks:
-            continue
-        _tasks[cam.id] = asyncio.create_task(_run_camera(cam.id), name=f"cam-{cam.id}")
-    log.info("Started pipeline workers: %s", list(_tasks.keys()))
-
-
-async def shutdown_pipeline() -> None:
-    for tid, task in list(_tasks.items()):
-        task.cancel()
-        try:
-            await task
-        except (asyncio.CancelledError, Exception):  # noqa: BLE001
-            pass
-        del _tasks[tid]
+async def startup_pipeline() -> None

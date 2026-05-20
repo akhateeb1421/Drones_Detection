@@ -55,6 +55,17 @@ async def read_local_video_as_mjpeg(path: str) -> AsyncIterator[bytes]:
             f"Could not open video source '{path}'. "
             "Check that the file exists, or use 'webcam:N' for a webcam, or 'http(s)://' for an MJPEG stream."
         )
+    # Honour the video\'s native FPS instead of the previous 25-fps
+    # hardcode. cv2 returns 0 if the codec didn\'t encode it; clamp to a
+    # sensible 5–60 fps range so a corrupt header can\'t pin the CPU
+    # or run a 200-fps slideshow.
+    fps_native = cap.get(cv2.CAP_PROP_FPS) or 0.0
+    fps_play = max(5.0, min(fps_native or 30.0, 60.0))
+    frame_dt = 1.0 / fps_play
+    log.info(
+        "Local video %s: native fps=%.2f, playback fps=%.2f",
+        path, fps_native, fps_play,
+    )
     try:
         consecutive_failures = 0
         while True:
@@ -73,7 +84,7 @@ async def read_local_video_as_mjpeg(path: str) -> AsyncIterator[bytes]:
             if not ok:
                 continue
             yield bytes(buf)
-            await asyncio.sleep(1 / 25.0)  # roughly 25 fps source
+            await asyncio.sleep(frame_dt)
     finally:
         cap.release()
 

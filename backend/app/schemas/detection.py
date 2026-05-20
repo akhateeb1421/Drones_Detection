@@ -44,6 +44,11 @@ class TrackOut(BaseModel):
     thumbnail_path: str | None = None
     alarm_fired_at: datetime | None = None
     outcome: str | None = None
+    # VLM-generated description of the track's thumbnail. Populated
+    # by the /detections/tracks endpoint from the in-memory Moondream2
+    # cache. None on first poll for a new track; replaced by a real
+    # sentence after background inference finishes (~5–15 s on CPU).
+    description: str | None = None
 
 
 class ApproveIn(BaseModel):

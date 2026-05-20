@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Cameras, Camera, Detections, Track, Areas, Area, trackThumbUrl } from "../services/api";
 import { useLiveStream } from "../hooks/useLiveStream";
+import { useTrackStore, Snapshot } from "../hooks/useTrackStore";
 import { useAlarmsContext } from "../contexts/AlarmsContext";
-import { useTheme } from "../contexts/ThemeContext";
 import { DroneMap } from "../components/DroneMap";
+import { WeatherPanel } from "../components/WeatherPanel";
 import { usePlaceLabel, useClassLabel, useBilingualName } from "../i18n/places";
 import { SAUDI_POPULATED_AREAS } from "../data/saudiPopulatedAreas";
 
@@ -49,231 +50,6 @@ const HOSTILE_CLASSES = new Set([
  *  helicopters, and unknown labels are filtered out. */
 function isHostileClass(cls: string | null | undefined): boolean {
   return HOSTILE_CLASSES.has(String(cls ?? "").toLowerCase().trim());
-}
-
-type Snapshot = {
-  trackId: number;
-  droneClass: string;
-  lat: number;
-  lon: number;
-  speedMps: number;
-  angleDeg: number;
-  direction: string;
-  confidence: number;
-  nearestArea: string | null;
-  etaS: number | null;
-  // wall-clock time (ms) of the LAST real detection for this track
-  lastSeenMs: number;
-};
-
-/* ── Weather panel ──────────────────────────────────────────────────
- * Live current-weather readout pulled from Open-Meteo (keyless, free)
- * for the selected camera's coordinates. Surfaces a detection-quality
- * verdict so the operator can tell at a glance whether visibility is
- * good enough to trust EO frames. Brand palette: mint→teal→sky.
- * ─────────────────────────────────────────────────────────────────── */
-
-/** Map WMO weather codes to a label key + an emoji glyph. The label
- *  key resolves through i18n so we get Arabic/English copy for free. */
-function wmoCondition(code: number, isDay: boolean): { key: string; glyph: string } {
-  if (code === 0) return { key: "clear", glyph: isDay ? "☀" : "🌙" };
-  if (code === 1) return { key: "mostly_clear", glyph: isDay ? "🌤" : "🌙" };
-  if (code === 2) return { key: "partly_cloudy", glyph: "⛅" };
-  if (code === 3) return { key: "cloudy", glyph: "☁" };
-  if (code === 45 || code === 48) return { key: "fog", glyph: "🌫" };
-  if (code >= 51 && code <= 57) return { key: "drizzle", glyph: "🌦" };
-  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return { key: "rain", glyph: "🌧" };
-  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return { key: "snow", glyph: "❄" };
-  if (code >= 95 && code <= 99) return { key: "storm", glyph: "⛈" };
-  return { key: "unknown", glyph: "" };
-}
-
-/** Detection-quality verdict — drives the colored status pill + footer. */
-function detectionStatus(code: number, windKmh: number): "optimal" | "degraded" | "poor" {
-  // Storm / heavy rain / snow / fog / very strong wind → poor visibility
-  if ([45, 48, 95, 96, 99, 71, 73, 75, 77, 65, 67, 82, 86].includes(code) || windKmh >= 35) return "poor";
-  // Light precip, overcast, or moderate wind → degraded but still usable
-  if ([3, 51, 53, 55, 56, 57, 61, 63, 66, 80, 81, 85].includes(code) || windKmh >= 20) return "degraded";
-  return "optimal";
-}
-
-type Weather = { tempC: number; windKmh: number; code: number; isDay: boolean };
-
-function WeatherPanel({ camera }: { camera: Camera | null }) {
-  const { t } = useTranslation();
-  const { theme } = useTheme();
-  const bilingualName = useBilingualName();
-  const [w, setW] = useState<Weather | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  // Re-fetch whenever the operator selects a different camera. Open-Meteo
-  // refreshes its `current_weather` block once per ~15 min, so we don't
-  // poll — one fetch per camera switch is plenty.
-  useEffect(() => {
-    if (!camera) return;
-    let cancelled = false;
-    setW(null); setErr(null);
-    const url =
-      `https://api.open-meteo.com/v1/forecast?latitude=${camera.latitude}` +
-      `&longitude=${camera.longitude}&current_weather=true` +
-      `&windspeed_unit=kmh&temperature_unit=celsius`;
-    fetch(url)
-      .then((r) => r.json())
-      .then((d: any) => {
-        if (cancelled) return;
-        const cw = d?.current_weather;
-        if (!cw) throw new Error("no_data");
-        setW({
-          tempC: Number(cw.temperature),
-          windKmh: Number(cw.windspeed),
-          code: Number(cw.weathercode),
-          isDay: cw.is_day === 1 || cw.is_day === true,
-        });
-      })
-      .catch((e) => { if (!cancelled) setErr(String(e)); });
-    return () => { cancelled = true; };
-  }, [camera?.id]);
-
-  if (!camera) return null;
-
-  // Brand tones used for background tints, borders, and tile hairlines.
-  // All TEXT inside the panel uses INK so the copy reads as one tone.
-  // INK flips with the theme: deep teal-black on light cards, pure
-  // white on dark cards so the copy stays readable against the navy
-  // gradient.
-  const C_MINT = "#01F2CF";
-  const C_SKY  = "#03B3DA";
-  const C_WARN = "#fbbf24";
-  const C_DANG = "#f87171";
-  const INK    = theme === "dark" ? "#ffffff" : "#0b2422";
-
-  const cond = w ? wmoCondition(w.code, w.isDay) : null;
-  const status = w ? detectionStatus(w.code, w.windKmh) : null;
-  const statusColor =
-    status === "optimal"  ? C_MINT :
-    status === "degraded" ? C_WARN :
-    status === "poor"     ? C_DANG : C_MINT;
-
-  // Camera label — use the bilingual helper so the chip reads the
-  // Arabic `name_ar` when the UI is in Arabic and the row provides one,
-  // and falls back to the English `name` otherwise. We avoid forcing
-  // upper-case because Arabic has no letter case.
-  const camChip = bilingualName(camera);
-
-  return (
-    <div className="card" style={{ padding: "clamp(14px,1.8vw,18px)" }}>
-      {/* Header row — WEATHER · <camera> on the right, condition glyph on the far right */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* Status pill on the left — chrome (bg/border) keeps the
-              brand status color so the pill still reads as a verdict,
-              but the text itself is INK (#0b2422). */}
-          {status && (
-            <span
-              className="badge"
-              style={{
-                background: `${statusColor}1F`,
-                color: INK,
-                border: `0.5px solid ${statusColor}55`,
-                textTransform: "uppercase",
-                letterSpacing: "0.10em",
-                fontSize: 11,
-              }}
-            >
-              {t(`live.weather_status_${status}`)}
-            </span>
-          )}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: INK, textTransform: "uppercase" }}>
-          <span>{t("live.weather")}</span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span>{camChip}</span>
-          {cond && <span style={{ fontSize: 18, marginInlineStart: 4 }} aria-hidden>{cond.glyph}</span>}
-        </div>
-      </div>
-
-      {/* Three metric tiles */}
-      {err ? (
-        <div style={{ padding: "16px 0", textAlign: "center", color: INK, fontSize: 13 }}>
-          {t("common.error")}
-        </div>
-      ) : !w ? (
-        <div style={{ padding: "16px 0", textAlign: "center", color: INK, fontSize: 13 }}>
-          {t("common.loading")}
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
-          <WTile
-            label={t("live.weather_wind")}
-            value={`${Math.round(w.windKmh)} km/h`}
-            accent={C_SKY}
-          />
-          <WTile
-            label={t("live.weather_temp")}
-            value={`${Math.round(w.tempC)}°C`}
-            accent={C_MINT}
-          />
-          <WTile
-            label={t("live.weather_condition")}
-            value={`${t(`live.weather_cond_${cond?.key ?? "unknown"}`)} ${cond?.glyph ?? ""}`.trim()}
-            accent={statusColor}
-          />
-        </div>
-      )}
-
-      {/* Detection-quality footer strip — chrome uses the status color
-          (subtle tint + border), text is INK (#0b2422). */}
-      {w && status && (
-        <div
-          style={{
-            marginTop: 10,
-            padding: "9px 14px",
-            borderRadius: 12,
-            background: `${statusColor}12`,
-            border: `0.5px solid ${statusColor}33`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            fontSize: 12,
-            color: INK,
-            fontWeight: 600,
-          }}
-        >
-          <span>{t(`live.weather_caption_${status}`)}</span>
-          <span aria-hidden>{status === "optimal" ? "✓" : status === "degraded" ? "!" : "✗"}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Single metric tile inside the weather panel — label on top, big value below. */
-function WTile({ label, value, accent }: { label: string; value: string; accent: string }) {
-  // Theme-aware text color so the tile copy is readable on both the
-  // navy dark card and the white light card. Mirrors INK in the parent.
-  const { theme } = useTheme();
-  const ink = theme === "dark" ? "#ffffff" : "#0b2422";
-  return (
-    <div
-      style={{
-        background: "var(--bg-elevated)",
-        border: "0.5px solid var(--border-subtle)",
-        borderRadius: 12,
-        padding: "12px 14px",
-        textAlign: "center",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${accent}55, transparent)` }} aria-hidden />
-      <div style={{ fontSize: 10, fontWeight: 700, color: ink, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: "clamp(14px,1.6vw,17px)", fontWeight: 800, color: ink }} dir="ltr">
-        {value}
-      </div>
-    </div>
-  );
 }
 
 export function LiveDetection() {
@@ -361,10 +137,13 @@ export function LiveDetection() {
 
   const { imageUrl, meta, connected } = useLiveStream(selected);
 
-  // Persist the most recent detection per track. We don't drop it when the
-  // drone leaves the camera frame — instead we keep extrapolating its
-  // position from the last known speed + heading.
-  const [tracks, setTracks] = useState<Map<number, Snapshot>>(new Map());
+  // Persist the most recent detection per track. Backed by the
+  // module-level store (useTrackStore) keyed on the selected camera so
+  // the tracked drones — and the predicted-path line drawn from them —
+  // survive navigating away from this page and back. Component-local
+  // useState reset to an empty Map on every remount, which is what made
+  // the predicted line vanish when the operator switched dashboard tabs.
+  const [tracks, setTracks] = useTrackStore(selected);
 
   // Tick every 200 ms so the predicted marker animates smoothly.
   const [tick, setTick] = useState(0);
@@ -414,29 +193,35 @@ export function LiveDetection() {
     });
   }, [meta]);
 
-  // Forget tracks we haven't seen in PREDICT_HORIZON_S seconds.
-  useEffect(() => {
-    const i = setInterval(() => {
-      setTracks((prev) => {
-        const cutoff = Date.now() - PREDICT_HORIZON_S * 1000;
-        const next = new Map<number, Snapshot>();
-        prev.forEach((snap, id) => {
-          if (snap.lastSeenMs >= cutoff) next.set(id, snap);
-        });
-        return next.size === prev.size ? prev : next;
-      });
-    }, 1000);
-    return () => clearInterval(i);
-  }, []);
+  // ─── Track lifetime ────────────────────────────────────────────────
+  // Tracks live in the module-level store (useTrackStore), so they survive
+  // navigating between dashboard sections — that's what fixed the original
+  // "predicted line vanishes when I switch sections" bug.
+  //
+  // Expiry is pure WALL-CLOCK and lazy: a track (and everything tied to it —
+  // line, intercept point, both map dots, details panel) is shown only
+  // while `Date.now() - lastSeenMs < PREDICT_HORIZON_S`, evaluated in the
+  // `useMemo`s below and re-checked every `tick` (200 ms). We deliberately
+  // do NOT pause or rewind that clock while the section is hidden: the
+  // predicted-now ghost dot must keep advancing along the line in real
+  // time, so when you return it sits at the LIVE predicted position rather
+  // than frozen where you left it (and it never replays "from the start").
+  // A track that genuinely goes PREDICT_HORIZON_S without a detection clears
+  // completely and stays cleared until a fresh detection arrives.
 
-  // Pick the most recent HOSTILE track to drive the "details" panel +
-  // map focus. Birds/airplanes/helicopters are filtered out — this is a
-  // counter-drone display, so the focused track must be a real threat.
+  // Pick the most recent NON-EXPIRED HOSTILE track to drive the details
+  // panel + map focus. Birds/airplanes/helicopters are filtered out — this
+  // is a counter-drone display. The `tick` dependency re-evaluates expiry
+  // over time so the focused track (and everything derived from it) clears
+  // ~200 ms after it crosses the horizon.
   const focused: Snapshot | null = useMemo(() => {
-    const hostile = Array.from(tracks.values()).filter((s) => isHostileClass(s.droneClass));
+    const now = Date.now();
+    const hostile = Array.from(tracks.values()).filter(
+      (s) => isHostileClass(s.droneClass) && now - s.lastSeenMs < PREDICT_HORIZON_S * 1000,
+    );
     if (hostile.length === 0) return null;
     return hostile.reduce<Snapshot>((acc, s) => (s.lastSeenMs > acc.lastSeenMs ? s : acc), hostile[0]);
-  }, [tracks]);
+  }, [tracks, tick]);
 
   // `focused` is already hostile by construction. The flag is kept for
   // clarity at the call sites that previously used it as a guard.
@@ -447,6 +232,36 @@ export function LiveDetection() {
     const end = projectPath(focused.lat, focused.lon, focused.speedMps, focused.angleDeg, PREDICT_HORIZON_S);
     return [[focused.lat, focused.lon] as [number, number], end];
   }, [focused, focusedIsHostile]);
+
+  // Auto-zoom: when a hostile drone is being tracked, fit the map to the
+  // detecting camera + the drone + the end of the predicted path. This
+  // gives the operator a tight regional view of "where the threat is,
+  // where it came from, where it's headed" without forcing a manual
+  // pan/zoom every time an alarm fires.
+  //
+  // The detecting camera is the currently-selected one because the
+  // `focused` snapshot is fed by the WebSocket stream of `selected`.
+  // (Cross-camera handoffs collapse onto the original track via the
+  // backend's link_root_camera_id, but the live preview always shows
+  // whichever camera the operator has open.) DroneMap fits these
+  // points with padding and a maxZoom cap, so we won't zoom past
+  // street level even when the drone is right on top of the camera.
+  const focusBounds = useMemo<[number, number][] | null>(() => {
+    if (!focused || !focusedIsHostile) return null;
+    const cam = cameras.find((c) => c.id === selected);
+    if (!cam) return null;
+    const pts: [number, number][] = [
+      [cam.latitude, cam.longitude],
+      [focused.lat, focused.lon],
+    ];
+    if (predictedPath && predictedPath.length >= 2) {
+      // predictedPath[1] is the projected end point PREDICT_HORIZON_S
+      // seconds ahead. Including it ensures the map keeps the full
+      // dashed path visible after fitBounds.
+      pts.push(predictedPath[1] as [number, number]);
+    }
+    return pts;
+  }, [focused, focusedIsHostile, cameras, selected, predictedPath]);
 
   // --- Suggested intercept point ---
   // Sample the predicted trajectory at fixed lookahead steps. For each
@@ -523,6 +338,10 @@ export function LiveDetection() {
       // its predicted-position dots end up cluttered with non-threats.
       if (!isHostileClass(s.droneClass)) return;
       const elapsedS = (now - s.lastSeenMs) / 1000;
+      // Track lost (no detection for the full horizon) — drop ALL of its
+      // markers so the map clears in step with the predicted line, the
+      // intercept point, and the focused-details panel.
+      if (elapsedS > PREDICT_HORIZON_S) return;
       const isStale = elapsedS > 0.5;
       // Brand triad palette: crimson stays for Shahed-class threats so
       // the operator can spot them at a glance; non-Shahed hostiles use
@@ -540,8 +359,11 @@ export function LiveDetection() {
         radius: 8,
       });
 
-      // Animated predicted-now position (only when extrapolating)
-      if (isStale && elapsedS <= PREDICT_HORIZON_S && s.speedMps > 0.1) {
+      // Animated predicted-now ghost dot — slides along the predicted
+      // path as the track ages (only while stale, i.e. between live
+      // sightings). Bounded by the horizon check above, so it never
+      // extrapolates beyond the end of the predicted-path line.
+      if (isStale && s.speedMps > 0.1) {
         const distance = s.speedMps * elapsedS;
         const bearing = (s.angleDeg * Math.PI) / 180;
         const dN = distance * Math.cos(bearing);
@@ -557,7 +379,7 @@ export function LiveDetection() {
           // mint friendly assets. Amber reads as "where the drone is
           // RIGHT NOW (extrapolated)" — a warning-tier indicator.
           color: "#fbbf24",
-          label: `#${s.trackId} predicted at +${elapsedS.toFixed(0)}s (${s.speedMps.toFixed(1)} m/s ${s.direction})`,
+          label: `#${s.trackId} predicted at +${elapsedS.toFixed(0)}s (${(s.speedMps * 3.6).toFixed(0)} km/h ${s.direction})`,
           radius: 6,
         });
       }
@@ -707,7 +529,7 @@ export function LiveDetection() {
                   <div><span className="label inline">{t("live.track_id")}</span> <span className="font-data" dir="ltr">#{focused.trackId}</span></div>
                   <div><span className="label inline">{t("live.drone_class")}</span> {classLabel(focused.droneClass)}</div>
                   <div><span className="label inline">{t("live.confidence")}</span> <span className="font-data">{(focused.confidence * 100).toFixed(0)}%</span></div>
-                  <div><span className="label inline">{t("live.speed")}</span> <span className="font-data" dir="ltr">{focused.speedMps.toFixed(1)} m/s</span></div>
+                  <div><span className="label inline">{t("live.speed")}</span> <span className="font-data" dir="ltr">{(focused.speedMps * 3.6).toFixed(0)} km/h</span></div>
                   <div><span className="label inline">{t("live.direction")}</span> {focused.direction}</div>
                   <div><span className="label inline">{t("live.nearest_area")}</span> {placeLabel(focused.nearestArea)}</div>
                   <div><span className="label inline">{t("live.lat")}</span> <span className="font-data" dir="ltr">{focused.lat.toFixed(5)}</span></div>
@@ -806,6 +628,7 @@ export function LiveDetection() {
                 cameras={showCams ? cameraMarkers : []}
                 predictedPath={predictedPath}
                 interceptPoint={showIntercept ? interceptForMap : null}
+                focusBounds={focusBounds}
               />
             </div>
           </div>
@@ -825,7 +648,14 @@ export function LiveDetection() {
             status="pending" the first frame it sees it, regardless of
             whether the threat-score gate fired an alarm. */}
         {(() => {
-          const visiblePending = pending.filter((p) => isHostileClass(p.voted_class));
+          // Sort by track_id ascending so the queue reads 1, 2, 3, 4, 5…
+          // instead of the recency order the backend returns (it orders
+          // by last_seen_at, so a re-detected track floats to the top and
+          // the # column jumps around). Tiebreak on camera_id for
+          // cross-camera track_id collisions.
+          const visiblePending = pending
+            .filter((p) => isHostileClass(p.voted_class))
+            .sort((a, b) => a.track_id - b.track_id || a.camera_id - b.camera_id);
           if (visiblePending.length === 0) {
             return <div className="text-sm text-muted">{t("common.no_data")}</div>;
           }
@@ -834,6 +664,7 @@ export function LiveDetection() {
             <thead className="text-start text-xs uppercase text-slate-400">
               <tr>
                 <th className="py-2 w-20 text-start">{t("live.thumb")}</th>
+                <th className="text-start min-w-[180px]">{t("live.description", "Description")}</th>
                 <th className="text-start">#</th>
                 <th className="text-start">{t("live.drone_class")}</th>
                 <th className="text-start">{t("live.nearest_area")}</th>
@@ -846,16 +677,40 @@ export function LiveDetection() {
               {visiblePending.map((p) => (
                 <tr key={p.id}>
                   <td className="py-2 text-start">
+                    {/* The img is keyed by thumbnail_path so a fresh
+                        file (atomic rename happened on the backend)
+                        forces a brand-new <img> with no stale DOM
+                        state. We DO NOT use an onError that mutates
+                        style.display directly — React doesn\'t know
+                        about that DOM mutation, so the element would
+                        stay invisible forever even when subsequent
+                        polls had a valid file. Instead, if the path
+                        is null (server already verified file is
+                        missing in the API), we render the placeholder
+                        dash. Native broken-image icon is the worst-
+                        case if the file vanishes between API response
+                        and browser fetch — still visible, no permanent
+                        hidden state. */}
                     {p.thumbnail_path ? (
                       <img
+                        key={p.thumbnail_path}
                         src={trackThumbUrl(p.id)}
                         alt={`track ${p.track_id}`}
                         className="h-12 w-16 rounded object-cover border border-slate-700"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                       />
                     ) : (
                       <div className="h-12 w-16 rounded bg-slate-800 text-xs text-muted flex items-center justify-center">—</div>
                     )}
+                  </td>
+                  {/* Moondream2 VLM caption of the thumbnail. May be
+                      null/empty for a few seconds after a track first
+                      appears while background inference runs; we show
+                      a subtle placeholder in that case so the column
+                      width doesn't jump around. */}
+                  <td className="text-start text-xs text-slate-300 align-middle" style={{ maxWidth: 280 }}>
+                    {p.description
+                      ? <span style={{ display: "inline-block", lineHeight: 1.35 }}>{p.description}</span>
+                      : <span className="text-muted italic">{t("live.description_loading", "...")}</span>}
                   </td>
                   <td className="text-start font-data"><span dir="ltr">#{p.track_id}</span></td>
                   <td className="text-start">{classLabel(p.voted_class)}</td>

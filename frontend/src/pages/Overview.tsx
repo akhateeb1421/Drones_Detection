@@ -391,7 +391,7 @@ export function Overview() {
                   canonical types the bucketing is never useful. */}
               <BarChart
                 data={types.map(tt => ({ ...tt, attack_type: typeLabel(tt.attack_type) }))}
-                margin={{ top:8, right:8, left:-22, bottom:0 }}
+                margin={{ top:8, right:8, left:0, bottom:0 }}
               >
                 <defs>
                   {GRAD_PAIRS.map(([a, b], i) => (
@@ -402,7 +402,7 @@ export function Overview() {
                 </defs>
                 <CartesianGrid {...GRID} vertical={false}/>
                 <XAxis dataKey="attack_type" tick={{ fill:"var(--text-muted)",fontSize:"clamp(9px,1vw,11px)" }} tickLine={false} axisLine={false} interval={0}/>
-                <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} width={36}/>
+                <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} width={48} tickFormatter={(v) => Number(v).toLocaleString()}/>
                 <Tooltip contentStyle={TT} labelStyle={TTL} itemStyle={TTI}
                   formatter={(v: number) => [v.toLocaleString(), t("overview.attacks","Attacks")]}/>
                 <Bar dataKey="count" radius={[6,6,0,0]} maxBarSize={56}>

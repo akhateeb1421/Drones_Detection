@@ -52,12 +52,49 @@ def list_tracks(
     db: Session = Depends(get_db),
     status: str | None = Query(default=None, description="pending | approved | rejected"),
     limit: int = Query(default=200, ge=1, le=2000),
-) -> list[Track]:
+) -> list[TrackOut]:
     stmt = select(Track)
     if status:
         stmt = stmt.where(Track.status == status)
     stmt = stmt.order_by(Track.last_seen_at.desc()).limit(limit)
-    return list(db.execute(stmt).scalars().all())
+    rows = list(db.execute(stmt).scalars().all())
+
+    # Enrich each row with a Moondream-generated description for its
+    # thumbnail. The moondream service caches by (track_id, thumb_path),
+    # so this is a fast dict lookup once the model is warm; the first
+    # call for a given track returns None and kicks off background
+    # inference. Wrapped in try/except so an offline VLM never blocks
+    # the pending-approvals queue.
+    try:
+        from app.services.moondream import describe_thumbnail
+        thumb_dir = Path(get_settings().thumbnail_dir).resolve()
+    except Exception:  # noqa: BLE001
+        describe_thumbnail = None  # type: ignore[assignment]
+        thumb_dir = None  # type: ignore[assignment]
+
+    out: list[TrackOut] = []
+    for t in rows:
+        obj = TrackOut.model_validate(t)
+        if t.thumbnail_path:
+            # Always verify the file is actually on disk. If the DB has
+            # a path but the file is gone (e.g. cleared cache, manual
+            # delete, pipeline mid-restart), null out thumbnail_path on
+            # the response so the frontend renders the placeholder dash
+            # instead of a broken <img> that gets hidden by onError.
+            if thumb_dir is not None:
+                full = thumb_dir / t.thumbnail_path
+                if not full.exists():
+                    obj.thumbnail_path = None
+                elif describe_thumbnail is not None:
+                    try:
+                        jpeg = full.read_bytes()
+                        obj.description = describe_thumbnail(t.id, t.thumbnail_path, jpeg)
+                    except Exception:  # noqa: BLE001
+                        # Any I/O or VLM hiccup -> leave description None
+                        # so the row still renders without the caption.
+                        pass
+        out.append(obj)
+    return out
 
 
 def _find_track(db: Session, camera_id: int, track_id: int) -> Track:

@@ -50,6 +50,10 @@ export type Track = {
   thumbnail_path: string | null;
   alarm_fired_at: string | null;
   outcome: "countered" | "hit" | null;
+  // VLM-generated one-sentence caption of the thumbnail image.
+  // Populated by the backend (Moondream2) on first poll for each
+  // track; may be null for a few seconds while inference runs.
+  description?: string | null;
 };
 
 // Convenience helper: URL the frontend uses to load a track's thumbnail JPEG.
@@ -140,6 +144,27 @@ export const Cameras = {
   // word) keeps working. Both hit DELETE /cameras/{id}.
   delete: (id: number) => api.delete(`/cameras/${id}`).then((r) => r.data),
   remove: (id: number) => api.delete(`/cameras/${id}`).then((r) => r.data),
+  // Recorded-clip helpers. `recorded` returns (and bootstraps on first
+  // call) the dedicated Camera row whose stream_url is the shahed demo
+  // video. `copyGeo` clones lat/lon/heading/FOV from another camera so
+  // the demo can be replayed at that camera's location.
+  recorded: () => api.get<Camera>("/cameras/recorded").then((r) => r.data),
+  copyGeo: (srcCameraId: number) =>
+    api.post<Camera>(`/cameras/recorded/copy-geo/${srcCameraId}`).then((r) => r.data),
+  // Pause / resume the backend worker for a camera. Used by the
+  // Recorded Clip page so "stop" actually freezes cv2.VideoCapture at
+  // the current frame instead of letting the clip silently advance.
+  // Idempotent on both ends.
+  pause: (cameraId: number) =>
+    api.post<Camera>(`/cameras/${cameraId}/pause`).then((r) => r.data),
+  resume: (cameraId: number) =>
+    api.post<Camera>(`/cameras/${cameraId}/resume`).then((r) => r.data),
+  // Runtime state of a camera's worker. Returns `{paused: boolean}`.
+  // The Recorded Clip page calls this on mount so a page reload (or
+  // tab close + reopen) restores the toggle to the worker's actual
+  // state instead of forcing the frontend's default `false`.
+  state: (cameraId: number) =>
+    api.get<{ paused: boolean }>(`/cameras/${cameraId}/state`).then((r) => r.data),
 };
 
 export const Areas = {

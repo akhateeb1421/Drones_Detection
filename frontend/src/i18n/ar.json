@@ -14,7 +14,8 @@
     "areas": "المناطق الحساسة",
     "placement": "اقتراح المواقع",
     "drones": "المسيّرات",
-    "about": "نبذة"
+    "about": "نبذة",
+    "recorded": "مقطع مسجل"
   },
   "common": {
     "language": "اللغة",
@@ -122,7 +123,9 @@
     "weather_cond_rain": "أمطار",
     "weather_cond_snow": "ثلوج",
     "weather_cond_storm": "عواصف رعدية",
-    "weather_cond_unknown": "غير معروف"
+    "weather_cond_unknown": "غير معروف",
+    "description": "الوصف",
+    "description_loading": "جارٍ التحليل..."
   },
   "history": {
     "title": "خريطة الهجمات التاريخية",
@@ -401,5 +404,14 @@
         "counter": "تشويش إلكتروني (التحكم + GPS)، صواريخ MANPADS كتفية، مدفعية مضادة متحركة، شباك مضادة للطائرات المسيّرة، اختراق سيبراني عبر انتحال إشارات GPS"
       }
     }
+  },
+  "recorded": {
+    "select_location": "اختر موقعاً",
+    "pause": "إيقاف",
+    "resume": "تشغيل",
+    "paused": "متوقف",
+    "video": "الفيديو",
+    "location": "الموقع",
+    "detections": "كشف نشط"
   }
 }

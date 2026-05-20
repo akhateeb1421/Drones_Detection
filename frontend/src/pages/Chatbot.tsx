@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Chat, ChatBackend } from "../services/api";
 import { useRole } from "../contexts/RoleContext";
 import { useChatbot } from "../contexts/ChatbotContext";
+import { useTheme } from "../contexts/ThemeContext";
 
 const BACKEND_KEY = "chatbot_backend";
 
@@ -15,6 +16,8 @@ export function Chatbot() {
   const { t, i18n } = useTranslation();
   const { role } = useRole();
   const { history, setHistory, clear } = useChatbot();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [backend, setBackend] = useState<ChatBackend>(loadBackend);
@@ -79,17 +82,23 @@ export function Chatbot() {
                         border: "1px solid var(--border-medium)",
                       }
                     : {
-                        // Assistant bubble — also a LIGHT box in both
-                        // modes, but a calmer pearl mint-tinted off-
-                        // white instead of a saturated brand gradient.
-                        // Reads as light against the dark chat card,
-                        // and as slightly tinted against the white
-                        // light-mode card. Always dark text on top.
-                        background:
-                          "linear-gradient(135deg, #e8f5f1 0%, #d4e8e2 100%)",
-                        color: "#0b2422",
-                        border: "1px solid rgba(11,36,34,0.10)",
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.18)",
+                        // Assistant bubble — matches the dashboard\'s
+                        // existing design tokens so it reads as a
+                        // native "inset tile" within the chat card,
+                        // exactly like the metric tiles on Overview,
+                        // the Weather sub-tiles in Live Detection,
+                        // and the per-row tiles in About. The same
+                        // three CSS vars (--bg-elevated /
+                        // --border-subtle / --text-primary) drive
+                        // every tile in the dashboard, so dark and
+                        // light modes both swap correctly without a
+                        // one-off color recipe.
+                        background: "var(--bg-elevated)",
+                        color: "var(--text-primary)",
+                        border: "1px solid var(--border-subtle)",
+                        boxShadow: isDark
+                          ? "0 1px 2px rgba(0,0,0,0.35)"
+                          : "0 1px 2px rgba(11,36,34,0.10)",
                       }
                 }
               >

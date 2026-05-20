@@ -11,6 +11,7 @@ import { ChatbotProvider } from "./contexts/ChatbotContext";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { Overview } from "./pages/Overview";
 import { LiveDetection } from "./pages/LiveDetection";
+import { RecordedClip } from "./pages/RecordedClip";
 import { HistoryMap } from "./pages/HistoryMap";
 import { Analysis } from "./pages/Analysis";
 import { Chatbot } from "./pages/Chatbot";
@@ -48,6 +49,7 @@ function AdminOnly({ children }: { children: JSX.Element }) {
 const NAV_MAIN = [
   { to:"/",         end:true,  key:"nav.overview",  d:"M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" },
   { to:"/live",     end:false, key:"nav.live",      d:"M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" },
+  { to:"/recorded", end:false, key:"nav.recorded",  d:"M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" },
   { to:"/history",  end:false, key:"nav.history",   d:"M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" },
 ];
 const NAV_INTEL = [
@@ -403,6 +405,7 @@ function Shell() {
           <Routes>
             <Route path="/"              element={<Overview/>}/>
             <Route path="/live"          element={<LiveDetection/>}/>
+            <Route path="/recorded"      element={<RecordedClip/>}/>
             <Route path="/history"       element={<HistoryMap/>}/>
             <Route path="/analysis"      element={<Analysis/>}/>
             <Route path="/drones"        element={<Drones/>}/>

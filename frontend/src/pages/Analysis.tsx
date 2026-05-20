@@ -126,27 +126,14 @@ export function Analysis() {
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:"clamp(10px,1.5vw,16px)" }} data-mount>
 
-      {/* Page header + horizon control */}
-      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12 }}>
+      {/* Page header — just the title + tag now. The horizon selector
+          was moved into the Attack Forecast card below, where it
+          actually applies; keeping it next to the page title was
+          misleading because the Timeline chart ignores it. */}
+      <div style={{ display:"flex",alignItems:"center",flexWrap:"wrap",gap:12 }}>
         <div>
           <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"var(--text-muted)",marginBottom:4 }}>{t("nav.analysis","الاستخبارات")}</div>
           <h1 style={{ fontSize:"clamp(18px,2.5vw,24px)",fontWeight:800,color:"var(--text-primary)",margin:0 }}>{t("analysis.title","التحليلات")}</h1>
-        </div>
-        {/* Horizon selector */}
-        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-          <div style={{ fontSize:12,color:"var(--text-muted)" }}>{t("analysis.horizon_days","أيام التوقع")}</div>
-          <div style={{ display:"flex",gap:3,padding:3,background:"var(--bg-elevated)",border:"1px solid var(--border-subtle)",borderRadius:10 }}>
-            {[7, 14, 30, 60, 90, 365].map(d => (
-              <button key={d} onClick={() => setHorizon(d)}
-                style={{ padding:"6px 12px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s",
-                  background: horizon===d ? `linear-gradient(135deg,${C1},${C3})` : "transparent",
-                  color: horizon===d ? "#0a1410" : "var(--text-muted)",
-                }}
-                title={d === 365 ? t("analysis.year_horizon","سنة كاملة") : `${d} ${t("analysis.days","يوم")}`}>
-                {d === 365 ? t("analysis.year_label","سنة") : d}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -191,6 +178,24 @@ export function Analysis() {
           label={t("analysis.attack_forecast","توقعات الهجمات")}
           sub={`${t("analysis.next","الـ")} ${horizon} ${t("analysis.days","يوم القادمة")}`}
         />
+        {/* Horizon selector — lives inside the Forecast card because it
+            only changes the forecast chart below. The Timeline above
+            uses a fixed historical range. */}
+        <div style={{ display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:12 }}>
+          <div style={{ fontSize:12,color:"var(--text-muted)" }}>{t("analysis.horizon_days","أيام التوقع")}</div>
+          <div style={{ display:"flex",gap:3,padding:3,background:"var(--bg-elevated)",border:"1px solid var(--border-subtle)",borderRadius:10 }}>
+            {[7, 14, 30, 60, 90, 365].map(d => (
+              <button key={d} onClick={() => setHorizon(d)}
+                style={{ padding:"6px 12px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s",
+                  background: horizon===d ? `linear-gradient(135deg,${C1},${C3})` : "transparent",
+                  color: horizon===d ? "#0a1410" : "var(--text-muted)",
+                }}
+                title={d === 365 ? t("analysis.year_horizon","سنة كاملة") : `${d} ${t("analysis.days","يوم")}`}>
+                {d === 365 ? t("analysis.year_label","سنة") : d}
+              </button>
+            ))}
+          </div>
+        </div>
         {fcData.length === 0 ? (
           <div style={{ height:200,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-faint)",fontSize:13 }}>
             {t("common.loading","جارٍ التحميل...")}

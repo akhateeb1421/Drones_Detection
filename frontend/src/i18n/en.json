@@ -14,7 +14,8 @@
     "areas": "Sensitive Areas",
     "placement": "Camera Placement",
     "drones": "Drones",
-    "about": "About"
+    "about": "About",
+    "recorded": "Recorded Clip"
   },
   "common": {
     "language": "Language",
@@ -122,7 +123,9 @@
     "weather_cond_rain": "Rain",
     "weather_cond_snow": "Snow",
     "weather_cond_storm": "Thunderstorm",
-    "weather_cond_unknown": "Unknown"
+    "weather_cond_unknown": "Unknown",
+    "description": "Description",
+    "description_loading": "analyzing..."
   },
   "history": {
     "title": "Historical Attacks Map",
@@ -401,5 +404,14 @@
         "counter": "EW jamming (control + GNSS), MANPADS, mobile AAA, anti-UAV nets, cyber takeover via spoofed GPS"
       }
     }
+  },
+  "recorded": {
+    "select_location": "Choose a location",
+    "pause": "Pause",
+    "resume": "Resume",
+    "paused": "Paused",
+    "video": "Video",
+    "location": "Location",
+    "detections": "active detections"
   }
 }
