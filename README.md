@@ -64,6 +64,12 @@ ollama pull qwen2.5:7b
 
 Then open `http://localhost:5173`.
 
+## Team Members
+
+- [Abdullah AlMudayfir](https://www.linkedin.com/in/abdullah-almudayfir-2500b8313)
+- [Leen AlJamaan](https://www.linkedin.com/in/leen-aljamaan)
+- [Rana AlMohaimeed](https://www.linkedin.com/in/rana-almohaimeed)
+
 ## License
 
 Educational use only. Not approved for operational defense deployment.
