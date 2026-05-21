@@ -2,520 +2,508 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ══════════════════════════════════════════════
-   SENTINEL — Final Design System
-   BG: #0d1117  (navy-black)
-   Accent: #01F2CF → #03DA9A → #03B3DA
-══════════════════════════════════════════════ */
+/*
+  SOURCE: drone_design/src/styles.css — exact tokens
+  FIXES:  sidebar nav icon centering, card top-line horizontal
+*/
 
-/* Theme tokens. Inline styles in pages use var(--token) so the dark/
-   light toggle actually changes them — CSS classes alone can't beat
-   inline `style={{}}` props. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+
+:root { --radius: 0.875rem; }
+
+/* ── Light mode ─────────────────────────────────────────────── */
 :root {
-  --bg-app:         #0d1117;
-  --bg-card:        linear-gradient(160deg, rgba(14,22,40,0.97) 0%, rgba(10,15,28,0.98) 100%);
-  --bg-card-flat:   #0e1628;
-  --bg-elevated:    rgba(8, 14, 26, 0.8);
-  --text-primary:   #e0f5f2;
-  --text-secondary: #b8e0db;
-  --text-muted:     #5fa09a;
-  --text-faint:     #3d7872;
-  --border-subtle:  rgba(1, 242, 207, 0.10);
-  --border-medium:  rgba(1, 242, 207, 0.22);
-}
-html.light {
-  /* Page is a clearly tinted teal-mint; cards stay near-white with a
-     visible border + shadow so they unambiguously float above the
-     page. Pure-white cards on a pale-mint page weren't readable as
-     "boxes" — the difference is intentionally larger now. */
-  --bg-app:         #a9c9c1;
-  --bg-card:        #ffffff;
-  --bg-card-flat:   #ffffff;
-  --bg-elevated:    #f0f7f5;
-  --text-primary:   #0b2422;
-  --text-secondary: #1f4541;
-  --text-muted:     #3a7570;
-  --text-faint:     #5e857f;
-  --border-subtle:  rgba(0, 90, 75, 0.36);
-  --border-medium:  rgba(0, 90, 75, 0.55);
-}
-
-/* Light-mode card lift — adds a real shadow so every box visibly
-   floats above the deeper page. Dark mode keeps the muted shadow from
-   the base .card rule. */
-html.light .card {
-  box-shadow:
-    0 1px 0 rgba(11,36,34,0.04),
-    0 6px 18px -6px rgba(11,36,34,0.18),
-    0 14px 36px -16px rgba(11,36,34,0.20) !important;
+  --background:             oklch(0.985 0.005 150);
+  --foreground:             oklch(0.18 0.02 160);
+  --card:                   oklch(1 0 0);
+  --card-foreground:        oklch(0.18 0.02 160);
+  --popover:                oklch(1 0 0);
+  --popover-foreground:     oklch(0.18 0.02 160);
+  --primary:                oklch(0.66 0.16 158);
+  --primary-foreground:     oklch(0.99 0.01 150);
+  --primary-glow:           oklch(0.86 0.19 130);
+  --secondary:              oklch(0.96 0.01 150);
+  --secondary-foreground:   oklch(0.22 0.02 160);
+  --muted:                  oklch(0.95 0.01 150);
+  --muted-foreground:       oklch(0.5 0.02 160);
+  --accent:                 oklch(0.86 0.19 130);
+  --accent-foreground:      oklch(0.18 0.04 160);
+  --destructive:            oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border:                 oklch(0.66 0.16 158 / 0.14);
+  --input:                  oklch(0.66 0.16 158 / 0.18);
+  --ring:                   oklch(0.66 0.16 158);
+  --glass:                  oklch(1 0 0 / 0.65);
+  --glass-border:           oklch(0.66 0.16 158 / 0.18);
+  --chart-1:                oklch(0.66 0.16 158);
+  --chart-2:                oklch(0.86 0.19 130);
+  --chart-3:                oklch(0.55 0.13 175);
+  --chart-4:                oklch(0.78 0.16 110);
+  --chart-5:                oklch(0.65 0.22 25);
+  --gradient-primary: linear-gradient(135deg, oklch(0.66 0.16 158), oklch(0.86 0.19 130));
+  --gradient-glow:    radial-gradient(circle at 50% 50%, oklch(0.66 0.16 158 / 0.35), transparent 70%);
+  --shadow-glow:      0 0 40px -10px oklch(0.66 0.16 158 / 0.35);
+  --shadow-card:      0 8px 32px -12px oklch(0.18 0.02 160 / 0.18);
 }
 
-html, body, #root {
-  height: 100%;
-  background-color: var(--bg-app) !important;
-  color: var(--text-primary);
+/* ── Dark mode (default) — obsidian + emerald ───────────────── */
+html.dark, html:not(.light) {
+  --background:             oklch(0.13 0.01 160);
+  --foreground:             oklch(0.96 0.01 150);
+  --card:                   oklch(0.18 0.015 160);
+  --card-foreground:        oklch(0.96 0.01 150);
+  --popover:                oklch(0.16 0.015 160);
+  --popover-foreground:     oklch(0.96 0.01 150);
+  --primary:                oklch(0.74 0.18 158);
+  --primary-foreground:     oklch(0.13 0.02 160);
+  --primary-glow:           oklch(0.9 0.21 128);
+  --secondary:              oklch(0.22 0.02 160);
+  --secondary-foreground:   oklch(0.96 0.01 150);
+  --muted:                  oklch(0.22 0.02 160);
+  --muted-foreground:       oklch(0.68 0.02 160);
+  --accent:                 oklch(0.9 0.21 128);
+  --accent-foreground:      oklch(0.13 0.02 160);
+  --destructive:            oklch(0.7 0.22 22);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border:                 oklch(0.74 0.18 158 / 0.14);
+  --input:                  oklch(0.74 0.18 158 / 0.2);
+  --ring:                   oklch(0.74 0.18 158);
+  --glass:                  oklch(0.2 0.015 160 / 0.45);
+  --glass-border:           oklch(0.74 0.18 158 / 0.18);
+  --chart-1:                oklch(0.74 0.18 158);
+  --chart-2:                oklch(0.9 0.21 128);
+  --chart-3:                oklch(0.62 0.13 175);
+  --chart-4:                oklch(0.78 0.16 110);
+  --chart-5:                oklch(0.7 0.22 22);
+  --gradient-primary: linear-gradient(135deg, oklch(0.74 0.18 158), oklch(0.9 0.21 128));
+  --gradient-glow:    radial-gradient(circle at 50% 50%, oklch(0.74 0.18 158 / 0.45), transparent 70%);
+  --shadow-glow:      0 0 60px -10px oklch(0.74 0.18 158 / 0.5);
+  --shadow-card:      0 8px 40px -12px oklch(0 0 0 / 0.6);
 }
 
+/* ═══ BASE ══════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; border-color: var(--border); }
+html { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+[dir="rtl"] body { font-family: 'Tajawal', 'Inter', ui-sans-serif, system-ui, sans-serif; }
+html, body, #root { height: 100%; margin: 0; padding: 0; }
 body {
-  font-family: "Inter", "Tajawal", system-ui, Arial, sans-serif;
-  font-size: 15px;
-  line-height: 1.6;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 70% -5%,  rgba(1,242,207,0.06), transparent),
-    radial-gradient(ellipse 60% 40% at -10% 90%, rgba(3,179,218,0.04), transparent),
-    radial-gradient(circle at 1px 1px, rgba(1,242,207,0.025) 1px, transparent 0);
-  background-size: auto, auto, 24px 24px;
-  background-attachment: fixed, fixed, fixed;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: 'cv02', 'cv11', 'ss01';
+  font-size: 14px;
 }
-
-[dir="rtl"] body { font-family: "Tajawal", "Inter", system-ui, Arial, sans-serif; }
-
 #root { position: relative; overflow-x: hidden; }
 
-/* ── Leaflet ── */
-/* `isolation: isolate` on .leaflet-container creates a private stacking
-   context so the map can't poke through dashboard chrome. DO NOT add a
-   `.leaflet-pane { z-index: auto }` override here — Leaflet's own CSS
-   gives each pane a specific z-index (tile=2, overlay=4, marker=6,
-   popup=8) and overriding them with `auto` causes markers to fall
-   behind tiles after any pane re-layout (which happens on click,
-   drag, and zoom animations). That manifested as the LocationPicker
-   marker "disappearing" whenever the operator clicked west/north/etc. */
-.leaflet-container { background: #08101a !important; position: relative; z-index: 0; isolation: isolate; }
-.leaflet-top, .leaflet-bottom { z-index: 1000; }
-.leaflet-tile { filter: saturate(0.6) brightness(0.75) hue-rotate(140deg); }
-/* Leaflet popups always render on a white bubble — force dark text
-   regardless of theme so the popup body never inherits a light
-   --text-primary (invisible-on-white in dark mode). */
-.leaflet-popup-content { color: #0b2422 !important; }
-.leaflet-popup-content strong { color: #0b2422 !important; }
+/* ═══ KEYFRAMES ══════════════════════════════════════════════ */
+@keyframes radar-sweep    { to { transform: rotate(360deg); } }
+@keyframes glow-pulse     { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes mountKf        { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulseRing      { 0% { transform: scale(.8); opacity: .5; } 100% { transform: scale(2.4); opacity: 0; } }
+@keyframes livePing       { 0%, 100% { transform: scale(.8); opacity: .5; } 50% { transform: scale(2.4); opacity: 0; } }
+@keyframes bannerIn       { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes shimmerScan    { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.animate-radar-sweep { animation: radar-sweep 4s linear infinite; }
+.animate-glow-pulse  { animation: glow-pulse 2.4s ease-in-out infinite; }
 
-/* ── Typography ── */
-.tabular { font-variant-numeric: tabular-nums; }
-.font-data {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
+/* ═══ GLASS ══════════════════════════════════════════════════ */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+}
+.glow-primary     { box-shadow: var(--shadow-glow); }
+.gradient-primary { background: var(--gradient-primary); }
+.text-gradient {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 
-/* ── Buttons ── */
-.btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200;
-  padding: 11px 22px;
-  font-size: 14px;
-  transform: translateZ(0);
+/* ═══ AMBIENT GLOW LAYERS ════════════════════════════════════ */
+.glow-layer-1 {
+  position: absolute; top: -160px; left: -160px;
+  width: 500px; height: 500px; border-radius: 50%;
+  background: var(--gradient-glow);
 }
-.btn:active { transform: translateY(1px) scale(0.99); }
-
-.btn-primary {
-  @apply btn;
-  background: linear-gradient(135deg, #01F2CF 0%, #03DA9A 50%, #03B3DA 100%);
-  color: #0a1410; font-weight: 700;
-  box-shadow: 0 0 0 1px rgba(1,242,207,0.3), 0 4px 20px -4px rgba(1,242,207,0.3);
-}
-.btn-primary:hover { filter: brightness(1.07); box-shadow: 0 0 24px rgba(1,242,207,0.25); }
-
-.btn-danger {
-  @apply btn text-white;
-  background: linear-gradient(135deg, #f87171 0%, #ef4444 60%, #dc2626 100%);
-  box-shadow: 0 0 0 1px rgba(248,113,113,0.3);
-}
-.btn-danger:hover { filter: brightness(1.08); }
-
-.btn-warning {
-  @apply btn;
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 60%, #d97706 100%);
-  color: #1a0e00; font-weight: 700;
+.glow-layer-2 {
+  position: absolute; top: 33%; right: -160px;
+  width: 600px; height: 600px; border-radius: 50%;
+  background: var(--gradient-glow); opacity: 0.5;
 }
 
-.btn-ghost {
-  @apply btn border;
-  color: #e0f5f2;
-  background: rgba(15, 25, 35, 0.6);
-  border-color: rgba(1,242,207,0.18);
-  backdrop-filter: blur(8px);
-}
-.btn-ghost:hover { background: rgba(1,242,207,0.08); border-color: rgba(1,242,207,0.4); color: #01F2CF; }
+/* ═══════════════════════════════════════════════════════════════
+   SIDEBAR — floating glass capsule (rounded-3xl = 24px)
 
-/* Live detection action buttons */
-.btn-countered {
-  @apply inline-flex items-center justify-center rounded-xl font-bold transition-all duration-150;
-  padding: 10px 18px; font-size: 14px;
-  background: linear-gradient(135deg, #01F2CF 0%, #03DA9A 100%);
-  color: #0a1410;
-  box-shadow: 0 0 14px rgba(1,242,207,0.25);
-  white-space: nowrap;
+   ALIGNMENT FIX:
+   Collapsed state: nav items are 44×44px centered squares.
+   The icon must be perfectly centered — no gap, no padding offset.
+   We use justify-content:center + align-items:center with no gap
+   when collapsed, and switch to flex-start + gap:12px when expanded.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --sb-mg: 24px;       /* matches Tailwind left-6 */
+  --sb-w:  80px;       /* matches Tailwind w-20 */
+  --sb-exp: 210px;
 }
-.btn-countered:hover { filter: brightness(1.07); box-shadow: 0 0 20px rgba(1,242,207,0.35); }
 
-.btn-hit {
-  @apply inline-flex items-center justify-center rounded-xl font-bold transition-all duration-150;
-  padding: 10px 18px; font-size: 14px;
-  background: linear-gradient(135deg, #1a1f2e, #141824);
-  color: #fbbf24;
-  border: 1.5px solid rgba(251,191,36,0.45);
-  box-shadow: 0 0 10px rgba(251,191,36,0.12);
-  white-space: nowrap;
+.sidebar {
+  position: fixed;
+  top: var(--sb-mg); left: var(--sb-mg);
+  bottom: var(--sb-mg); right: auto;
+  width: var(--sb-w);
+  border-radius: 24px;           /* rounded-3xl */
+  z-index: 40;
+  display: flex; flex-direction: column;
+  /* COLLAPSED: items centered */
+  align-items: center;
+  padding: 20px 0;
+  overflow: hidden;
+  transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.btn-hit:hover { border-color: rgba(251,191,36,0.7); box-shadow: 0 0 18px rgba(251,191,36,0.2); }
-
-.btn-reject {
-  @apply inline-flex items-center justify-center rounded-xl font-bold transition-all duration-150;
-  padding: 10px 18px; font-size: 14px;
-  background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
-  color: white;
-  white-space: nowrap;
+[dir="rtl"] .sidebar { left: auto; right: var(--sb-mg); }
+.sidebar[data-expanded="true"] {
+  width: var(--sb-exp);
+  align-items: stretch;
 }
-.btn-reject:hover { filter: brightness(1.08); }
 
-/* Small delete button */
-.btn-delete-sm {
-  @apply inline-flex items-center justify-center rounded-xl font-bold transition-all duration-150;
-  padding: 9px 16px; font-size: 13px;
-  background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
-  color: white; border: none; cursor: pointer;
+/* Logo */
+.sidebar-logo {
+  width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
+  background: var(--gradient-primary); box-shadow: var(--shadow-glow);
+  display: flex; align-items: center; justify-content: center;
 }
-.btn-delete-sm:hover { filter: brightness(1.08); }
 
-/* ── Cards ── */
+/* Brand text */
+.sidebar-brand-text { opacity: 0; max-width: 0; overflow: hidden; transition: opacity 180ms 60ms, max-width 260ms; flex-shrink: 0; }
+.sidebar[data-expanded="true"] .sidebar-brand-text { opacity: 1; max-width: 140px; }
+.sidebar-brand-name {
+  font-size: 15px; font-weight: 800;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+html.light .sidebar-brand-name { background: none; color: var(--foreground); }
+.sidebar-brand-sub { font-size: 10px; color: var(--muted-foreground); margin-top: 1px; }
+
+/* Nav container */
+.sidebar-nav {
+  display: flex; flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  /* collapsed: center all items */
+  align-items: center;
+  padding: 0;
+  width: 100%;
+  overflow-y: auto; overflow-x: hidden;
+}
+.sidebar[data-expanded="true"] .sidebar-nav {
+  align-items: stretch;
+  padding: 0 12px;
+}
+.sidebar-nav::-webkit-scrollbar { width: 3px; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: oklch(from var(--primary) l c h / 0.2); border-radius: 4px; }
+
+.sidebar-divider {
+  /* collapsed: narrow centered line */
+  width: 32px; height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+  flex-shrink: 0;
+}
+.sidebar[data-expanded="true"] .sidebar-divider { width: 100%; }
+
+/* ═══ NAV ITEM ═══════════════════════════════════════════════
+   FIX: collapsed icon centering.
+   - width/height fixed at 44px
+   - display:flex; align-items:center; justify-content:center
+   - NO gap, NO padding when collapsed (icon is the only child)
+   - .nav-label max-width:0 → takes zero space → icon centers
+   ═══════════════════════════════════════════════════════════ */
+.nav-item {
+  /* Collapsed: fixed square, centered icon */
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;           /* rounded-xl */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;                        /* no gap when label hidden */
+  padding: 0;
+  position: relative;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  transition: background 140ms, color 140ms;
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.nav-item:hover { color: var(--foreground); background: oklch(from var(--muted) l c h / 0.4); }
+.nav-item.active {
+  background: oklch(from var(--primary) l c h / 0.15);
+  color: var(--primary);
+}
+/* Active indicator bar */
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%; transform: translateY(-50%);
+  width: 3px; height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: var(--gradient-primary);
+}
+[dir="rtl"] .nav-item.active::before { border-radius: 3px 0 0 3px; }
+
+/* Expanded nav item — wider, left-aligned, shows label */
+.sidebar[data-expanded="true"] .nav-item {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  gap: 12px;
+  justify-content: flex-start;
+}
+.sidebar[data-expanded="true"] .nav-item.active::before {
+  inset-inline-start: 0;
+}
+
+/* Nav label — hidden when collapsed via max-width trick */
+.nav-item .nav-label {
+  font-size: 13px; font-weight: 500;
+  opacity: 0; max-width: 0; overflow: hidden; white-space: nowrap;
+  transition: opacity 160ms 80ms, max-width 260ms;
+  flex-shrink: 0;
+}
+.sidebar[data-expanded="true"] .nav-item .nav-label { opacity: 1; max-width: 160px; }
+
+/* ═══ SIDEBAR FOOTER CONTROLS ════════════════════════════════
+   Same centering logic as nav items:
+   collapsed: 44px square, icon centered, no gap, label hidden
+   expanded: full-width, icon + label left-aligned
+   ═══════════════════════════════════════════════════════════ */
+.sidebar-ctrl {
+  width: 44px; height: 40px;
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; padding: 0;
+  background: oklch(from var(--primary) l c h / 0.08);
+  border: 0.5px solid var(--glass-border);
+  color: var(--muted-foreground);
+  cursor: pointer; font-family: inherit;
+  transition: background 140ms, width 260ms, gap 260ms, padding 260ms;
+  overflow: hidden; white-space: nowrap; flex-shrink: 0;
+}
+.sidebar-ctrl:hover { background: oklch(from var(--primary) l c h / 0.16); color: var(--foreground); }
+.sidebar[data-expanded="true"] .sidebar-ctrl {
+  width: 100%; padding: 0 14px; gap: 10px; justify-content: flex-start;
+}
+.sidebar-ctrl-label {
+  opacity: 0; max-width: 0; overflow: hidden; flex-shrink: 0;
+  font-size: 13px; font-weight: 600;
+  transition: opacity 160ms 80ms, max-width 260ms;
+}
+.sidebar[data-expanded="true"] .sidebar-ctrl-label { opacity: 1; max-width: 140px; }
+
+/* Toggle chevron row */
+.sidebar-toggle-row {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.sidebar[data-expanded="true"] .sidebar-toggle-row { justify-content: flex-end; padding: 8px 14px; }
+.sidebar-toggle-btn {
+  width: 44px; height: 34px; border-radius: 10px;
+  border: 0.5px solid var(--glass-border);
+  background: oklch(from var(--primary) l c h / 0.08);
+  color: var(--muted-foreground); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 140ms;
+}
+.sidebar-toggle-btn:hover { background: oklch(from var(--primary) l c h / 0.16); color: var(--primary); }
+
+/* ═══ ROLE PILLS (TopBar) ════════════════════════════════════ */
+.role-pill-container {
+  display: flex; align-items: center; gap: 0; padding: 4px;
+  background: var(--glass); backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border); border-radius: 9999px;
+  font-size: 12px; font-weight: 500;
+}
+.role-pill {
+  padding: 6px 14px; border-radius: 9999px;
+  transition: all 160ms; cursor: pointer;
+  font-family: inherit; border: none; font-size: 12px; font-weight: 500;
+}
+.role-pill-active  { background: var(--primary); color: var(--primary-foreground); }
+.role-pill-inactive { background: transparent; color: var(--muted-foreground); }
+
+/* ═══ WORKSPACE ═══════════════════════════════════════════════ */
+.workspace {
+  position: relative; box-sizing: border-box; min-height: 100vh;
+  padding: 40px 32px;
+  transition: padding-inline-start 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ═══ PAGE TITLE ROW ═══════════════════════════════════════════ */
+.page-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 32px;
+}
+/* supertitle removed — class kept for compat but display:none */
+.page-supertitle { display: none; }
+.page-title {
+  font-size: clamp(20px, 2.5vw, 26px); font-weight: 600;
+  letter-spacing: -0.025em; color: var(--foreground);
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* ═══ ALARM BANNER ════════════════════════════════════════════ */
+.alarm-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 60; animation: bannerIn .35s cubic-bezier(.22,1,.36,1) both; }
+.alarm-banner-inner {
+  background: oklch(0.16 0.04 22 / 0.92); backdrop-filter: blur(24px) saturate(1.8);
+  border-bottom: 1px solid oklch(0.7 0.22 22 / 0.45);
+  box-shadow: 0 4px 32px -4px oklch(0.7 0.22 22 / 0.40);
+}
+.alarm-shimmer { height: 2px; background: linear-gradient(90deg, transparent, var(--destructive) 20%, oklch(0.9 0.12 25) 50%, var(--destructive) 80%, transparent); background-size: 200% 100%; animation: shimmerScan 2s linear infinite; opacity: .85; }
+
+/* ═══ CARD ════════════════════════════════════════════════════ */
+/* glass rounded-2xl — from drone_design StatCards */
 .card {
-  @apply rounded-2xl;
-  padding: clamp(18px, 2.2vw, 28px);
-  background: linear-gradient(160deg, rgba(14,22,40,0.97) 0%, rgba(10,15,28,0.98) 100%);
-  border: 0.5px solid rgba(1,242,207,0.10);
-  box-shadow: inset 0 1px 0 rgba(1,242,207,0.06), 0 1px 0 rgba(0,0,0,0.5), 0 24px 48px -20px rgba(0,0,0,0.6);
-  backdrop-filter: blur(12px);
-  transition: transform 220ms ease, border-color 220ms ease;
-  position: relative; overflow: hidden;
+  background: var(--glass) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 20px;
+  padding: clamp(18px, 2.2vw, 26px);
+  position: relative; overflow: hidden; color: var(--foreground);
+  box-shadow: var(--shadow-card);
+  transition: border-color 200ms, transform 200ms;
 }
+/* Card top shimmer — MUST be perfectly horizontal, not tilted */
 .card::before {
-  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(1,242,207,0.16), transparent);
+  content: "";
+  position: absolute;
+  /* Exactly at the top, full width, 1px tall */
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  /* Horizontal gradient, no angle offset */
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.74 0.18 158 / 0.5) 30%,
+    oklch(0.9 0.21 128 / 0.8) 55%,
+    oklch(0.74 0.18 158 / 0.5) 75%,
+    transparent 100%
+  );
   pointer-events: none;
 }
-.card-interactive { cursor: pointer; }
-.card-interactive:hover { transform: translateY(-2px); border-color: rgba(1,242,207,0.22); }
-.card-accent { @apply card; border-color: rgba(1,242,207,0.20); }
+/* Kill old ::after */
+.card::after { display: none; }
 
-/* ── Inputs — theme-aware so date pickers, text fields, and the
-       `from / to` filters on the History map stay readable when the
-       user switches to light mode. ── */
-.input {
-  @apply w-full rounded-xl transition-all duration-150;
-  padding: 12px 16px;
-  background: var(--bg-elevated);
-  border: 0.5px solid var(--border-medium);
-  color: var(--text-primary);
-  font-size: 15px;
-  font-family: inherit;
-}
-.input::placeholder { color: var(--text-faint); }
-.input:focus { outline: none; border-color: rgba(1,242,207,0.48); box-shadow: 0 0 0 3px rgba(1,242,207,0.09); }
-select.input option { background: var(--bg-card-flat); color: var(--text-primary); }
-/* Make the browser-rendered calendar icon on <input type="date"> visible
-   on a dark background; flip its luminance back in light mode. */
-input[type="date"], input[type="datetime-local"], input[type="time"] {
-  color-scheme: dark;
-}
-html.light input[type="date"],
-html.light input[type="datetime-local"],
-html.light input[type="time"] {
-  color-scheme: light;
-}
-
-/* ── Labels ── */
-.label {
-  @apply block uppercase;
-  color: #01F2CF; letter-spacing: 0.15em; font-weight: 700;
-  font-size: 11px; opacity: 0.65; margin-bottom: 8px;
-}
-
-/* ── Badges ── */
-.badge { @apply inline-flex items-center rounded-full font-bold; padding: 5px 12px; font-size: 12px; }
-.badge-accent  { background: rgba(1,242,207,0.10);  color: #01F2CF;  border: 0.5px solid rgba(1,242,207,0.22); }
-.badge-danger  { background: rgba(248,113,113,0.12); color: #f87171;  border: 0.5px solid rgba(248,113,113,0.25); }
-.badge-warning { background: rgba(251,191,36,0.10);  color: #fbbf24;  border: 0.5px solid rgba(251,191,36,0.25); }
-.badge-muted   { background: rgba(95,160,154,0.10);  color: #5fa09a;  border: 0.5px solid rgba(95,160,154,0.2); }
-
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(1,242,207,0.12); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(1,242,207,0.25); }
-.scrollbar-thin::-webkit-scrollbar { width: 4px; }
-
-/* ── Nav ── */
-.nav-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 11px 13px; border-radius: 11px;
-  font-size: 14px; color: rgba(224,245,242,0.5);
-  margin-bottom: 3px; cursor: pointer; text-decoration: none;
-  transition: all 0.15s; line-height: 1.3;
-  position: relative;
-}
-.nav-item:hover { background: rgba(1,242,207,0.05); color: #e0f5f2; }
-.nav-item.active {
-  background: linear-gradient(135deg, rgba(1,242,207,0.13), rgba(3,179,218,0.06));
-  color: #01F2CF; font-weight: 700;
-  box-shadow: inset 0 1px 0 rgba(1,242,207,0.08);
-}
-.nav-item.active::before {
-  content: ""; position: absolute; inset-inline-start: 0;
-  top: 8px; bottom: 8px; width: 2.5px;
-  background: linear-gradient(180deg, #01F2CF, #03B3DA);
-  border-radius: 2px;
-}
-
-/* ── Status dot ── */
-.status-dot { position: relative; display: inline-block; width: 9px; height: 9px; border-radius: 9999px; }
-.status-dot::after {
-  content: ""; position: absolute; inset: -2px; border-radius: 9999px;
-  background: currentColor; opacity: 0.35;
-  animation: pulseRing 1.8s cubic-bezier(0.22,1,0.36,1) infinite;
-}
-@keyframes pulseRing { 0% { transform: scale(0.6); opacity: 0.5; } 100% { transform: scale(2.5); opacity: 0; } }
-
-/* ── Tables ── */
-.table-header-row {
-  display: grid;
-  padding: 12px 20px;
-  background: rgba(1,242,207,0.04);
-  border-bottom: 0.5px solid rgba(1,242,207,0.08);
-  font-size: 11px; font-weight: 700; letter-spacing: 0.13em;
-  text-transform: uppercase; color: rgba(1,242,207,0.45);
-  gap: 12px;
-}
-.table-data-row {
-  display: grid;
-  padding: 16px 20px;
-  border-bottom: 0.5px solid rgba(1,242,207,0.05);
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  transition: background 0.1s;
-}
-.table-data-row:hover { background: rgba(1,242,207,0.02); }
-.table-data-row:nth-child(even) { background: rgba(1,242,207,0.015); }
-.table-data-row:nth-child(even):hover { background: rgba(1,242,207,0.03); }
-
-/* ── Divider ── */
-.divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(1,242,207,0.12), transparent); margin: 1.5rem 0; }
-
-/* ── Mount animations ── */
-[data-mount] > * { animation: mountKf 400ms cubic-bezier(0.22,1,0.36,1) both; }
-[data-mount] > *:nth-child(1){animation-delay:0ms}
-[data-mount] > *:nth-child(2){animation-delay:55ms}
-[data-mount] > *:nth-child(3){animation-delay:110ms}
-[data-mount] > *:nth-child(4){animation-delay:165ms}
-[data-mount] > *:nth-child(5){animation-delay:220ms}
-[data-mount] > *:nth-child(6){animation-delay:275ms}
-@keyframes mountKf { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
-}
-
-/* ── Gradient utilities (used by toggles, headings, accent CTAs) ── */
-.gradient-accent {
-  background: linear-gradient(135deg, #01F2CF 0%, #03DA9A 50%, #03B3DA 100%);
-}
-.gradient-text {
-  background: linear-gradient(90deg, #01F2CF 0%, #03DA9A 50%, #03B3DA 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.text-bg { color: #0a1410; }
-
-/* ── Color overrides ── */
-.text-accent    { color: #01F2CF; }
-.text-slate-100 { color: #e0f5f2; }
-.text-slate-200 { color: #b8e0db; }
-.text-slate-300 { color: #8ec8c1; }
-.text-slate-400 { color: #5fa09a; }
-.text-slate-500 { color: #3d7872; }
-.text-muted     { color: #5fa09a; }
-.text-success   { color: #01F2CF; }
-.text-warning   { color: #fbbf24; }
-.text-danger    { color: #f87171; }
-
-/* CRITICAL: override any green card colors */
-.bg-slate-800   { background-color: #0f1a2e !important; }
-.bg-slate-900   { background-color: #0d1117 !important; }
-.bg-slate-700   { background-color: #162040 !important; }
-.bg-panel       { background-color: #0d1117 !important; }
-
-.border-slate-800 { border-color: rgba(1,242,207,0.10) !important; }
-.border-slate-700 { border-color: rgba(1,242,207,0.18) !important; }
-/* Divider between table rows — was barely visible at 0.07; bumped so
-   the operator can scan rows easily in both modes. */
-.divide-slate-800 > * + * { border-color: rgba(1,242,207,0.18) !important; }
-
-.bg-success { background: linear-gradient(135deg, #01F2CF, #03DA9A) !important; color: #0a1410 !important; }
-.bg-danger  { background: linear-gradient(135deg, #f87171, #dc2626) !important; }
-.bg-warning { background: linear-gradient(135deg, #fbbf24, #d97706) !important; }
-.bg-accent  { background: linear-gradient(135deg, #01F2CF, #03B3DA) !important; color: #0a1410 !important; }
-
-/* Fix any stray green backgrounds */
-[class*="bg-green"], [class*="bg-emerald"], [class*="bg-teal-5"] {
-  background: rgba(1,242,207,0.10) !important;
-  color: #01F2CF !important;
-}
-
-/* ── Light mode ── */
-html.light, html.light body, html.light #root { background-color: #e8f7f5 !important; color: #0b2422; }
-html.light .bg-panel   { background-color: #f0faf8 !important; }
-html.light .bg-slate-900 { background-color: #e8f7f5 !important; }
-html.light .bg-slate-800 { background-color: #c8eae5 !important; }
 html.light .card {
-  background: linear-gradient(160deg, #ffffff 0%, #f4faf8 100%) !important;
-  border-color: #b0dcd6 !important;
-}
-html.light .input { background: #f4faf8 !important; border-color: #a0d4cd !important; color: #0b2422 !important; }
-html.light .label { color: #009980 !important; }
-html.light .nav-item { color: rgba(11,36,34,0.5); }
-html.light .nav-item:hover { background: rgba(1,160,140,0.06); color: #0b2422; }
-html.light .nav-item.active { background: linear-gradient(135deg, rgba(1,160,140,0.14), rgba(3,140,180,0.06)); color: #009980; }
-html.light .text-accent { color: #009980 !important; }
-html.light .text-muted  { color: #3a7570 !important; }
-html.light .text-success { color: #03796a !important; }
-html.light .text-warning { color: #a16207 !important; }
-html.light .text-danger  { color: #dc2626 !important; }
-
-/* Slate-100 was missing — the Live Detection layer-toggle "active"
-   state and the assistant chat bubble were rendering near-white text
-   on light cards. Plus the explicit text-slate-100 for completeness. */
-html.light .text-slate-100 { color: #0b2422 !important; }
-
-/* Table headers (admin lists) — the bright cyan-on-cyan was ~3:1.
-   Drop opacity and use the theme-aware muted token. */
-html.light .table-header-row { color: var(--text-muted) !important; }
-
-/* Badge text in light mode — bright dark-theme colors on light fills
-   become illegible. Darken each to a tone that survives WCAG AA on
-   the pale card. */
-html.light .badge-accent  { color: #03796a !important; background: rgba(0,153,128,0.10) !important; border-color: rgba(0,153,128,0.28) !important; }
-html.light .badge-danger  { color: #b91c1c !important; background: rgba(220,38,38,0.10) !important; border-color: rgba(220,38,38,0.30) !important; }
-html.light .badge-warning { color: #a16207 !important; background: rgba(245,158,11,0.12) !important; border-color: rgba(245,158,11,0.32) !important; }
-html.light .badge-muted   { color: #3a7570 !important; background: rgba(58,117,112,0.08) !important; border-color: rgba(58,117,112,0.24) !important; }
-
-/* Page-title `text-white` we added earlier would otherwise vanish on the
-   pale light-mode background. Reroute it through the theme token. */
-html.light .text-white { color: var(--text-primary) !important; }
-
-/* Tailwind slate utilities that some merged pages used — keep readable. */
-html.light .text-slate-200 { color: #1f4541 !important; }
-html.light .text-slate-300 { color: #2d5450 !important; }
-html.light .text-slate-400 { color: #3a7570 !important; }
-html.light .text-slate-500 { color: #587b76 !important; }
-
-/* Tailwind `hover:bg-slate-800` is overridden to dark navy at the base
-   rule — but on light mode that makes a dark-on-dark icon on hover.
-   Give it a subtle tinted hover instead so dark-icon text stays
-   readable. ThemeToggle, Drones tabs, etc. */
-html.light .hover\:bg-slate-800:hover,
-html.light .hover\:bg-slate-700:hover {
-  background-color: rgba(11,36,34,0.08) !important;
+  background: oklch(1 0 0 / 0.75) !important;
+  border-color: oklch(0.66 0.16 158 / 0.14) !important;
 }
 
-/* `.btn-ghost` (Chatbot "Clear conversation", admin sign-in button,
-   etc.) hardcodes a dark backdrop + light-cyan text in App.tsx.
-   Restore it to a light-mode button so both the panel and the label
-   read clearly against the bright page. */
-html.light .btn-ghost {
-  background: var(--bg-elevated) !important;
-  color: var(--text-primary) !important;
-  border-color: var(--border-medium) !important;
-}
-html.light .btn-ghost:hover {
-  background: rgba(11,36,34,0.06) !important;
-  color: var(--text-primary) !important;
-  border-color: var(--border-medium) !important;
-}
+/* ═══ BUTTONS ═════════════════════════════════════════════════ */
+.btn-primary { background:var(--gradient-primary);color:var(--primary-foreground);font-weight:700;font-family:inherit;border:none;cursor:pointer;border-radius:var(--radius);display:inline-flex;align-items:center;justify-content:center;gap:7px;height:40px;padding:0 20px;font-size:13px;width:auto;flex-shrink:0;box-shadow:var(--shadow-glow);transition:filter .14s; }
+.btn-primary:hover { filter:brightness(1.07); }
+.btn-danger { background:var(--destructive);color:var(--destructive-foreground);font-weight:700;font-family:inherit;border:none;cursor:pointer;border-radius:var(--radius);display:inline-flex;align-items:center;justify-content:center;gap:7px;height:40px;padding:0 20px;font-size:13px;width:auto;flex-shrink:0;transition:filter .14s; }
+.btn-ghost { background:var(--glass);border:1px solid var(--glass-border);color:var(--foreground);font-family:inherit;cursor:pointer;border-radius:var(--radius);display:inline-flex;align-items:center;justify-content:center;gap:7px;height:40px;padding:0 20px;font-size:13px;width:auto;flex-shrink:0;transition:all .14s; }
+.btn-ghost:hover { color:var(--primary); }
+.btn-countered { background:var(--gradient-primary);color:var(--primary-foreground);box-shadow:var(--shadow-glow);font-weight:700;font-family:inherit;border:none;cursor:pointer;border-radius:var(--radius);display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 16px;font-size:13px;width:auto;flex-shrink:0;transition:filter .14s; }
+.btn-hit { background:oklch(from var(--chart-4) l c h/0.12);color:var(--chart-4);border:1px solid oklch(from var(--chart-4) l c h/0.4);font-weight:700;font-family:inherit;cursor:pointer;border-radius:var(--radius);display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 16px;font-size:13px;width:auto;flex-shrink:0; }
+.btn-reject { background:var(--destructive);color:var(--destructive-foreground);font-weight:700;font-family:inherit;border:none;cursor:pointer;border-radius:var(--radius);display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 16px;font-size:13px;width:auto;flex-shrink:0; }
+.btn-delete-sm { background:oklch(from var(--destructive) l c h/0.12);color:var(--destructive);border:1px solid oklch(from var(--destructive) l c h/0.3);font-weight:600;font-family:inherit;cursor:pointer;border-radius:calc(var(--radius)-2px);display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 14px;font-size:12px;width:auto;flex-shrink:0; }
 
-/* Table-row dividers in light mode — the dark-mode 0.18 cyan is too
-   pale on white cards; use a teal-green at higher alpha. */
-html.light .divide-slate-800 > * + * { border-color: rgba(0,90,75,0.22) !important; }
+/* ═══ INPUTS ═══════════════════════════════════════════════════ */
+.input { width:100%;height:40px;padding:0 14px;border-radius:var(--radius);background:oklch(from var(--primary) l c h/0.06);border:1px solid var(--input);color:var(--foreground);font-size:14px;font-family:inherit;transition:border-color .14s,box-shadow .14s;box-sizing:border-box; }
+.input::placeholder { color:var(--muted-foreground);opacity:.7; }
+.input:focus { outline:none;border-color:var(--ring);box-shadow:0 0 0 3px oklch(from var(--ring) l c h/0.18); }
+select.input { cursor:pointer; }
+select.input option { background:var(--card);color:var(--foreground); }
+input[type="date"],input[type="datetime-local"],input[type="time"] { color-scheme:dark; }
+html.light input[type="date"],html.light input[type="datetime-local"],html.light input[type="time"] { color-scheme:light; }
 
-/* ── Charts in light mode ──
-   The brand cyan/mint/sky palette is designed for dark backgrounds.
-   On the white card the Radar's polar grid (7% cyan) is invisible,
-   the radar fill (13% bright cyan) is invisible, and the Combined
-   Attacks bar gradients (bright cyan→sky) wash out. Force visible
-   strokes / fills via CSS targeted at recharts internals. */
-html.light .recharts-polar-grid path,
-html.light .recharts-polar-grid line {
-  stroke: rgba(0,90,75,0.32) !important;
-}
-html.light .recharts-radar-polygon {
-  stroke: #00956d !important;
-  stroke-width: 2 !important;
-  fill: #00956d !important;
-  fill-opacity: 0.20 !important;
-}
-/* Darken the gradient-filled bars in the Combined Attacks chart so
-   the bright cyan→sky strip survives on a white card. Saturate
-   compensates for the brightness drop. */
-html.light .recharts-bar-rectangles path,
-html.light .recharts-bar-rectangle path {
-  filter: saturate(1.4) brightness(0.62);
-}
-/* Same for the Area chart fills (weekly trend) so they're visible. */
-html.light .recharts-area-area {
-  fill-opacity: 0.55 !important;
-}
-html.light .recharts-area-curve {
-  stroke-width: 2.5 !important;
-}
-/* Cartesian grid lines in charts — invisible at 0.05 alpha on white. */
-html.light .recharts-cartesian-grid line {
-  stroke: rgba(0,90,75,0.18) !important;
-}
+/* Glass selector */
+.ts-selector { display:flex;gap:3px;padding:4px;background:var(--glass);border:1px solid var(--glass-border);border-radius:9999px;backdrop-filter:blur(20px); }
+.ts-selector button { padding:6px 14px;border-radius:9999px;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;transition:all .18s;background:transparent;color:var(--muted-foreground);height:auto;width:auto; }
+.ts-selector button:hover { color:var(--foreground);background:oklch(from var(--primary) l c h/0.10); }
+.ts-selector button.active { background:var(--gradient-primary);color:var(--primary-foreground);box-shadow:var(--shadow-glow);transform:scale(1.03); }
 
-/* ── Chrome readability in light mode ──
-   Header and sidebar share the same deeper-mint bg now, so text on
-   them needs to read as dark, not the muted-teal that was tuned for
-   the page-bg cards. Force every text token inside the header / aside
-   to use the high-contrast primary text colour. Brand colours used as
-   text inside the chrome get darkened to match. */
-html.light .gradient-text,
-html.light header .gradient-text,
-html.light header h1,
-html.light header h2,
-html.light header h3 {
-  /* In light mode the brand cyan→mint→sky gradient on text reads
-     low-contrast on the white card / mint chrome. Switch the
-     gradient-clip to a solid #0b2422 (deep teal-black) so any
-     element styled with `.gradient-text` reads as a strong dark
-     heading in light mode. We achieve "solid" via a same-color
-     gradient so the underlying background-clip:text rule still
-     works without changing the property cascade. */
-  background: linear-gradient(90deg, #0b2422 0%, #0b2422 100%) !important;
-  color: #0b2422 !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  color: transparent !important;
-}
-html.light header,
-html.light aside {
-  color: #0b2422;
-}
-html.light aside .nav-item        { color: rgba(11,36,34,0.62) !important; }
-html.light aside .nav-item:hover  { color: #0b2422 !important; }
-html.light aside .nav-item.active { color: #00505a !important; background: rgba(0,90,75,0.14) !important; }
-html.light aside .nav-item.active::before { background: linear-gradient(180deg,#006e74,#003a55) !important; }
-/* Sidebar group labels (SbLabel "General", "Intelligence", "Admin") —
-   the inline color:var(--text-faint) reads OK but on the deeper mint
-   sidebar bg we want stronger so the group separators are obvious. */
-html.light aside > nav > div[style*="uppercase"] {
-  color: rgba(11,36,34,0.55) !important;
-}
+/* ═══ BADGES ═══════════════════════════════════════════════════ */
+.badge { display:inline-flex;align-items:center;padding:3px 10px;border-radius:9999px;font-size:11px;font-weight:700; }
+.badge-accent  { background:oklch(from var(--primary)     l c h/0.12);color:var(--primary);     border:1px solid oklch(from var(--primary)     l c h/0.25); }
+.badge-danger  { background:oklch(from var(--destructive) l c h/0.12);color:var(--destructive); border:1px solid oklch(from var(--destructive) l c h/0.25); }
+.badge-warning { background:oklch(from var(--chart-4)     l c h/0.12);color:var(--chart-4);     border:1px solid oklch(from var(--chart-4)     l c h/0.25); }
+.badge-muted   { background:oklch(from var(--muted-foreground) l c h/0.10);color:var(--muted-foreground);border:1px solid oklch(from var(--muted-foreground) l c h/0.18); }
+.badge-info    { background:oklch(from var(--chart-3)     l c h/0.12);color:var(--chart-3);     border:1px solid oklch(from var(--chart-3)     l c h/0.25); }
+.bg-success { background:var(--gradient-primary)!important;color:var(--primary-foreground)!important; }
+.bg-danger  { background:var(--destructive)!important;color:var(--destructive-foreground)!important; }
+.bg-accent  { background:var(--gradient-primary)!important;color:var(--primary-foreground)!important; }
 
-/* ── Table headings (admin Cameras / Areas / Live Detection) ──
-   In light mode the bright-cyan-at-45%-opacity used as the `th` text
-   colour collapsed to invisible on the new elevated-table-header bg.
-   Force a dark teal so the column labels read clearly. */
-html.light .table-header-row,
-html.light thead th,
-html.light thead {
-  color: #1f4541 !important;
-}
+/* ═══ TABLES ═══════════════════════════════════════════════════ */
+.table-header-row { display:grid;padding:10px 18px;background:oklch(from var(--primary) l c h/0.06);border-bottom:1px solid var(--border);font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-foreground);gap:12px; }
+.table-data-row { display:grid;padding:16px 18px;border-bottom:1px solid var(--border);align-items:center;gap:12px;font-size:14px;transition:background .1s; }
+.table-data-row:hover { background:oklch(from var(--primary) l c h/0.05); }
+table tbody tr td { padding-top:16px;padding-bottom:16px; }
+table thead tr th { padding-top:10px;padding-bottom:10px; }
+
+/* ═══ STATUS DOT ════════════════════════════════════════════════ */
+.status-dot { position:relative;display:inline-block;width:9px;height:9px;border-radius:9999px; }
+.status-dot::after { content:"";position:absolute;inset:-2px;border-radius:9999px;background:currentColor;opacity:.35;animation:pulseRing 1.8s ease-out infinite; }
+@keyframes pulseRing { 0%{transform:scale(.6);opacity:.5}100%{transform:scale(2.4);opacity:0} }
+
+/* ═══ WEATHER ════════════════════════════════════════════════════ */
+.weather-unified-card { background:var(--glass)!important;backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:20px;padding:clamp(16px,2.2vw,22px);position:relative;overflow:hidden; }
+.weather-unified-card::before { content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,oklch(0.74 0.18 158/0.5),oklch(0.9 0.21 128/0.8),transparent);pointer-events:none; }
+.weather-metrics-grid { display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px; }
+.weather-mini-card { padding:clamp(12px,1.5vw,18px);text-align:center;position:relative;background:oklch(from var(--primary) l c h/0.05);border-radius:var(--radius);border:1px solid var(--border); }
+.weather-mini-card .w-label { font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--primary);opacity:.8;margin-bottom:8px;display:block; }
+.weather-mini-card .w-value { font-size:clamp(20px,2.8vw,28px);font-weight:800;color:var(--foreground);line-height:1; }
+
+/* ═══ SCROLLBAR ══════════════════════════════════════════════════ */
+::-webkit-scrollbar { width:5px;height:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:oklch(from var(--primary) l c h/0.22);border-radius:4px; }
+::-webkit-scrollbar-thumb:hover { background:oklch(from var(--primary) l c h/0.38); }
+.scrollbar-thin::-webkit-scrollbar { width:4px; }
+
+/* ═══ MOUNT ══════════════════════════════════════════════════════ */
+[data-mount]>* { animation:mountKf 420ms cubic-bezier(.22,1,.36,1) both; }
+[data-mount]>*:nth-child(1){animation-delay:0ms}
+[data-mount]>*:nth-child(2){animation-delay:55ms}
+[data-mount]>*:nth-child(3){animation-delay:110ms}
+[data-mount]>*:nth-child(4){animation-delay:165ms}
+[data-mount]>*:nth-child(5){animation-delay:220ms}
+[data-mount]>*:nth-child(6){animation-delay:275ms}
+
+/* ═══ COLOR UTILS ════════════════════════════════════════════════ */
+.text-accent{color:var(--primary);}
+.text-muted{color:var(--muted-foreground);}
+.text-danger{color:var(--destructive);}
+.text-warning{color:var(--chart-4);}
+.text-success{color:var(--primary);}
+.font-data{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+.tabular{font-variant-numeric:tabular-nums;}
+.label{display:block;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:4px;}
+
+/* Override any old blue-navy leftover classes */
+.bg-slate-900,.bg-panel { background-color:var(--background)!important; }
+.bg-slate-800 { background-color:var(--card)!important; }
+.bg-slate-700 { background-color:var(--secondary)!important; }
+.border-slate-800,.border-slate-700 { border-color:var(--border)!important; }
+.divide-slate-800>*+*,.divide-y>*+* { border-color:var(--border)!important; }
+
+/* ═══ RECHARTS ════════════════════════════════════════════════════ */
+.recharts-cartesian-axis-tick text { font-family:'Inter',system-ui,sans-serif!important;font-size:11px!important;fill:var(--muted-foreground)!important; }
+.recharts-cartesian-grid line { stroke:var(--border)!important; }
+.recharts-polar-grid line,.recharts-polar-grid-angle line { stroke:var(--border)!important; }
+.recharts-legend-wrapper { display:none!important; }
+
+/* ═══ LEAFLET ═════════════════════════════════════════════════════ */
+.leaflet-container { background:var(--background)!important;position:relative;z-index:0;isolation:isolate; }
+.leaflet-top,.leaflet-bottom { z-index:1000; }
+.leaflet-tile { filter:saturate(.55) brightness(.68) hue-rotate(140deg); }
+html.light .leaflet-tile { filter:saturate(.75) brightness(.88) hue-rotate(130deg); }
+.leaflet-popup-content,.leaflet-popup-content strong { color:oklch(0.18 0.02 160)!important; }
+.leaflet-bar a { background-color:var(--card)!important;color:var(--foreground)!important;border-color:var(--border)!important; }
+.leaflet-bar a:hover { background-color:oklch(from var(--primary) l c h/0.12)!important;color:var(--primary)!important; }

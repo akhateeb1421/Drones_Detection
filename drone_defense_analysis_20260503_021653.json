@@ -1,0 +1,418 @@
+{
+  "metadata": {
+    "generated_at": "2026-05-03T02:16:53.476976",
+    "total_records": 51
+  },
+  "predictions": {
+    "high_risk_locations": [
+      {
+        "location": "Eastern Region",
+        "region": "Eastern Region",
+        "attack_count": 8,
+        "risk_score": 100,
+        "days_since_last": 25,
+        "lat": 26.4207,
+        "lon": 50.0888,
+        "prediction": "عالي"
+      },
+      {
+        "location": "Prince Sultan Air Base",
+        "region": "Al-Kharj",
+        "attack_count": 7,
+        "risk_score": 70,
+        "days_since_last": 34,
+        "lat": 24.1503,
+        "lon": 47.3346,
+        "prediction": "عالي"
+      },
+      {
+        "location": "Riyadh + Eastern Region",
+        "region": "Riyadh + Eastern Region",
+        "attack_count": 5,
+        "risk_score": 70,
+        "days_since_last": 25,
+        "lat": 24.7136,
+        "lon": 46.6753,
+        "prediction": "عالي"
+      },
+      {
+        "location": "Empty Quarter – Shaybah Field",
+        "region": "Eastern Region",
+        "attack_count": 5,
+        "risk_score": 50,
+        "days_since_last": 55,
+        "lat": 26.4207,
+        "lon": 50.0888,
+        "prediction": "متوسط"
+      },
+      {
+        "location": "East of Kharj Governorate",
+        "region": "Al-Kharj",
+        "attack_count": 4,
+        "risk_score": 40,
+        "days_since_last": 57,
+        "lat": 24.1503,
+        "lon": 47.3346,
+        "prediction": "متوسط"
+      },
+      {
+        "location": "Riyadh + Al-Kharj + Eastern Region",
+        "region": "Riyadh + Al-Kharj + Eastern Region",
+        "attack_count": 2,
+        "risk_score": 40,
+        "days_since_last": 25,
+        "lat": 24.7136,
+        "lon": 46.6753,
+        "prediction": "متوسط"
+      },
+      {
+        "location": "Riyadh Region",
+        "region": "Riyadh",
+        "attack_count": 3,
+        "risk_score": 30,
+        "days_since_last": 34,
+        "lat": 24.7136,
+        "lon": 46.6753,
+        "prediction": "متوسط"
+      },
+      {
+        "location": "Multiple Locations",
+        "region": "Riyadh + Eastern Region",
+        "attack_count": 3,
+        "risk_score": 30,
+        "days_since_last": 50,
+        "lat": 24.7136,
+        "lon": 46.6753,
+        "prediction": "متوسط"
+      },
+      {
+        "location": "Ras Tanura Oil Refinery",
+        "region": "Eastern Region",
+        "attack_count": 2,
+        "risk_score": 20,
+        "days_since_last": 60,
+        "lat": 26.4207,
+        "lon": 50.0888,
+        "prediction": "متوسط"
+      },
+      {
+        "location": "East of Al-Jouf Region",
+        "region": "Al-Jouf",
+        "attack_count": 2,
+        "risk_score": 20,
+        "days_since_last": 55,
+        "lat": 29.9697,
+        "lon": 40.2064,
+        "prediction": "متوسط"
+      }
+    ],
+    "temporal_predictions": {
+      "high_risk_months": [
+        3,
+        4,
+        2
+      ],
+      "high_risk_weekdays": [
+        5,
+        0,
+        2
+      ],
+      "current_month_risk": "متوسط"
+    },
+    "attack_type_forecast": {
+      "طائرات_مسيرة": 32,
+      "صواريخ_باليستية": 17,
+      "صواريخ_كروز": 2
+    },
+    "confidence_score": 95
+  },
+  "source_analysis": {
+    "probable_sources": [
+      {
+        "direction": "شرق",
+        "source_region": "إيران/الخليج",
+        "proximity_score": 71.3,
+        "avg_distance_km": 287.0,
+        "likelihood": "عالي"
+      },
+      {
+        "direction": "شمال_شرق",
+        "source_region": "الكويت/إيران",
+        "proximity_score": 43.4,
+        "avg_distance_km": 566.0,
+        "likelihood": "متوسط"
+      },
+      {
+        "direction": "جنوب",
+        "source_region": "اليمن",
+        "proximity_score": 1.0,
+        "avg_distance_km": 990.0,
+        "likelihood": "متوسط"
+      },
+      {
+        "direction": "شمال",
+        "source_region": "العراق/سوريا",
+        "proximity_score": 0,
+        "avg_distance_km": 1062.0,
+        "likelihood": "متوسط"
+      }
+    ],
+    "attack_patterns": {
+      "primary_threat_axis": "شرق",
+      "attack_frequency_by_region": {
+        "Eastern Region": 16,
+        "Al-Kharj": 13,
+        "Riyadh": 8,
+        "Riyadh + Eastern Region": 8,
+        "Al-Jouf": 2,
+        "Riyadh + Al-Kharj + Eastern Region": 2,
+        "Hafr Al-Batin": 1,
+        "Riyadh + Eastern Region + Yanbu": 1
+      },
+      "attack_complexity": "متقدم",
+      "coordination_level": "عالي"
+    },
+    "threat_assessment": "تهديد متصاعد وخطير",
+    "intelligence_summary": {
+      "primary_source": "إيران/الخليج",
+      "confidence": "متوسط إلى عالي",
+      "strategic_intent": "تعطيل البنية التحتية الحيوية"
+    }
+  },
+  "defense_optimization": {
+    "optimal_radar_positions": [
+      {
+        "radar_id": "RADAR-02",
+        "lat": 24.7136,
+        "lon": 46.6753,
+        "coverage_radius_km": 282.0,
+        "priority": "متوسطة",
+        "strategic_value": -88.0
+      },
+      {
+        "radar_id": "RADAR-06",
+        "lat": 24.7136,
+        "lon": 46.6753,
+        "coverage_radius_km": 282.0,
+        "priority": "متوسطة",
+        "strategic_value": -88.0
+      },
+      {
+        "radar_id": "RADAR-05",
+        "lat": 24.1503,
+        "lon": 47.3346,
+        "coverage_radius_km": 298.0,
+        "priority": "متوسطة",
+        "strategic_value": -99.0
+      },
+      {
+        "radar_id": "RADAR-01",
+        "lat": 26.4207,
+        "lon": 50.0888,
+        "coverage_radius_km": 437.0,
+        "priority": "متوسطة",
+        "strategic_value": -191.0
+      },
+      {
+        "radar_id": "RADAR-04",
+        "lat": 28.4328,
+        "lon": 45.9708,
+        "coverage_radius_km": 676.0,
+        "priority": "متوسطة",
+        "strategic_value": -351.0
+      },
+      {
+        "radar_id": "RADAR-03",
+        "lat": 29.9697,
+        "lon": 40.2064,
+        "coverage_radius_km": 1359.0,
+        "priority": "متوسطة",
+        "strategic_value": -806.0
+      }
+    ],
+    "layered_defense_strategy": {
+      "outer_layer": {
+        "description": "طبقة الإنذار المبكر",
+        "range_km": 200,
+        "systems": [
+          "رادار بعيد المدى",
+          "أقمار استطلاع"
+        ],
+        "function": "كشف مبكر وتتبع"
+      },
+      "middle_layer": {
+        "description": "طبقة التتبع والتوجيه",
+        "range_km": 100,
+        "systems": [
+          "رادار متوسط المدى",
+          "مراكز القيادة"
+        ],
+        "function": "تتبع دقيق وتوجيه"
+      },
+      "inner_layer": {
+        "description": "طبقة الاعتراض النهائي",
+        "range_km": 30,
+        "systems": [
+          "صواريخ دفاع نقطي",
+          "أنظمة C-RAM"
+        ],
+        "function": "اعتراض نهائي"
+      }
+    },
+    "coverage_analysis": {
+      "total_area_km2": 708576.0,
+      "coverage_efficiency": "85-90%",
+      "identified_gaps": [
+        "منطقة الحدود الشمالية الشرقية",
+        "المناطق النائية في الربع الخالي",
+        "المناطق البحرية الشرقية"
+      ]
+    },
+    "integration_recommendations": [
+      "ربط جميع الأنظمة بشبكة قيادة موحدة",
+      "تطوير نظام إدارة معركة متقدم",
+      "إنشاء مراكز احتياطية للتكرار"
+    ]
+  },
+  "combat_strategy": {
+    "interception_zones": [
+      {
+        "zone_id": "IZ-Riyadh",
+        "region": "Riyadh",
+        "center_lat": 24.7136,
+        "center_lon": 46.6753,
+        "optimal_range_km": 60,
+        "threat_count": 8,
+        "primary_threat": "صواريخ_باليستية",
+        "engagement_priority": "عالية"
+      },
+      {
+        "zone_id": "IZ-EasternRegion",
+        "region": "Eastern Region",
+        "center_lat": 26.4207,
+        "center_lon": 50.0888,
+        "optimal_range_km": 20,
+        "threat_count": 16,
+        "primary_threat": "طائرات_مسيرة",
+        "engagement_priority": "عالية"
+      },
+      {
+        "zone_id": "IZ-Al-Kharj",
+        "region": "Al-Kharj",
+        "center_lat": 24.1503,
+        "center_lon": 47.3346,
+        "optimal_range_km": 60,
+        "threat_count": 13,
+        "primary_threat": "صواريخ_باليستية",
+        "engagement_priority": "عالية"
+      },
+      {
+        "zone_id": "IZ-Al-Jouf",
+        "region": "Al-Jouf",
+        "center_lat": 29.9697,
+        "center_lon": 40.2064,
+        "optimal_range_km": 20,
+        "threat_count": 2,
+        "primary_threat": "طائرات_مسيرة",
+        "engagement_priority": "متوسطة"
+      },
+      {
+        "zone_id": "IZ-HafrAl-Batin",
+        "region": "Hafr Al-Batin",
+        "center_lat": 28.4328,
+        "center_lon": 45.9708,
+        "optimal_range_km": 20,
+        "threat_count": 1,
+        "primary_threat": "طائرات_مسيرة",
+        "engagement_priority": "متوسطة"
+      },
+      {
+        "zone_id": "IZ-Riyadh+EasternRegion",
+        "region": "Riyadh + Eastern Region",
+        "center_lat": 24.7136,
+        "center_lon": 46.6753,
+        "optimal_range_km": 20,
+        "threat_count": 8,
+        "primary_threat": "طائرات_مسيرة",
+        "engagement_priority": "عالية"
+      },
+      {
+        "zone_id": "IZ-Riyadh+Al-Kharj+EasternRegion",
+        "region": "Riyadh + Al-Kharj + Eastern Region",
+        "center_lat": 24.7136,
+        "center_lon": 46.6753,
+        "optimal_range_km": 20,
+        "threat_count": 2,
+        "primary_threat": "طائرات_مسيرة",
+        "engagement_priority": "متوسطة"
+      },
+      {
+        "zone_id": "IZ-Riyadh+EasternRegion+Yanbu",
+        "region": "Riyadh + Eastern Region + Yanbu",
+        "center_lat": 24.7136,
+        "center_lon": 46.6753,
+        "optimal_range_km": 20,
+        "threat_count": 1,
+        "primary_threat": "طائرات_مسيرة",
+        "engagement_priority": "متوسطة"
+      }
+    ],
+    "engagement_tactics": {
+      "صواريخ_باليستية": {
+        "method": "اعتراض صاروخي متعدد الطبقات",
+        "timing": "مرحلة الصعود والمتوسط",
+        "systems": [
+          "PAC-3",
+          "THAAD"
+        ],
+        "success_rate": "85-95%",
+        "notes": "اشتباك مبكر ضروري"
+      },
+      "صواريخ_كروز": {
+        "method": "اعتراض نقطي متقدم",
+        "timing": "المرحلة النهائية",
+        "systems": [
+          "Iron Dome",
+          "C-RAM"
+        ],
+        "success_rate": "90-98%",
+        "notes": "تتبع مستمر للطيران المنخفض"
+      },
+      "طائرات_مسيرة": {
+        "method": "حرب إلكترونية + صواريخ",
+        "timing": "عند الكشف المبكر",
+        "systems": [
+          "تشويش",
+          "صواريخ قصيرة"
+        ],
+        "success_rate": "75-90%",
+        "notes": "الحرب الإلكترونية خط أول"
+      }
+    },
+    "tactical_recommendations": [
+      {
+        "category": "التنسيق",
+        "priority": "حرجة",
+        "action": "إنشاء مركز قيادة موحد",
+        "benefit": "تحسين 40% في وقت الاستجابة"
+      },
+      {
+        "category": "الدفاع المتدرج",
+        "priority": "عالية",
+        "action": "تطبيق دفاع ثلاثي الطبقات",
+        "benefit": "معدل اعتراض 70-85%"
+      },
+      {
+        "category": "الحرب الإلكترونية",
+        "priority": "عالية",
+        "action": "تطوير قدرات التشويش",
+        "benefit": "تحييد 30-50% بدون صواريخ"
+      }
+    ],
+    "effectiveness_factors": {
+      "geographic_advantage": "متوسط",
+      "technology_edge": "عالي",
+      "coordination_level": "يحتاج تطوير"
+    }
+  }
+}

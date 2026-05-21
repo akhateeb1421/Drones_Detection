@@ -2,7 +2,8 @@
 
 from fastapi import Header, HTTPException, status
 
-from app.core.config import get_settings
+from app.core.config import Settings
+settings = Settings()
 
 
 def require_admin(x_admin_token: str | None = Header(default=None)) -> None:

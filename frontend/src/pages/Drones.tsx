@@ -11,14 +11,14 @@ const DRONES: DroneSpec[] = [
 ];
 
 const SPEC_ROWS = [
-  { key: "role", labelKey: "drones.spec.role" },
-  { key: "origin", labelKey: "drones.spec.origin" },
+  { key: "role",       labelKey: "drones.spec.role" },
+  { key: "origin",     labelKey: "drones.spec.origin" },
   { key: "first_used", labelKey: "drones.spec.first_used" },
-  { key: "speed", labelKey: "drones.spec.speed" },
-  { key: "range", labelKey: "drones.spec.range" },
-  { key: "wingspan", labelKey: "drones.spec.wingspan" },
-  { key: "payload", labelKey: "drones.spec.payload" },
-  { key: "counter", labelKey: "drones.spec.counter" },
+  { key: "speed",      labelKey: "drones.spec.speed" },
+  { key: "range",      labelKey: "drones.spec.range" },
+  { key: "wingspan",   labelKey: "drones.spec.wingspan" },
+  { key: "payload",    labelKey: "drones.spec.payload" },
+  { key: "counter",    labelKey: "drones.spec.counter" },
 ];
 
 export function Drones() {
@@ -30,41 +30,23 @@ export function Drones() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold">{t("drones.title")}</h1>
-        {/* Pill-group toggle — same shape as the Analysis horizon
-            selector. Subtle outer track, gradient pill on the active
-            option, muted text on inactive. Reads clearly in both
-            light and dark modes. */}
-        <div style={{
-          display:"flex", gap:3, padding:3,
-          background:"var(--bg-elevated)",
-          border:"1px solid var(--border-subtle)",
-          borderRadius:10,
-        }}>
-          {DRONES.map((d) => {
-            const isActive = d.id === active;
-            return (
-              <button
-                key={d.id}
-                onClick={() => setActive(d.id)}
-                style={{
-                  padding:"6px 14px", borderRadius:8, border:"none",
-                  cursor:"pointer", fontFamily:"inherit",
-                  fontSize:13, fontWeight:700,
-                  transition:"all 0.15s",
-                  background: isActive
-                    ? "linear-gradient(135deg,#01F2CF,#03B3DA)"
-                    : "transparent",
-                  color: isActive ? "#0a1410" : "var(--text-muted)",
-                }}
-              >
-                {t(`${d.keyBase}.name`)}
-              </button>
-            );
-          })}
+
+        {/* Drone selector — .ts-selector glass pill from index.css */}
+        <div className="ts-selector">
+          {DRONES.map((d) => (
+            <button
+              key={d.id}
+              onClick={() => setActive(d.id)}
+              className={d.id === active ? "active" : ""}
+            >
+              {t(`${d.keyBase}.name`)}
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-5">
+        {/* 3D viewer card */}
         <div className="card md:col-span-3">
           <div className="mb-2 flex items-center justify-between">
             <div>
@@ -76,26 +58,32 @@ export function Drones() {
           <DroneViewer modelKey={drone.id} modelUrl={drone.modelUrl} embedUrl={drone.embedUrl} />
         </div>
 
+        {/* Specs card */}
         <div className="card md:col-span-2">
           <div className="mb-2 text-lg font-semibold">{t("drones.specs")}</div>
-          <dl className="divide-y divide-slate-800">
+          <dl style={{ borderTop: "1px solid var(--border)" }}>
             {SPEC_ROWS.map((row) => (
-              <div key={row.key} className="flex items-start justify-between gap-3 py-2 text-sm">
-                <dt className="w-1/3 shrink-0 text-muted">{t(row.labelKey)}</dt>
-                <dd className="flex-1 text-end" dir="auto" style={{ color: "var(--text-primary)" }}>
+              <div
+                key={row.key}
+                style={{
+                  display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+                  gap: 12, padding: "8px 0", fontSize: 13,
+                  borderBottom: "1px solid var(--border)",
+                }}
+              >
+                <dt style={{ color: "var(--muted-foreground)", width: "33%", flexShrink: 0 }}>
+                  {t(row.labelKey)}
+                </dt>
+                <dd style={{ flex: 1, textAlign: "end", color: "var(--foreground)" }} dir="auto">
                   {t(`${drone.keyBase}.values.${row.key}`)}
                 </dd>
               </div>
             ))}
           </dl>
-          <div
-            className="mt-3 rounded-md p-3 text-xs leading-relaxed"
-            style={{
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border-subtle)",
-              color: "var(--text-primary)",
-            }}
-          >
+          <div style={{
+            marginTop: 12, borderRadius: "var(--radius)", padding: 12, fontSize: 12, lineHeight: 1.7,
+            background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)",
+          }}>
             {t(`${drone.keyBase}.summary`)}
           </div>
         </div>

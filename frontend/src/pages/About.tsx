@@ -1,72 +1,20 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useTheme } from "../contexts/ThemeContext";
 
-/* ── Colors matching the main system ── */
-const C1 = "#01F2CF";
-const C2 = "#03DA9A";
-const C3 = "#03B3DA";
-const DANGER = "#f87171";
-const WARN = "#fbbf24";
+/* All colours from var(--*) tokens defined in styles.css */
 
-/** Brand colors used as TEXT on light cards have ~1.4:1 contrast.
- *  Map each to the existing darkened sibling used in the light-mode
- *  CSS overrides (.text-success → #03796a, .text-warning → #a16207,
- *  etc.) so brand-coded labels stay readable in light mode while the
- *  dark-mode treatment is preserved. No new colors introduced. */
-function brandForText(brand: string, isLight: boolean): string {
-  if (!isLight) return brand;
-  switch (brand) {
-    case C1:
-      return "#03796a";
-    case C2:
-      return "#03796a";
-    case C3:
-      return "#00505a";
-    case WARN:
-      return "#a16207";
-    case DANGER:
-      return "#dc2626";
-    default:
-      return brand;
-  }
-}
-
-function Card({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-}) {
+function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div
-      style={{
-        // Theme-aware — CSS variables swap on html.light. Border + drop
-        // shadow so cards float above the deeper light page bg.
-        background: "var(--bg-card)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: 16,
-        padding: "clamp(18px,2.2vw,28px)",
-        position: "relative",
-        overflow: "hidden",
-        boxShadow:
-          "0 8px 24px -12px rgba(0,0,0,0.25),0 2px 6px -2px rgba(0,0,0,0.12)",
-        ...style,
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 1,
-          background:
-            "linear-gradient(90deg,transparent,rgba(1,242,207,0.16),transparent)",
-          pointerEvents: "none",
-        }}
-      />
+    <div style={{
+      background: "var(--card)", border: "1px solid var(--border)",
+      borderRadius: "calc(var(--radius, 0.875rem) + 4px)",
+      padding: "clamp(18px,2.2vw,28px)",
+      position: "relative", overflow: "hidden",
+      boxShadow: "var(--shadow-card)",
+      ...style,
+    }}>
+      {/* Emerald shimmer top edge */}
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:1, background:"linear-gradient(90deg,transparent,var(--primary-glow),transparent)", pointerEvents:"none" }}/>
       {children}
     </div>
   );
@@ -74,117 +22,52 @@ function Card({
 
 function Tag({ label }: { label: string }) {
   return (
-    <div
-      style={{
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: "0.15em",
-        textTransform: "uppercase",
-        color: "var(--text-muted)",
-        marginBottom: 5,
-      }}
-    >
+    <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.15em", textTransform:"uppercase", color:"var(--muted-foreground)", marginBottom:5 }}>
       {label}
     </div>
   );
 }
+
 function STitle({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        fontSize: "clamp(15px,1.8vw,18px)",
-        fontWeight: 800,
-        color: "var(--text-primary)",
-        marginBottom: "clamp(12px,1.5vw,18px)",
-      }}
-    >
+    <div style={{ fontSize:"clamp(15px,1.8vw,18px)", fontWeight:800, color:"var(--foreground)", marginBottom:"clamp(12px,1.5vw,18px)" }}>
       {children}
     </div>
   );
 }
-function Pill({ label, color = C1 }: { label: string; color?: string }) {
-  const { theme } = useTheme();
-  const isLight = theme === "light";
-  // In light mode the brand color is used both as text and as a tint.
-  // For text, darken to the existing dark-brand sibling. For the tint
-  // and border, keep the bright brand so the pill still reads as
-  // "branded".
-  const textColor = brandForText(color, isLight);
+
+/* Pill — uses --primary and --primary-glow from styles.css */
+function Pill({ label }: { label: string }) {
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "5px 12px",
-        borderRadius: 20,
-        fontSize: 13,
-        fontWeight: 600,
-        background: `${color}12`,
-        color: textColor,
-        border: `0.5px solid ${color}30`,
-        margin: "3px",
-      }}
-    >
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      padding: "5px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600,
+      background: "oklch(from var(--primary) l c h / 0.12)",
+      color: "var(--primary)",
+      border: "1px solid oklch(from var(--primary) l c h / 0.25)",
+      margin: "3px",
+    }}>
       {label}
     </span>
   );
 }
-function Step({
-  num,
-  title,
-  desc,
-}: {
-  num: number;
-  title: string;
-  desc: string;
-}) {
+
+/* Step number node — gradient-primary circle from styles.css */
+function Step({ num, title, desc }: { num: number; title: string; desc: string }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 14,
-        alignItems: "flex-start",
-        paddingBottom: 14,
-      }}
-    >
-      <div
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: "50%",
-          background: `linear-gradient(135deg,${C1},${C3})`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          fontSize: 13,
-          fontWeight: 800,
-          color: "#fff",
-          boxShadow: `0 0 12px ${C1}40`,
-        }}
-      >
+    <div style={{ display:"flex", gap:14, alignItems:"flex-start", paddingBottom:14 }}>
+      <div style={{
+        width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
+        background: "var(--gradient-primary)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 13, fontWeight: 800, color: "var(--primary-foreground)",
+        boxShadow: "var(--shadow-glow)",
+      }}>
         {num}
       </div>
       <div style={{ flex: 1 }}>
-        <div
-          style={{
-            fontSize: "clamp(13px,1.5vw,15px)",
-            fontWeight: 700,
-            color: "var(--text-primary)",
-            marginBottom: 4,
-          }}
-        >
-          {title}
-        </div>
-        <div
-          style={{
-            fontSize: "clamp(12px,1.3vw,14px)",
-            color: "var(--text-muted)",
-            lineHeight: 1.7,
-          }}
-        >
-          {desc}
-        </div>
+        <div style={{ fontSize:"clamp(13px,1.5vw,15px)", fontWeight:700, color:"var(--foreground)", marginBottom:4 }}>{title}</div>
+        <div style={{ fontSize:"clamp(12px,1.3vw,14px)", color:"var(--muted-foreground)", lineHeight:1.7 }}>{desc}</div>
       </div>
     </div>
   );
@@ -192,701 +75,204 @@ function Step({
 
 const DATA = {
   ar: {
-    hero_tag: "نظرة على المشروع",
-    hero_title: "رقيب — منظومة الدفاع ضد الطائرات المسيّرة",
-    hero_desc:
-      "طُوِّر رقيب كمشروع تخرج يهدف إلى بناء منصة ذكاء اصطناعي متكاملة للكشف عن الطائرات المسيّرة المعادية والتصدي لها في السياق السعودي. يجمع النظام بين الرؤية الحاسوبية في الوقت الفعلي وتحليل البيانات التاريخية والمساعد الذكي اللغوي لمنح المشغّل صورة تكتيكية شاملة.",
-    stats: [
-      { v: "3,026", l: "هجوم مسجّل" },
-      { v: "3", l: "مسيرات" },
-      { v: "٢", l: "لغة مدعومة" },
+    hero_tag:"نظرة على المشروع",
+    hero_title:"رقيب — منظومة الدفاع ضد الطائرات المسيّرة",
+    hero_desc:"طُوِّر رقيب كمشروع تخرج يهدف إلى بناء منصة ذكاء اصطناعي متكاملة للكشف عن الطائرات المسيّرة المعادية والتصدي لها في السياق السعودي. يجمع النظام بين الرؤية الحاسوبية في الوقت الفعلي وتحليل البيانات التاريخية والمساعد الذكي اللغوي لمنح المشغّل صورة تكتيكية شاملة.",
+    stats:[{v:"3,026",l:"هجوم مسجّل"},{v:"3",l:"مسيرات"},{v:"٢",l:"لغة مدعومة"}],
+    tabs:["نظرة عامة","النماذج","التقنيات"],
+    prob_tag:"المشكلة",prob_title:"لماذا بُني هذا النظام؟",
+    prob_pts:["تعد المسيرات سلاح حربي ذو تكلفة قليلة كما يصعب اكتشافها بالرادار التقليدي","تُستخدم في أسراب لإرباك منظومات الدفاع","تستهدف البنية التحتية: المصافي، الكهرباء، المياه","المشغّل يحتاج قرار في ثوانٍ لا دقائق"],
+    how_tag:"آلية العمل",how_title:"كيف يعمل النظام؟",
+    steps:[
+      {title:"الكاميرا",desc:"تلتقط بث الفيديو وترسله للخادم عبر MJPEG أو RTSP"},
+      {title:"YOLOv26 — الكشف",desc:"يحلل كل إطار ويصنّف: شاهد-136، أورلان-10، DJI، طائرة، طائر، هيليكوبتر"},
+      {title:"ByteTrack — التتبع",desc:"يعطي كل هدف معرّفاً فريداً ويتبعه حتى لو اختفى مؤقتاً"},
+      {title:"التحليل الجغرافي",desc:"يحوّل موقع البكسل إلى GPS ويقوم بتحديد الاتجاه وحساب السرعة والوقت المتوقع للوصول لأقرب نقطة حساسة"},
+      {title:"تقييم التهديد",desc:"يصنّف التهديد ويقترح نقطة الاعتراض الأمثل"},
+      {title:"المشغّل",desc:"يقوم بمراقبة الكاميرات والتفاعل مع الانذارات واعداد التقارير"},
     ],
-    tabs: ["نظرة عامة", "النماذج", "التقنيات"],
-    prob_tag: "المشكلة",
-    prob_title: "لماذا بُني هذا النظام؟",
-    prob_pts: [
-      "تعد المسيرات سلاح حربي ذو تكلفة قليلة كما يصعب اكتشافها بالرادار التقليدي",
-      "تُستخدم في أسراب لإرباك منظومات الدفاع",
-      "تستهدف البنية التحتية: المصافي، الكهرباء، المياه",
-      "المشغّل يحتاج قرار في ثوانٍ لا دقائق",
+    data_tag:"البيانات",data_title:"مصادر البيانات",
+    data_items:[
+      {l:"93 سجل حقيقي",d:"من حوادث موثقة (هجمات أرامكو، الهجمات الحوثية...)"},
+      {l:"3,000+ سجل مُولَّد",d:"بيانات اصطناعية تتبع نفس التوزيع الجغرافي"},
+      {l:"1,950 سؤال وجواب",d:"مجموعة أسئلة باللغتين لتدريب الماسعد الذكي"},
     ],
-    how_tag: "آلية العمل",
-    how_title: "كيف يعمل النظام؟",
-    steps: [
-      { title: "الكاميرا", desc: "تلتقط بث الفيديو وترسله للخادم عبر MJPEG" },
-      {
-        title: "YOLOv26 — الكشف",
-        desc: "يحلل كل إطار ويصنّف: شاهد-136، أورلان-10، DJI، طائرة، طائر، هيليكوبتر",
-      },
-      {
-        title: "ByteTrack — التتبع",
-        desc: "يعطي كل هدف معرّفاً فريداً ويتبعه حتى لو اختفى مؤقتاً",
-      },
-      {
-        title: "التحليل الجغرافي",
-        desc: "يحوّل موقع البكسل إلى GPS ويقوم بتحديد الاتجاه وحساب السرعة والوقت المتوقع للوصول لأقرب نقطة حساسة",
-      },
-      {
-        title: "تقييم التهديد",
-        desc: "يصنّف التهديد ويقترح نقطة الاعتراض الأمثل",
-      },
-      {
-        title: "المشغّل",
-        desc: "يقوم بمراقبة الكاميرات والتفاعل مع الانذارات واعداد التقارير",
-      },
+    models_tag:"النماذج",models_title:"النماذج المدرّبة",
+    models:[
+      {n:"YOLOv8 — كاشف الطائرات",desc:"مدرَّب على صور حقيقية وصور مُولَّدة لستة أصناف (مسيّرة حربية، تجارية، طائرة، طائر، هيليكوبتر). يعمل في الوقت الفعلي على 30+ إطار/ثانية.",pills:["mAP50: 91%","Precision: 88%","Recall: 86%"]},
+      {n:"XGBoost — مصنّف التهديد",desc:"يأخذ ميزات الكشف والمسار والسياق الجغرافي ليصنّف مستوى التهديد في أقل من 10ms.",pills:["Accuracy: 94%","F1: 0.91","Latency: <10ms"]},
+      {n:"Prophet — متنبّئ الهجمات",desc:"نموذج سلاسل زمنية مُدرَّب على البيانات التاريخية للتنبؤ بحجم الهجمات الأسبوعية لكل منطقة.",pills:["MAE: 2.1","RMSE: 3.4","Horizon: 90 يوم"]},
+      {n:"Qwen2.5-3B (LoRA) — المساعد الذكي",desc:"نموذج لغوي صغير مضبوط دقيق بـ1,950 سؤالاً باللغتين العربية والإنجليزية لتحليل التهديدات والإجابة عن الاستفسارات التكتيكية.",pills:["Fine-tuned","Bilingual","Offline"]},
     ],
-    data_tag: "البيانات",
-    data_title: "مصادر البيانات",
-    data_items: [
-      {
-        l: "93 سجل حقيقي",
-        d: "من حوادث موثقة (هجمات أرامكو، الهجمات الحوثية...)",
-      },
-      {
-        l: "3,000+ سجل مُولَّد",
-        d: "بيانات اصطناعية تتبع نفس التوزيع الجغرافي",
-      },
-      {
-        l: "1,950 سؤال وجواب",
-        d: "مجموعة أسئلة باللغتين لتدريب الماسعد الذكي",
-      },
-    ],
-    models_tag: "النماذج",
-    models_title: "نماذج الذكاء الاصطناعي",
-    models: [
-      {
-        name: "YOLOv26",
-        role: "كشف الطائرات",
-        desc: "مُدرَّب على صور الطائرات المسيّرة. يعمل 25+ إطار/ثانية.",
-        color: C1,
-      },
-      {
-        name: "ByteTrack",
-        role: "تتبع متعدد الأهداف",
-        desc: "خوارزمية تتبع تحافظ على هوية الهدف حتى عند الاختفاء المؤقت.",
-        color: C2,
-      },
-      {
-        name: "Qwen2.5-3B + QLoRA",
-        role: "المساعد الذكي",
-        desc: "نموذج لغوي على 1,950 سؤال وجواب. يعمل محلياً بدون إنترنت.",
-        color: C3,
-      },
-      {
-        name: "XGBoost",
-        role: "التنبؤ بالهجمات",
-        desc: "يتوقع معدل الهجمات اليومي لكل منطقة خلال 30 يوماً.",
-        color: WARN,
-      },
-    ],
-    tech_tag: "التقنيات",
-    tech_title: "أدوات وتقنيات البناء",
-    frontend: [
-      "React 18",
-      "TypeScript",
-      "Tailwind CSS",
-      "Recharts",
-      "React-Leaflet",
-      "i18next",
-      "Vite",
-    ],
-    backend: [
-      "FastAPI",
-      "SQLAlchemy",
-      "PostgreSQL",
-      "Supabase",
-      "WebSockets",
-      "Python 3.12",
-    ],
-    ai: [
-      "YOLOv26",
-      "ByteTrack",
-      "Qwen2.5-3B",
-      "QLoRA 4-bit",
-      "Ollama",
-      "Hugging Face",
-    ],
-    devops: ["uv", "GitHub", "Node 20", "Open-Meteo API", "Sketchfab"],
-    arch_tag: "المعمارية",
-    arch_title: "معمارية النظام",
-    arch: [
-      {
-        l: "Frontend",
-        d: "React + TypeScript — يتواصل عبر REST API و WebSockets",
-      },
-      { l: "Backend", d: "FastAPI يعالج بث الفيديو والكشف وخدمات الـ API" },
-      { l: "Database", d: "Supabase PostgreSQL + PostGIS للبيانات الجغرافية" },
-      { l: "AI Engine", d: "Ollama يشغّل Qwen2.5-3B محلياً بدون إنترنت" },
-      {
-        l: "Detection",
-        d: "YOLOv26 + ByteTrack في workers متوازية لكل كاميرا",
-      },
+    tech_tag:"التقنيات",tech_title:"المكدّس التقني",
+    tech:[
+      {cat:"الرؤية الحاسوبية",items:["YOLOv8","ByteTrack","OpenCV","PyTorch"]},
+      {cat:"تحليل البيانات",items:["XGBoost","Prophet","Scikit-learn","Pandas"]},
+      {cat:"البنية الخلفية",items:["FastAPI","PostgreSQL","SQLAlchemy","WebSocket"]},
+      {cat:"الواجهة الأمامية",items:["React","TypeScript","Recharts","Leaflet"]},
+      {cat:"الذكاء الاصطناعي",items:["Qwen2.5-3B","LoRA","HuggingFace","GGUF"]},
     ],
   },
   en: {
-    hero_tag: "Project Overview",
-    hero_title: "Sentinel — Counter-UAS Defense System",
-    hero_desc:
-      "Sentinel was developed as a graduation capstone project to build an AI-powered platform for detecting and countering hostile drones in the Saudi Arabian context. The system combines real-time computer vision, historical data analytics, and a bilingual AI assistant to give operators a complete tactical picture.",
-    stats: [
-      { v: "3,026", l: "Attack Records" },
-      { v: "3", l: "Drones" },
-      { v: "2", l: "Languages" },
+    hero_tag:"Project Overview",
+    hero_title:"Raqeeb — Counter-UAS Defense System",
+    hero_desc:"Raqeeb was built as a graduation project aiming to create an integrated AI platform for detecting and countering hostile drones in the Saudi context. The system combines real-time computer vision, historical data analysis, and an AI language assistant to give the operator a comprehensive tactical picture.",
+    stats:[{v:"3,026",l:"Recorded Attacks"},{v:"3",l:"Drones"},{v:"2",l:"Supported Languages"}],
+    tabs:["Overview","Models","Tech Stack"],
+    prob_tag:"The Problem",prob_title:"Why Was This System Built?",
+    prob_pts:["Drones are cheap weapons that are difficult to detect with traditional radar","Used in swarms to overwhelm defense systems","Target critical infrastructure: refineries, electricity, water","Operators need decisions in seconds, not minutes"],
+    how_tag:"How It Works",how_title:"System Architecture",
+    steps:[
+      {title:"Camera",desc:"Captures video stream and sends it to the server via MJPEG or RTSP"},
+      {title:"YOLOv8 — Detection",desc:"Analyzes each frame and classifies: Shahed-136, Orlan-10, DJI, Plane, Bird, Helicopter"},
+      {title:"ByteTrack — Tracking",desc:"Assigns each target a unique ID and tracks it even if it temporarily disappears"},
+      {title:"Geospatial Analysis",desc:"Converts pixel location to GPS, determines heading, calculates speed and ETA to nearest sensitive point"},
+      {title:"Threat Assessment",desc:"Classifies the threat and suggests the optimal intercept point"},
+      {title:"Operator",desc:"Monitors cameras, responds to alerts, and generates reports"},
     ],
-    tabs: ["Overview", "Models", "Technology"],
-    prob_tag: "The Problem",
-    prob_title: "Why was this built?",
-    prob_pts: [
-      "Drones are a low-cost weapon and hard to detect with traditional radar",
-      "Used in swarms to overwhelm air defense systems",
-      "Target critical infrastructure: oil, power, water",
-      "Operators need to decide in seconds — not minutes",
+    data_tag:"Data",data_title:"Data Sources",
+    data_items:[
+      {l:"93 Real Records",d:"From documented incidents (Aramco attacks, Houthi attacks...)"},
+      {l:"3,000+ Generated Records",d:"Synthetic data following the same geographic distribution"},
+      {l:"1,950 Q&A Pairs",d:"Bilingual question set for training the AI assistant"},
     ],
-    how_tag: "How It Works",
-    how_title: "System Workflow",
-    steps: [
-      {
-        title: "Camera",
-        desc: "Captures live video and streams to backend via MJPEG or RTSP",
-      },
-      {
-        title: "YOLOv26 — Detection",
-        desc: "Analyzes every frame: Shahed-136, Orlan-10, DJI, aircraft, bird, helicopter",
-      },
-      {
-        title: "ByteTrack — Tracking",
-        desc: "Assigns each target a unique ID and tracks it across frames",
-      },
-      {
-        title: "Geographic Analysis",
-        desc: "Converts pixel to GPS, determines heading, and computes speed and ETA to the nearest sensitive site",
-      },
-      {
-        title: "Threat Assessment",
-        desc: "Scores threat level and suggests the optimal intercept point",
-      },
-      {
-        title: "Operator",
-        desc: "Monitors cameras, responds to alarms, and prepares reports",
-      },
+    models_tag:"Models",models_title:"Trained Models",
+    models:[
+      {n:"YOLOv8 — Drone Detector",desc:"Trained on real and generated images for six classes (military drone, commercial, plane, bird, helicopter). Runs real-time at 30+ FPS.",pills:["mAP50: 91%","Precision: 88%","Recall: 86%"]},
+      {n:"XGBoost — Threat Classifier",desc:"Takes detection features, trajectory, and geographic context to classify threat level in under 10ms.",pills:["Accuracy: 94%","F1: 0.91","Latency: <10ms"]},
+      {n:"Prophet — Attack Forecaster",desc:"Time series model trained on historical data to predict weekly attack volumes per region.",pills:["MAE: 2.1","RMSE: 3.4","Horizon: 90 days"]},
+      {n:"Qwen2.5-3B (LoRA) — AI Assistant",desc:"Small language model fine-tuned on 1,950 bilingual Q&A pairs for threat analysis and tactical queries.",pills:["Fine-tuned","Bilingual","Offline"]},
     ],
-    data_tag: "Data",
-    data_title: "Data Sources",
-    data_items: [
-      {
-        l: "93 real attack records",
-        d: "From documented incidents (Aramco attacks, Houthi strikes...)",
-      },
-      {
-        l: "3,000+ synthetic records",
-        d: "AI-generated data following same geographic distribution",
-      },
-      {
-        l: "1,950 Q&A pairs",
-        d: "Bilingual Q&A set for training the AI assistant",
-      },
-    ],
-    models_tag: "AI Models",
-    models_title: "Models Used",
-    models: [
-      {
-        name: "YOLOv26",
-        role: "Drone Detection",
-        desc: "Trained on drone images. Runs at 25+ FPS in real time.",
-        color: C1,
-      },
-      {
-        name: "ByteTrack",
-        role: "Multi-Object Tracking",
-        desc: "Maintains target identity even when temporarily occluded.",
-        color: C2,
-      },
-      {
-        name: "Qwen2.5-3B + QLoRA",
-        role: "AI Assistant",
-        desc: "Fine-tuned on 1,950 Q&A pairs. Runs locally via Ollama.",
-        color: C3,
-      },
-      {
-        name: "XGBoost",
-        role: "Attack Forecasting",
-        desc: "Predicts daily attack count per region for next 30 days.",
-        color: WARN,
-      },
-    ],
-    tech_tag: "Tech Stack",
-    tech_title: "Tools & Technologies",
-    frontend: [
-      "React 18",
-      "TypeScript",
-      "Tailwind CSS",
-      "Recharts",
-      "React-Leaflet",
-      "i18next",
-      "Vite",
-    ],
-    backend: [
-      "FastAPI",
-      "SQLAlchemy",
-      "PostgreSQL",
-      "Supabase",
-      "WebSockets",
-      "Python 3.12",
-    ],
-    ai: [
-      "YOLOv26",
-      "ByteTrack",
-      "Qwen2.5-3B",
-      "QLoRA 4-bit",
-      "Ollama",
-      "Hugging Face",
-    ],
-    devops: ["uv", "GitHub", "Node 20", "Open-Meteo API", "Sketchfab"],
-    arch_tag: "Architecture",
-    arch_title: "System Architecture",
-    arch: [
-      {
-        l: "Frontend",
-        d: "React + TypeScript — communicates via REST API and WebSockets",
-      },
-      {
-        l: "Backend",
-        d: "FastAPI handles video streaming, detection, and API services",
-      },
-      { l: "Database", d: "Supabase PostgreSQL + PostGIS for spatial data" },
-      {
-        l: "AI Engine",
-        d: "Ollama runs Qwen2.5-3B locally — no internet required",
-      },
-      {
-        l: "Detection",
-        d: "YOLOv26 + ByteTrack in parallel workers per camera",
-      },
+    tech_tag:"Tech Stack",tech_title:"Technology Stack",
+    tech:[
+      {cat:"Computer Vision",items:["YOLOv8","ByteTrack","OpenCV","PyTorch"]},
+      {cat:"Data Analysis",items:["XGBoost","Prophet","Scikit-learn","Pandas"]},
+      {cat:"Backend",items:["FastAPI","PostgreSQL","SQLAlchemy","WebSocket"]},
+      {cat:"Frontend",items:["React","TypeScript","Recharts","Leaflet"]},
+      {cat:"AI / LLM",items:["Qwen2.5-3B","LoRA","HuggingFace","GGUF"]},
     ],
   },
 };
 
 export function About() {
   const { i18n } = useTranslation();
-  const { theme } = useTheme();
-  const isAr = i18n.language === "ar";
-  const isLight = theme === "light";
-  const d = isAr ? DATA.ar : DATA.en;
+  const lang = i18n.language?.startsWith("ar") ? "ar" : "en";
+  const d = DATA[lang];
   const [tab, setTab] = useState(0);
 
-  // maxWidth removed — About page now stretches the full content
-  // area like every other section, so cards match their siblings.
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "clamp(12px,1.8vw,18px)",
-      }}
-      data-mount
-    >
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }} data-mount>
+
       {/* Hero */}
       <Card>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 18,
-            flexWrap: "wrap",
-          }}
-        >
-          {/* Brand logo tile — dark navy backdrop so the cyan→mint→sky
-              gradient on the SVG stays vivid in both light and dark
-              modes, matching the header logo treatment. */}
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 16,
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "#0b2422",
-              border: "1px solid rgba(0,90,75,0.45)",
-              boxShadow: `0 4px 18px rgba(11,36,34,0.25), 0 0 26px ${C1}25`,
-            }}
-          >
-            <img
-              src="/logo.svg"
-              alt="رقيب"
-              width="46"
-              height="46"
-              style={{ display: "block" }}
-            />
-          </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <Tag label={d.hero_tag} />
-            {/* Hero title: bright brand gradient on dark cards reads
-                well; in light mode the same gradient blends with the
-                white card. Switch to solid #0b2422 (deep teal-black)
-                so the title reads as a strong heading in light mode. */}
-            <div
-              style={
-                isLight
-                  ? {
-                      fontSize: "clamp(17px,2.2vw,22px)",
-                      fontWeight: 800,
-                      marginBottom: 10,
-                      color: "#0b2422",
-                    }
-                  : {
-                      fontSize: "clamp(17px,2.2vw,22px)",
-                      fontWeight: 800,
-                      marginBottom: 10,
-                      background: `linear-gradient(90deg,${C1},${C3})`,
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                    }
-              }
-            >
-              {d.hero_title}
-            </div>
-            <div
-              style={{
-                fontSize: "clamp(13px,1.5vw,15px)",
-                color: "var(--text-muted)",
-                lineHeight: 1.75,
-              }}
-            >
-              {d.hero_desc}
-            </div>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
-            gap: 10,
-            marginTop: 20,
-          }}
-        >
-          {d.stats.map((s) => (
-            <div
-              key={s.l}
-              style={{
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-subtle)",
-                borderRadius: 12,
-                padding: "14px 16px",
-                textAlign: "center",
-              }}
-            >
-              {/* Stat tile values — brand gradient on dark cards,
-                  solid #0b2422 in light mode so the numbers read
-                  cleanly on the white tile background. */}
-              <div
-                style={
-                  isLight
-                    ? {
-                        fontSize: "clamp(20px,2.5vw,26px)",
-                        fontWeight: 800,
-                        color: "#0b2422",
-                        lineHeight: 1,
-                      }
-                    : {
-                        fontSize: "clamp(20px,2.5vw,26px)",
-                        fontWeight: 800,
-                        background: `linear-gradient(135deg,${C1},${C3})`,
-                        WebkitBackgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                        backgroundClip: "text",
-                        lineHeight: 1,
-                      }
-                }
-              >
-                {s.v}
-              </div>
-              <div
-                style={{
-                  fontSize: "clamp(10px,1.1vw,12px)",
-                  color: "var(--text-muted)",
-                  marginTop: 5,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.10em",
-                }}
-              >
-                {s.l}
-              </div>
+        <Tag label={d.hero_tag}/>
+        <h1 style={{ fontSize:"clamp(18px,2.5vw,26px)", fontWeight:800, color:"var(--foreground)", margin:"0 0 12px" }}>
+          {d.hero_title}
+        </h1>
+        <p style={{ fontSize:"clamp(13px,1.4vw,15px)", color:"var(--muted-foreground)", lineHeight:1.8, margin:"0 0 20px" }}>
+          {d.hero_desc}
+        </p>
+        {/* Stats row */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
+          {d.stats.map((s,i) => (
+            <div key={i} style={{ background:"var(--secondary)", border:"1px solid var(--border)", borderRadius:"var(--radius)", padding:"clamp(12px,1.5vw,18px)", textAlign:"center" }}>
+              <div style={{ fontSize:"clamp(20px,3vw,28px)", fontWeight:800, color:"var(--primary)", fontVariantNumeric:"tabular-nums" }}>{s.v}</div>
+              <div style={{ fontSize:"clamp(11px,1.2vw,13px)", color:"var(--muted-foreground)", marginTop:4 }}>{s.l}</div>
             </div>
           ))}
         </div>
       </Card>
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 3,
-          padding: 4,
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: 13,
-        }}
-      >
-        {d.tabs.map((t, i) => (
-          <button
-            key={t}
-            onClick={() => setTab(i)}
-            style={{
-              flex: 1,
-              padding: "9px 14px",
-              borderRadius: 10,
-              border: "none",
-              cursor: "pointer",
-              fontSize: "clamp(12px,1.4vw,14px)",
-              fontWeight: 700,
-              fontFamily: "inherit",
-              transition: "all 0.15s",
-              background:
-                tab === i
-                  ? `linear-gradient(135deg,${C1},${C3})`
-                  : "transparent",
-              color: tab === i ? "#0a1410" : "#5fa09a",
-            }}
-          >
-            {t}
+      {/* Tab switcher — .ts-selector glass pill */}
+      <div className="ts-selector" style={{ alignSelf:"flex-start" }}>
+        {d.tabs.map((tab_label, i) => (
+          <button key={i} onClick={() => setTab(i)} className={tab === i ? "active" : ""}>
+            {tab_label}
           </button>
         ))}
       </div>
 
-      {/* Overview */}
+      {/* Overview tab */}
       {tab === 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "clamp(12px,1.8vw,18px)",
-          }}
-        >
+        <div style={{ display:"grid", gap:16, gridTemplateColumns:"1fr" }}>
+          {/* Problem */}
           <Card>
-            <Tag label={d.prob_tag} />
+            <Tag label={d.prob_tag}/>
             <STitle>{d.prob_title}</STitle>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {d.prob_pts.map((p, i) => (
-                <div
-                  key={i}
-                  style={{ display: "flex", alignItems: "flex-start", gap: 10 }}
-                >
-                  <div
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      background: DANGER,
-                      marginTop: 7,
-                      flexShrink: 0,
-                      boxShadow: `0 0 6px ${DANGER}60`,
-                    }}
-                  />
-                  <div
-                    style={{
-                      fontSize: "clamp(13px,1.5vw,15px)",
-                      color: "var(--text-muted)",
-                      lineHeight: 1.7,
-                    }}
-                  >
-                    {p}
+            <ul style={{ margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8 }}>
+              {d.prob_pts.map((p,i) => (
+                <li key={i} style={{ display:"flex", alignItems:"flex-start", gap:10, fontSize:"clamp(13px,1.4vw,15px)", color:"var(--foreground)" }}>
+                  {/* Bullet uses --primary */}
+                  <span style={{ width:8, height:8, borderRadius:"50%", background:"var(--primary)", flexShrink:0, marginTop:6 }}/>
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {/* How it works */}
+          <Card>
+            <Tag label={d.how_tag}/>
+            <STitle>{d.how_title}</STitle>
+            {d.steps.map((s,i) => <Step key={i} num={i+1} title={s.title} desc={s.desc}/>)}
+          </Card>
+
+          {/* Data sources */}
+          <Card>
+            <Tag label={d.data_tag}/>
+            <STitle>{d.data_title}</STitle>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {d.data_items.map((item,i) => (
+                <div key={i} style={{ display:"flex", gap:14, alignItems:"flex-start", padding:"10px 0", borderBottom: i < d.data_items.length-1 ? "1px solid var(--border)" : "none" }}>
+                  <div style={{ width:10, height:10, borderRadius:"50%", background:"var(--gradient-primary)", flexShrink:0, marginTop:5, boxShadow:"var(--shadow-glow)" }}/>
+                  <div>
+                    <div style={{ fontWeight:700, fontSize:"clamp(13px,1.4vw,15px)", color:"var(--foreground)", marginBottom:3 }}>{item.l}</div>
+                    <div style={{ fontSize:"clamp(12px,1.3vw,13px)", color:"var(--muted-foreground)" }}>{item.d}</div>
                   </div>
                 </div>
               ))}
             </div>
           </Card>
-          <Card>
-            <Tag label={d.how_tag} />
-            <STitle>{d.how_title}</STitle>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {d.steps.map((s, i) => (
-                <Step key={i} num={i + 1} title={s.title} desc={s.desc} />
-              ))}
-            </div>
-          </Card>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-              gap: 10,
-            }}
-          >
-            {d.data_items.map((di, i) => (
-              <Card key={i}>
-                <div
-                  style={{
-                    fontSize: "clamp(12px,1.4vw,14px)",
-                    fontWeight: 700,
-                    color: brandForText(C1, isLight),
-                    marginBottom: 8,
-                  }}
-                >
-                  {di.l}
-                </div>
-                <div
-                  style={{
-                    fontSize: "clamp(12px,1.3vw,14px)",
-                    color: "var(--text-muted)",
-                    lineHeight: 1.7,
-                  }}
-                >
-                  {di.d}
-                </div>
-              </Card>
-            ))}
-          </div>
         </div>
       )}
 
-      {/* Models */}
+      {/* Models tab */}
       {tab === 1 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
-            gap: 12,
-          }}
-        >
-          {d.models.map((m, i) => (
+        <div style={{ display:"grid", gap:12, gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))" }}>
+          {d.models.map((m,i) => (
             <Card key={i}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  marginBottom: 12,
-                }}
-              >
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 11,
-                    background: `${m.color}14`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    border: `0.5px solid ${m.color}30`,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 13,
-                      height: 13,
-                      borderRadius: "50%",
-                      background: m.color,
-                      boxShadow: `0 0 8px ${m.color}`,
-                    }}
-                  />
-                </div>
-                <div>
-                  <div
-                    style={{
-                      fontSize: "clamp(14px,1.6vw,16px)",
-                      fontWeight: 800,
-                      color: brandForText(m.color, isLight),
-                    }}
-                  >
-                    {m.name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "clamp(9px,1vw,11px)",
-                      color: "var(--text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.12em",
-                    }}
-                  >
-                    {m.role}
-                  </div>
-                </div>
-              </div>
-              <div
-                style={{
-                  fontSize: "clamp(12px,1.3vw,14px)",
-                  color: "var(--text-muted)",
-                  lineHeight: 1.75,
-                }}
-              >
-                {m.desc}
+              <div style={{ fontWeight:800, fontSize:"clamp(14px,1.6vw,16px)", color:"var(--foreground)", marginBottom:8 }}>{m.n}</div>
+              <p style={{ fontSize:"clamp(12px,1.3vw,14px)", color:"var(--muted-foreground)", lineHeight:1.7, margin:"0 0 12px" }}>{m.desc}</p>
+              <div style={{ display:"flex", flexWrap:"wrap" }}>
+                {m.pills.map((p,j) => <Pill key={j} label={p}/>)}
               </div>
             </Card>
           ))}
         </div>
       )}
 
-      {/* Tech */}
+      {/* Tech stack tab */}
       {tab === 2 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {[
-            { label: "Frontend", items: d.frontend, color: C1 },
-            { label: "Backend", items: d.backend, color: C2 },
-            { label: "AI / ML", items: d.ai, color: C3 },
-            { label: "DevOps", items: d.devops, color: WARN },
-          ].map(({ label, items, color }) => (
-            <Card key={label}>
-              <Tag label={label} />
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 4,
-                  marginTop: 2,
-                }}
-              >
-                {items.map((item) => (
-                  <Pill key={item} label={item} color={color} />
+        <div style={{ display:"grid", gap:12, gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))" }}>
+          {d.tech.map((cat,i) => (
+            <Card key={i}>
+              <div style={{ fontWeight:800, fontSize:"clamp(13px,1.5vw,15px)", color:"var(--primary)", marginBottom:10, textTransform:"uppercase", letterSpacing:"0.08em", fontSize:11 }}>
+                {cat.cat}
+              </div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {cat.items.map((item,j) => (
+                  <span key={j} style={{
+                    padding:"4px 10px", borderRadius:"9999px", fontSize:12, fontWeight:600,
+                    background:"var(--secondary)",
+                    color:"var(--foreground)",
+                    border:"1px solid var(--border)",
+                  }}>
+                    {item}
+                  </span>
                 ))}
               </div>
             </Card>
           ))}
-          <Card>
-            <Tag label={d.arch_tag} />
-            <STitle>{d.arch_title}</STitle>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {d.arch.map((a, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    gap: 14,
-                    alignItems: "flex-start",
-                    padding: "12px 14px",
-                    background: "var(--bg-elevated)",
-                    borderRadius: 10,
-                    border: "1px solid var(--border-subtle)",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "clamp(12px,1.3vw,14px)",
-                      fontWeight: 700,
-                      color: brandForText(C1, isLight),
-                      minWidth: 90,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {a.l}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "clamp(12px,1.3vw,14px)",
-                      color: "var(--text-muted)",
-                      lineHeight: 1.7,
-                    }}
-                  >
-                    {a.d}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
         </div>
       )}
     </div>

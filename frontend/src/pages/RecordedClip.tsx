@@ -498,9 +498,8 @@ export function RecordedClip() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-xl font-semibold">{t("nav.recorded", "مقطع مسجل")}</h1>
-        <div className="flex items-center gap-2 flex-wrap">
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", direction:"ltr" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
           <span className={`badge ${connected ? "bg-success text-white" : "badge-muted"}`}>
             {connected ? t("live.online", "● live") : t("live.offline", "● offline")}
           </span>
@@ -516,16 +515,10 @@ export function RecordedClip() {
               }}
               disabled={busy}
             >
-              <option value="" disabled>
-                {t("recorded.select_location", "اختر موقعاً")}
-              </option>
-              {allCams
-                .filter((c) => c.id !== recorded.id)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {bilingualName(c)}
-                  </option>
-                ))}
+              <option value="" disabled>{t("recorded.select_location", "اختر موقعاً")}</option>
+              {allCams.filter((c) => c.id !== recorded.id).map((c) => (
+                <option key={c.id} value={c.id}>{bilingualName(c)}</option>
+              ))}
             </select>
           )}
           <button
@@ -536,6 +529,9 @@ export function RecordedClip() {
             {paused ? t("recorded.resume", "تشغيل") : t("recorded.pause", "إيقاف")}
           </button>
         </div>
+        <h1 className="text-xl font-semibold" style={{ direction:"rtl" }}>
+          {t("nav.recorded", "مقطع مسجل")}
+        </h1>
       </div>
 
       {err && <div className="card text-danger">{err}</div>}
@@ -630,12 +626,12 @@ export function RecordedClip() {
                   type="button"
                   onClick={() => setShowAreas((v) => !v)}
                   aria-pressed={showAreas}
-                  className={[
-                    "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-150",
-                    showAreas
-                      ? "border-accent/60 bg-accent/15 text-slate-100"
-                      : "border-slate-700 bg-slate-900/50 text-muted hover:text-slate-200",
-                  ].join(" ")}
+                  className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-150"
+                  style={{
+                    borderColor: showAreas ? "var(--primary)" : "var(--border)",
+                    background: showAreas ? "oklch(from var(--primary) l c h / 0.15)" : "transparent",
+                    color: "var(--foreground)",
+                  }}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: "#03DA9A" }} aria-hidden />
                   {t("live.toggle_areas")}
@@ -644,12 +640,12 @@ export function RecordedClip() {
                   type="button"
                   onClick={() => setShowCams((v) => !v)}
                   aria-pressed={showCams}
-                  className={[
-                    "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-150",
-                    showCams
-                      ? "border-accent/60 bg-accent/15 text-slate-100"
-                      : "border-slate-700 bg-slate-900/50 text-muted hover:text-slate-200",
-                  ].join(" ")}
+                  className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-150"
+                  style={{
+                    borderColor: showCams ? "var(--primary)" : "var(--border)",
+                    background: showCams ? "oklch(from var(--primary) l c h / 0.15)" : "transparent",
+                    color: "var(--foreground)",
+                  }}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: "#03DA9A" }} aria-hidden />
                   {t("live.toggle_cameras")}
@@ -658,12 +654,12 @@ export function RecordedClip() {
                   type="button"
                   onClick={() => setShowIntercept((v) => !v)}
                   aria-pressed={showIntercept}
-                  className={[
-                    "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-150",
-                    showIntercept
-                      ? "border-accent/60 bg-accent/15 text-slate-100"
-                      : "border-slate-700 bg-slate-900/50 text-muted hover:text-slate-200",
-                  ].join(" ")}
+                  className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-150"
+                  style={{
+                    borderColor: showIntercept ? "var(--primary)" : "var(--border)",
+                    background: showIntercept ? "oklch(from var(--primary) l c h / 0.15)" : "transparent",
+                    color: "var(--foreground)",
+                  }}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: "#a78bfa" }} aria-hidden />
                   {t("live.toggle_intercept")}
