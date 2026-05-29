@@ -7,6 +7,15 @@ import { useTheme } from "../contexts/ThemeContext";
 
 const BACKEND_KEY = "chatbot_backend";
 
+// Starter questions shown as clickable chips above the input. Clicking one
+// fills the text bar (does NOT auto-send) so the user can tweak before
+// sending. Phrased to exercise the forecast + relative-date + region paths.
+const SUGGESTED_QUESTIONS = [
+  "ما توقّعاتُ الأسبوع القادم؟",
+  "كم هجمةً وقعت في المنطقة الوسطى الشهر الماضي؟",
+  "كم هجمة وقعت على مدينة الرياض في شهر مارس 2026؟",
+];
+
 function loadBackend(): ChatBackend {
   const v = localStorage.getItem(BACKEND_KEY);
   return v === "api" ? "api" : "local";
@@ -30,6 +39,7 @@ export function Chatbot() {
   // Auto-scroll the message list to the latest reply whenever the history
   // changes or while we're waiting for a response.
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [history, busy]);
@@ -109,8 +119,32 @@ export function Chatbot() {
             <div ref={bottomRef} />
           </div>
         </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {SUGGESTED_QUESTIONS.map((q) => (
+              <button
+                key={q}
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setDraft(q);
+                  inputRef.current?.focus();
+                }}
+                className="rounded-full px-3 py-1.5 text-xs transition"
+                style={{
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-primary)",
+                  cursor: busy ? "not-allowed" : "pointer",
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                {q}
+              </button>
+            ))}
+        </div>
         <div className="mt-3 flex gap-2">
           <input
+            ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {

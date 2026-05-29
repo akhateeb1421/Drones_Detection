@@ -579,16 +579,25 @@ export function RecordedClip() {
                     <div className="col-span-2 mt-1 flex items-center gap-2">
                       <span className="label inline">{t("live.threat_level")}</span>
                       {(() => {
-                        const dist = focused.lat && focused.lon && focused.nearestArea
-                          ? (() => {
-                              const a = areas.find((x) => x.name === focused.nearestArea);
-                              if (!a) return null;
-                              const dN = (a.latitude - focused.lat) * 111320;
-                              const dE = (a.longitude - focused.lon) * 111320 * Math.cos((focused.lat * Math.PI) / 180);
-                              return Math.sqrt(dN * dN + dE * dE);
-                            })()
-                          : null;
-                        const tier = threatTier(focused.etaS, dist, focused.droneClass);
+                        // Use the SAME tier as this track's pending-approvals
+                        // row so the card badge and the queue badge always
+                        // agree (same min_eta_s + alarm_fired_at inputs).
+                        const match = pending.find((p) => p.track_id === focused.trackId);
+                        let tier;
+                        if (match) {
+                          tier = threatTier(match.min_eta_s, distToNearest(match), match.voted_class, match.alarm_fired_at);
+                        } else {
+                          const dist = focused.lat && focused.lon && focused.nearestArea
+                            ? (() => {
+                                const a = areas.find((x) => x.name === focused.nearestArea);
+                                if (!a) return null;
+                                const dN = (a.latitude - focused.lat) * 111320;
+                                const dE = (a.longitude - focused.lon) * 111320 * Math.cos((focused.lat * Math.PI) / 180);
+                                return Math.sqrt(dN * dN + dE * dE);
+                              })()
+                            : null;
+                          tier = threatTier(focused.etaS, dist, focused.droneClass);
+                        }
                         const lbl = tier.label === "—" ? "—" : t(`threat.${tier.label}`, { defaultValue: tier.label });
                         return <span className={`badge ${tier.cls} font-semibold`}>{lbl}</span>;
                       })()}
