@@ -161,7 +161,7 @@ export function Overview() {
   const combTotal  = useMemo(() => combined.reduce((a,c) => a+c.count, 0), [combined]);
 
   const regDisp   = useMemo(() => filterMin(regions,totalRows,"region").map(r=>({...r,region:placeLabel(r.region)})), [regions,totalRows,placeLabel]);
-  const typDisp   = useMemo(() => filterMin(types,typesTotal,"attack_type").map(tt=>({...tt,attack_type:typeLabel(tt.attack_type)})), [types,typesTotal,typeLabel]);
+  const typDisp   = useMemo(() => filterMin(types,typesTotal,"attack_type").filter(tt => !tt.attack_type.toLowerCase().includes("mixed")).map(tt=>({...tt,attack_type:typeLabel(tt.attack_type)})),[types,typesTotal,typeLabel]);
   const combDisp  = useMemo(() => filterMin(combined,combTotal,"label").slice(0,8).map(c=>({...c,label:c.label.split(/\s*\+\s*/).map((p:string)=>placeLabel(p)).join(" + ")})), [combined,combTotal,placeLabel]);
   const radarData = useMemo(() => regDisp.slice(0,6).map(r=>({subject:r.region,value:r.count})), [regDisp]);
 
@@ -325,7 +325,7 @@ export function Overview() {
             </div>
             {/* Colored chip badges for bar legend */}
             <div style={{ display:"flex",flexWrap:"wrap",gap:6 }}>
-              {types.map((tt,i) => {
+            {types.filter(tt=>!tt.attack_type.toLowerCase().includes("mixed")).map((tt,i) => {
                 const [a,b] = GRAD_PAIRS[i%GRAD_PAIRS.length];
                 return (
                   <span key={i} style={{ padding:"4px 12px",borderRadius:20,background:`linear-gradient(135deg,${a},${b})`,color:"var(--primary-foreground)",fontSize:"clamp(10px,1vw,12px)",fontWeight:700,boxShadow:`0 0 8px ${a}44` }}>
@@ -338,7 +338,7 @@ export function Overview() {
           <div style={{ height:"clamp(150px,20vw,220px)", direction:"ltr" }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={types.map(tt=>({...tt,attack_type:typeLabel(tt.attack_type)}))}
+                data={types.filter(tt=>!tt.attack_type.toLowerCase().includes("mixed")).map(tt=>({...tt,attack_type:typeLabel(tt.attack_type)}))}
                 margin={{ top:8,right:8,left:-22,bottom:0 }}
               >
                 <defs>

@@ -8,7 +8,6 @@ settings = Settings()
 
 def require_admin(x_admin_token: str | None = Header(default=None)) -> None:
     """Reject the request unless the X-Admin-Token header matches the configured token."""
-    settings = get_settings()
     if not settings.admin_token or settings.admin_token == "replace_me":
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

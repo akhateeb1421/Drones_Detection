@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { Camera } from "../services/api";
 import { useBilingualName } from "../i18n/places";
 
-/** Map WMO weather codes to a label key + an emoji glyph. */
 function wmoCondition(code: number, isDay: boolean): { key: string; glyph: string } {
   if (code === 0)  return { key:"clear",         glyph: isDay ? "☀" : "🌙" };
   if (code === 1)  return { key:"mostly_clear",  glyph: isDay ? "🌤" : "🌙" };
@@ -25,14 +24,7 @@ function detectionStatus(code: number, windKmh: number): "optimal" | "degraded" 
 
 type Weather = { tempC: number; windKmh: number; code: number; isDay: boolean };
 
-interface Props { camera: Camera | null; }
-
-/**
- * Unified weather card — ALL three metrics (Status, Temp, Wind) in
- * ONE single glassmorphic card with a 3-column grid separated by thin
- * vertical dividers instead of separate isolated boxes.
- */
-export function WeatherPanel({ camera }: Props) {
+export function WeatherPanel({ camera }: { camera: Camera | null }) {
   const { t } = useTranslation();
   const bilingualName = useBilingualName();
   const [w,   setW]   = useState<Weather | null>(null);
@@ -52,12 +44,7 @@ export function WeatherPanel({ camera }: Props) {
         if (cancelled) return;
         const cw = d?.current_weather;
         if (!cw) throw new Error("no_data");
-        setW({
-          tempC:   Number(cw.temperature),
-          windKmh: Number(cw.windspeed),
-          code:    Number(cw.weathercode),
-          isDay:   cw.is_day === 1 || cw.is_day === true,
-        });
+        setW({ tempC: Number(cw.temperature), windKmh: Number(cw.windspeed), code: Number(cw.weathercode), isDay: cw.is_day === 1 || cw.is_day === true });
       })
       .catch(e => { if (!cancelled) setErr(String(e)); });
     return () => { cancelled = true; };
@@ -67,93 +54,55 @@ export function WeatherPanel({ camera }: Props) {
 
   const cond   = w ? wmoCondition(w.code, w.isDay) : null;
   const status = w ? detectionStatus(w.code, w.windKmh) : null;
-
-  /* Status colors via var(--*) tokens — no hardcoded hex */
   const statusColor =
     status === "optimal"  ? "var(--primary)" :
     status === "degraded" ? "var(--chart-5)" :
     status === "poor"     ? "var(--destructive)" : "var(--primary)";
 
-  const camLabel = bilingualName(camera);
+  if (err) return <div className="card" style={{ fontSize:13, color:"var(--muted-foreground)", textAlign:"center" }}>{t("common.error")}</div>;
+  if (!w)  return <div className="card" style={{ fontSize:13, color:"var(--muted-foreground)", textAlign:"center" }}>{t("common.loading")}</div>;
 
   return (
-    /* ONE unified glassmorphic card */
-    <div className="weather-unified-card">
-
-      {/* Card header */}
-      <div style={{
-        display:"flex", alignItems:"center", justifyContent:"space-between",
-        marginBottom:14, flexWrap:"wrap", gap:8,
-      }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          {status && (
-            <span style={{
-              fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:9999,
-              textTransform:"uppercase", letterSpacing:"0.10em",
-              background:`oklch(from ${statusColor} l c h / 0.12)`,
-              color:statusColor,
-              border:`1px solid oklch(from ${statusColor} l c h / 0.28)`,
-            }}>
-              {t(`live.weather_status_${status}`)}
-            </span>
-          )}
+    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div className="label" style={{ marginBottom:0 }}>
+          {t("live.weather")} · {bilingualName(camera)} {cond ? cond.glyph : ""}
         </div>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"var(--muted-foreground)", textTransform:"uppercase", display:"flex", alignItems:"center", gap:8 }}>
-          <span>{t("live.weather")}</span>
-          <span style={{ opacity:0.4 }}>·</span>
-          <span>{camLabel}</span>
-          {cond && <span style={{ fontSize:18 }} aria-hidden>{cond.glyph}</span>}
+        {status && (
+          <span style={{
+            fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:9999,
+            background:`oklch(from ${statusColor} l c h / 0.12)`,
+            color:statusColor,
+            border:`1px solid oklch(from ${statusColor} l c h / 0.30)`,
+            textTransform:"uppercase", letterSpacing:"0.10em",
+          }}>
+            {t(`live.weather_status_${status}`)}
+          </span>
+        )}
+      </div>
+
+      <div style={{ display:"flex", gap:16, flexWrap:"wrap" }}>
+        <div className="weather-mini-card">
+          <span className="w-label">{t("live.weather_condition")}</span>
+          <div className="w-value" style={{ color:statusColor }}>
+            {`${t(`live.weather_cond_${cond?.key ?? "unknown"}`)} ${cond?.glyph ?? ""}`.trim()}
+          </div>
+        </div>
+        <div className="weather-mini-card">
+          <span className="w-label">{t("live.weather_temp")}</span>
+          <div className="w-value">{Math.round(w.tempC)}°C</div>
+        </div>
+        <div className="weather-mini-card">
+          <span className="w-label">{t("live.weather_wind")}</span>
+          <div className="w-value" dir="ltr">{Math.round(w.windKmh)} km/h</div>
         </div>
       </div>
 
-      {/* Body */}
-      {err ? (
-        <div style={{ padding:"20px 0", textAlign:"center", color:"var(--muted-foreground)", fontSize:13 }}>
-          {t("common.error")}
-        </div>
-      ) : !w ? (
-        <div style={{ padding:"20px 0", textAlign:"center", color:"var(--muted-foreground)", fontSize:13 }}>
-          {t("common.loading")}
-        </div>
-      ) : (
-        /*
-          3-COLUMN GRID inside the single card.
-          Separated by thin vertical dividers via .weather-metric-cell + .weather-metric-cell::before
-          (see index.css) — not isolated boxes.
-        */
-        <div className="weather-metrics-grid">
-          {/* الحالة — Status/Condition */}
-          <div className="weather-metric-cell">
-            <span className="weather-metric-label">{t("live.weather_condition")}</span>
-            <div className="weather-metric-value" style={{ color:statusColor }}>
-              {`${t(`live.weather_cond_${cond?.key ?? "unknown"}`)} ${cond?.glyph ?? ""}`.trim()}
-            </div>
-          </div>
-
-          {/* الحرارة — Temperature */}
-          <div className="weather-metric-cell">
-            <span className="weather-metric-label">{t("live.weather_temp")}</span>
-            <div className="weather-metric-value" dir="ltr">
-              {Math.round(w.tempC)}°C
-            </div>
-          </div>
-
-          {/* سرعة الرياح — Wind Speed */}
-          <div className="weather-metric-cell">
-            <span className="weather-metric-label">{t("live.weather_wind")}</span>
-            <div className="weather-metric-value" dir="ltr">
-              {Math.round(w.windKmh)} <span style={{ fontSize:"0.65em", fontWeight:600, color:"var(--muted-foreground)" }}>km/h</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Detection quality footer */}
-      {w && status && (
+      {status && (
         <div style={{
-          marginTop:14, padding:"10px 16px", borderRadius:"var(--radius)",
+          padding:"9px 14px", borderRadius:"var(--radius)",
           background:`oklch(from ${statusColor} l c h / 0.08)`,
-          border:`1px solid oklch(from ${statusColor} l c h / 0.22)`,
+          border:`1px solid oklch(from ${statusColor} l c h / 0.25)`,
           display:"flex", alignItems:"center", justifyContent:"space-between",
           fontSize:13, color:"var(--foreground)", fontWeight:600,
         }}>
