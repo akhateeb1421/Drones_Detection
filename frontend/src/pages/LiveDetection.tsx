@@ -182,6 +182,9 @@ export function LiveDetection() {
           nearestArea: d.nearest_area,
           etaS: d.eta_s,
           lastSeenMs: now,
+          speedStdMps: d.speed_std_mps,
+          headingStdDeg: d.heading_std_deg,
+          positionSource: d.position_source,
         });
         // If this is a re-acquisition on a new camera, drop any duplicate
         // entry under the *new* track_id so we don't render two markers.
@@ -231,6 +234,24 @@ export function LiveDetection() {
     if (!focused || !focusedIsHostile) return null;
     const end = projectPath(focused.lat, focused.lon, focused.speedMps, focused.angleDeg, PREDICT_HORIZON_S);
     return [[focused.lat, focused.lon] as [number, number], end];
+  }, [focused, focusedIsHostile]);
+
+  // Uncertainty cone: the Kalman filter reports a 1-sigma heading error;
+  // fan the predicted path out by ±sigma so the operator sees an honest
+  // "somewhere in this wedge" instead of a false-precision single line.
+  // Clamped to [4°, 45°] — below 4° the cone is invisible, above 45° the
+  // heading is meaningless and the wedge would swallow the map.
+  const predictedCone = useMemo<[number, number][] | null>(() => {
+    if (!focused || !focusedIsHostile || focused.speedMps < 0.5) return null;
+    const sigma = Math.min(Math.max(focused.headingStdDeg ?? 25, 4), 45);
+    if (sigma >= 45) return null;
+    // Outer edge reaches slightly farther than the centre line when the
+    // speed itself is uncertain.
+    const dist = (focused.speedMps + (focused.speedStdMps ?? 0)) * PREDICT_HORIZON_S;
+    const seconds = dist / Math.max(focused.speedMps, 0.1);
+    const left = projectPath(focused.lat, focused.lon, focused.speedMps, focused.angleDeg - sigma, seconds);
+    const right = projectPath(focused.lat, focused.lon, focused.speedMps, focused.angleDeg + sigma, seconds);
+    return [[focused.lat, focused.lon], left, right];
   }, [focused, focusedIsHostile]);
 
   // Auto-zoom: when a hostile drone is being tracked, fit the map to the
@@ -535,6 +556,11 @@ export function LiveDetection() {
                   <div><span className="label inline">{t("live.lat")}</span> <span className="font-data" dir="ltr">{focused.lat.toFixed(5)}</span></div>
                   <div><span className="label inline">{t("live.lon")}</span> <span className="font-data" dir="ltr">{focused.lon.toFixed(5)}</span></div>
                   <div><span className="label inline">{t("live.eta")}</span> <span className="font-data" dir="ltr">{focused.etaS !== null ? `${focused.etaS.toFixed(1)}s` : "—"}</span></div>
+                  {focused.positionSource === "triangulated" && (
+                    <div className="col-span-2">
+                      <span className="badge badge-accent">{t("live.triangulated", "Position: two-camera triangulated fix")}</span>
+                    </div>
+                  )}
                   <div className="col-span-2 mt-1 flex items-center gap-2">
                     <span className="label inline">{t("live.threat_level")}</span>
                     {(() => {
@@ -627,6 +653,7 @@ export function LiveDetection() {
                 sensitiveAreas={showAreas ? sensitive : []}
                 cameras={showCams ? cameraMarkers : []}
                 predictedPath={predictedPath}
+                predictedCone={predictedCone}
                 interceptPoint={showIntercept ? interceptForMap : null}
                 focusBounds={focusBounds}
               />

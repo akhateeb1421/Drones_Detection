@@ -16,6 +16,12 @@ export type Snapshot = {
   nearestArea: string | null;
   etaS: number | null;
   lastSeenMs: number;
+  // Kalman 1-sigma uncertainties (optional — older cached payloads may
+  // not carry them). Drive the prediction-cone rendering.
+  speedStdMps?: number;
+  headingStdDeg?: number;
+  // "triangulated" when the position is a two-camera measured fix.
+  positionSource?: string;
 };
 
 /* ── Persistent per-camera track store ──────────────────────────────────

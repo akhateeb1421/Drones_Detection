@@ -91,3 +91,7 @@ models/llm/
 # a Windows-style path to a Linux-side mkdir.
 .cowork-write-test
 **/.cowork-write-test
+
+datasets/
+runs/
+_review_src.tgz

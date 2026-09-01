@@ -3,11 +3,38 @@ import { useTranslation } from "react-i18next";
 import { DroneViewer } from "../components/DroneViewer";
 
 type DroneId = "shahed" | "orlan";
-interface DroneSpec { id: DroneId; modelUrl?: string; embedUrl?: string; keyBase: string; }
+interface DroneCredit { title: string; url: string; author: string; authorUrl: string; }
+interface DroneSpec {
+  id: DroneId; modelUrl?: string; embedUrl?: string; keyBase: string;
+  /** Viewer background override (e.g. white for models authored on light scenes). */
+  viewerBg?: string;
+  credit?: DroneCredit;
+}
 
 const DRONES: DroneSpec[] = [
-  { id: "shahed", embedUrl: "https://sketchfab.com/models/3f4f8742fe044c4cb1bf20ca4caf56ef/embed", keyBase: "drones.shahed" },
-  { id: "orlan",  embedUrl: "https://sketchfab.com/models/f0f9e877c22443abad0126da0aefd080/embed", keyBase: "drones.orlan" },
+  {
+    id: "shahed",
+    embedUrl: "https://sketchfab.com/models/cdbc9e04f94f4ad4a41341936e7aa087/embed",
+    keyBase: "drones.shahed",
+    credit: {
+      title: "Shahed-136",
+      url: "https://sketchfab.com/3d-models/shahed-136-cdbc9e04f94f4ad4a41341936e7aa087",
+      author: "Taszty",
+      authorUrl: "https://sketchfab.com/taszty",
+    },
+  },
+  {
+    id: "orlan",
+    embedUrl: "https://sketchfab.com/models/e2efb223c1814b7291818a9a7b4e80c5/embed",
+    keyBase: "drones.orlan",
+    viewerBg: "#ffffff",
+    credit: {
+      title: "Orlan-10",
+      url: "https://sketchfab.com/3d-models/orlan-10-e2efb223c1814b7291818a9a7b4e80c5",
+      author: "FLIGHTCLUB",
+      authorUrl: "https://sketchfab.com/flightclubua",
+    },
+  },
 ];
 
 const SPEC_ROWS = [
@@ -73,7 +100,17 @@ export function Drones() {
             </div>
             <div className="text-xs uppercase tracking-wide text-muted">{t("drones.viewer_hint")}</div>
           </div>
-          <DroneViewer modelKey={drone.id} modelUrl={drone.modelUrl} embedUrl={drone.embedUrl} />
+          <DroneViewer modelKey={drone.id} modelUrl={drone.modelUrl} embedUrl={drone.embedUrl} viewerBg={drone.viewerBg} />
+          {/* Sketchfab attribution — required by the model licenses. */}
+          {drone.credit && (
+            <div className="mt-2 text-xs text-muted">
+              <a href={drone.credit.url} target="_blank" rel="noreferrer nofollow" className="font-semibold" style={{ color: "#1CAAD9" }}>{drone.credit.title}</a>
+              {" "}by{" "}
+              <a href={drone.credit.authorUrl} target="_blank" rel="noreferrer nofollow" className="font-semibold" style={{ color: "#1CAAD9" }}>{drone.credit.author}</a>
+              {" "}on{" "}
+              <a href="https://sketchfab.com" target="_blank" rel="noreferrer nofollow" className="font-semibold" style={{ color: "#1CAAD9" }}>Sketchfab</a>
+            </div>
+          )}
         </div>
 
         <div className="card md:col-span-2">

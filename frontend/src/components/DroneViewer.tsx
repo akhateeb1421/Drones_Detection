@@ -7,9 +7,13 @@ interface Props {
   embedUrl?: string;
   modelKey: string;
   autoRotate?: boolean;
+  /** Force a specific viewer background (e.g. "#ffffff"). When set, the
+   *  Sketchfab embed is asked for a transparent canvas so this color
+   *  shows through, regardless of the app theme. */
+  viewerBg?: string;
 }
 
-export function DroneViewer({ modelUrl, embedUrl, modelKey }: Props) {
+export function DroneViewer({ modelUrl, embedUrl, modelKey, viewerBg }: Props) {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const [missing, setMissing] = useState(false);
@@ -24,14 +28,17 @@ export function DroneViewer({ modelUrl, embedUrl, modelKey }: Props) {
     return () => { alive = false; };
   }, [modelUrl, embedUrl]);
 
-  const bg = theme === "light" ? "#e8edf2" : "#0e1a14";
+  const bg = viewerBg ?? (theme === "light" ? "#e8edf2" : "#0e1a14");
 
   if (embedUrl) {
     const base = embedUrl.split("?")[0];
     const params = new URLSearchParams({
       autostart: "1", ui_infos: "0", ui_watermark_link: "0", ui_watermark: "0",
       ui_stop: "0", ui_inspector: "0", ui_settings: "0", ui_vr: "0",
-      ui_help: "0", ui_hint: "0", transparent: "0",
+      ui_help: "0", ui_hint: "0",
+      // transparent=1 lets the container background (viewerBg) show
+      // through instead of the scene's authored backdrop.
+      transparent: viewerBg ? "1" : "0",
     });
     const src = `${base}?${params.toString()}`;
     return (

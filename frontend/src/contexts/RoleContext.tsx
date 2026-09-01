@@ -1,32 +1,28 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { ReactNode } from "react";
+import { useAuth } from "./AuthContext";
 
 export type Role = "admin" | "viewer";
 
 type RoleApi = {
   role: Role;
-  setRole: (r: Role) => void;
 };
 
-const RoleContext = createContext<RoleApi | null>(null);
-const STORAGE_KEY = "user_role";
-
+/**
+ * Thin compatibility wrapper over AuthContext.
+ *
+ * Historically the role lived in localStorage and could be flipped by the
+ * client at will. It is now DERIVED from the server-verified session:
+ * an admin account maps to "admin", everything else to "viewer". There is
+ * deliberately no setRole — the only way to change roles is to sign in
+ * with a different account.
+ */
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [role, setRoleState] = useState<Role>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved === "admin" ? "admin" : "viewer";
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, role);
-  }, [role]);
-
-  return (
-    <RoleContext.Provider value={{ role, setRole: setRoleState }}>{children}</RoleContext.Provider>
-  );
+  // State lives in AuthContext; nothing to provide here anymore. Kept so
+  // existing <RoleProvider> wrapping in App.tsx stays harmless.
+  return <>{children}</>;
 }
 
 export function useRole(): RoleApi {
-  const ctx = useContext(RoleContext);
-  if (!ctx) throw new Error("useRole must be used inside <RoleProvider>");
-  return ctx;
+  const { user } = useAuth();
+  return { role: user?.role === "admin" ? "admin" : "viewer" };
 }

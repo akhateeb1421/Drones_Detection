@@ -19,7 +19,11 @@ def test_normalize_type_canonical():
     assert normalize_type("Drones") == "drone"
     assert normalize_type("Ballistic Missiles") == "ballistic_missile"
     assert normalize_type("Cruise Missile") == "cruise_missile"
-    assert normalize_type("Mixed Stuff + Other") == "mixed"
+    # "+" rows are split into one of their canonical components; when no
+    # component is recognizable the safe fallback is "drone". The legacy
+    # "mixed" bucket is no longer emitted anywhere.
+    assert normalize_type("Mixed Stuff + Other") == "drone"
+    assert normalize_type("Drones + Cruise Missile") in {"drone", "cruise_missile"}
 
 
 def test_generate_returns_requested_rows_and_correct_source():
@@ -42,4 +46,4 @@ def test_normalize_real_for_db_shape():
         "source",
     }
     assert (norm["source"] == "historical").all()
-    assert set(norm["attack_type"]).issubset({"drone", "ballistic_missile", "cruise_missile", "mixed"})
+    assert set(norm["attack_type"]).issubset({"drone", "ballistic_missile", "cruise_missile"})

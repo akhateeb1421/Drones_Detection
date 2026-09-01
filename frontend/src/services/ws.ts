@@ -1,4 +1,13 @@
+import { getAuthToken } from "./api";
+
 const wsBase = import.meta.env.VITE_WS_BASE ?? "ws://localhost:8000";
+
+/** Append the session token — both WS endpoints now require auth and
+ *  close unauthenticated sockets with code 4401. */
+function withToken(url: string): string {
+  const token = getAuthToken();
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
+}
 
 export type DetectionMeta = {
   type: "frame";
@@ -19,6 +28,14 @@ export type DetectionMeta = {
     nearest_area: string | null;
     dist_m: number | null;
     eta_s: number | null;
+    // Kalman 1-sigma uncertainties (new). Used to draw the widening
+    // prediction cone on the live map.
+    speed_std_mps?: number;
+    heading_std_deg?: number;
+    // "triangulated" when two linked cameras produced a measured fix
+    // instead of the single-camera assumed-distance estimate.
+    position_source?: string;
+    bearing_from_cam_deg?: number;
     // Set when this detection has been linked back to a prior track from
     // another camera (cross-camera handoff). The frontend uses these to
     // merge sightings into one logical drone.
@@ -42,9 +59,9 @@ export type AlarmEvent = {
 };
 
 export function liveStreamUrl(cameraId: number): string {
-  return `${wsBase}/ws/live/${cameraId}`;
+  return withToken(`${wsBase}/ws/live/${cameraId}`);
 }
 
 export function alarmsUrl(): string {
-  return `${wsBase}/ws/alarms`;
+  return withToken(`${wsBase}/ws/alarms`);
 }

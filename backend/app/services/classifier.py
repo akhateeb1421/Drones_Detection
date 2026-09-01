@@ -47,6 +47,8 @@ def _features_for_region(df: pd.DataFrame, region: str, asof: datetime) -> dict[
             "days_since_last": 9999.0,
             "share_drone": 0.0,
             "share_missile": 0.0,
+            "month": float(asof.month),
+            "weekday": float(asof.weekday()),
         }
     last_30 = sub[sub["occurred_at"] >= asof - timedelta(days=30)].shape[0]
     last_7 = sub[sub["occurred_at"] >= asof - timedelta(days=7)].shape[0]
@@ -60,6 +62,12 @@ def _features_for_region(df: pd.DataFrame, region: str, asof: datetime) -> dict[
         "days_since_last": float(days_since_last),
         "share_drone": float(types.get("drone", 0.0)),
         "share_missile": float(types.get("ballistic_missile", 0.0) + types.get("cruise_missile", 0.0)),
+        # Calendar features — the model is TRAINED with month (1-12) and
+        # weekday (0-6). These used to be missing at serving time, so the
+        # feature-order lookup silently filled month=0 / weekday=0 — an
+        # out-of-distribution point that skewed every risk probability.
+        "month": float(asof.month),
+        "weekday": float(asof.weekday()),
     }
 
 

@@ -30,6 +30,13 @@ class Track(Base):
     last_lat: Mapped[float | None] = mapped_column(REAL, nullable=True)
     last_lon: Mapped[float | None] = mapped_column(REAL, nullable=True)
     last_heading_deg: Mapped[float | None] = mapped_column(REAL, nullable=True)
+    # Most recent observed speed (m/s) — used by cross-camera forward
+    # projection instead of the all-time max, which over-projects.
+    last_speed_mps: Mapped[float | None] = mapped_column(REAL, nullable=True)
+    # Compass bearing from the DETECTING CAMERA to the drone at the last
+    # sighting. Two linked cameras' bearings let us triangulate a real
+    # position instead of relying on the assumed target distance.
+    last_cam_bearing_deg: Mapped[float | None] = mapped_column(REAL, nullable=True)
 
     linked_track_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     thumbnail_path: Mapped[str | None] = mapped_column(String(255), nullable=True)

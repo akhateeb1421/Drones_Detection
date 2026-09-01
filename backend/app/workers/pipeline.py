@@ -26,6 +26,7 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.models import Camera, Detection, Track
 from app.services import cross_camera
+from app.services import triangulate
 from app.services import alarms as alarms_svc
 from app.services.eta import load_areas, nearest
 from app.services.geo import CameraGeo
@@ -173,13 +174,13 @@ def _enrich_output(
 _clip_cache: dict[tuple, dict] = {}
 
 
-async def _publish_clip_progress(camera_id: int, done: int, total: int) -> None:
-    """Push a placeholder 'Analyzing clip… N%' frame to the WebSocket so
-    the operator sees progress instead of a frozen 'loading' spinner while
-    the one-time pre-compute pass runs."""
+async def _publish_clip_progress(camera_id: int, done: int, total: int, label: str = "Analyzing clip") -> None:
+    """Push a placeholder '<label>… N%' frame to the WebSocket so the
+    operator sees progress instead of a frozen 'loading' spinner while
+    the one-time pre-compute passes run."""
     img = np.full((360, 640, 3), (34, 26, 20), dtype=np.uint8)  # dark teal-navy (BGR)
     pct = int(done / total * 100) if total else 0
-    msg = f"Analyzing clip... {pct}%" if total else f"Analyzing clip... {done}"
+    msg = f"{label}... {pct}%" if total else f"{label}... {done}"
     # Brand cyan #01F2CF -> BGR (207, 242, 1).
     cv2.putText(img, msg, (110, 195), cv2.FONT_HERSHEY_SIMPLEX, 0.95, (207, 242, 1), 2)
     ok, buf = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
@@ -237,20 +238,16 @@ async def _run_recorded_clip(
             "Recorded clip cam=%s: pre-computing detections over ~%d frames "
             "(one-time; cached per location).", camera_id, total_hint,
         )
-        # Each entry: (annotated_jpeg_bytes, serialized_dets). Encoding the
-        # overlay HERE — where we already decode every frame for YOLO — means
-        # the replay loop never touches the video file or the JPEG encoder,
-        # so the playback-speed sleep alone controls the frame rate.
-        # Each frame: (annotated_jpeg_bytes, serialized_dets, threats). The
-        # threats are kept so Phase 2 can RAISE THE ALARM during replay — the
-        # live loop publishes them to the "alarms" channel, but the recorded
-        # clip used to discard them, so the recorded clip never alarmed.
-        computed: list[tuple[bytes, list[dict], list[dict]]] = []
-        # Enriched detections per detected frame, kept so we can (re)persist
-        # the pending-approval rows on EVERY worker start — see the persist
-        # pass below. Holds the thumbnail bytes too (~tens of KB per detected
-        # frame, a handful of frames per clip — negligible memory).
-        persist_pass: list[tuple[int, list[dict]]] = []
+        # ── Pass A: detect (no overlay encoding yet) ───────────────────
+        # The per-frame class vote needs several frames to settle, so the
+        # demo Shahed's first appearances used to be labelled "dji" — and
+        # because the overlay JPEGs were encoded inline, that wrong label
+        # was burned into the cached replay forever. A recorded clip is a
+        # FIXED file: once the whole clip is analysed we know each track's
+        # final class, so we relabel every frame retroactively and only
+        # then render the overlays (Pass B). Every replayed frame shows
+        # the settled verdict from its very first appearance.
+        frame_dets: list[tuple[list[dict], list[dict], int]] = []  # (enriched, threats, frame_idx)
         detect_frames = 0
         try:
             while True:
@@ -261,16 +258,65 @@ async def _run_recorded_clip(
                 enriched, threats = _enrich_output(camera_id, output, frame, areas_local)
                 if enriched:
                     detect_frames += 1
-                    persist_pass.append((output.frame_idx, enriched))
+                frame_dets.append((enriched, threats, output.frame_idx))
+                if len(frame_dets) % 15 == 0:
+                    await _publish_clip_progress(camera_id, len(frame_dets), total_hint)
+        finally:
+            cap.release()
+
+        # ── Retroactive class vote (confidence-weighted, whole clip) ───
+        class_weight: dict[int, dict[str, float]] = {}
+        for enriched, _thr, _fi in frame_dets:
+            for d in enriched:
+                w = class_weight.setdefault(d["track_id"], {})
+                w[d["drone_class"]] = w.get(d["drone_class"], 0.0) + float(d["confidence"])
+        final_class = {tid: max(w, key=lambda c: w[c]) for tid, w in class_weight.items()}
+        relabelled = 0
+        for enriched, threats, _fi in frame_dets:
+            for d in enriched:
+                fc = final_class.get(d["track_id"])
+                if fc and d["drone_class"] != fc:
+                    d["drone_class"] = fc
+                    relabelled += 1
+            for thr in threats:
+                fc = final_class.get(thr.get("track_id"))
+                if fc:
+                    thr["drone_class"] = fc
+        if relabelled:
+            log.info(
+                "Recorded clip cam=%s: retroactively corrected %d early-frame class "
+                "labels to the whole-clip verdict %s.",
+                camera_id, relabelled, final_class,
+            )
+
+        # Enriched detections per detected frame, kept so we can (re)persist
+        # the pending-approval rows on EVERY worker start — see the persist
+        # pass below. Built AFTER the relabel so the DB rows carry the
+        # settled class. Holds the thumbnail bytes too (negligible memory).
+        persist_pass: list[tuple[int, list[dict]]] = [
+            (fi, enriched) for enriched, _thr, fi in frame_dets if enriched
+        ]
+
+        # ── Pass B: render overlays with the corrected labels ──────────
+        # Re-reading the video costs one extra decode pass (cheap next to
+        # YOLO) and buys correct labels on every cached frame. Encoding
+        # here keeps the replay loop untouched: it only ships pre-encoded
+        # JPEGs and sleeps, so the playback-speed knob still governs fps.
+        computed: list[tuple[bytes, list[dict], list[dict]]] = []
+        cap2 = cv2.VideoCapture(video_path)
+        try:
+            for enriched, threats, _fi in frame_dets:
+                ok, frame = cap2.read()
+                if not ok:
+                    break
                 sdets = [_serialize_det(d) for d in enriched]
                 annotated = overlay(frame, sdets)
                 ok2, buf = cv2.imencode(".jpg", annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
-                jpeg_bytes = bytes(buf) if ok2 else b""
-                computed.append((jpeg_bytes, sdets, threats))
-                if len(computed) % 15 == 0:
-                    await _publish_clip_progress(camera_id, len(computed), total_hint)
+                computed.append((bytes(buf) if ok2 else b"", sdets, threats))
+                if len(computed) % 30 == 0:
+                    await _publish_clip_progress(camera_id, len(computed), len(frame_dets), label="Rendering")
         finally:
-            cap.release()
+            cap2.release()
         cached = {"fps": pipeline.fps, "frames": computed, "persist": persist_pass}
         _clip_cache[geo_key] = cached
         log.info(
@@ -302,7 +348,10 @@ async def _run_recorded_clip(
         with SessionLocal() as db:
             for fidx, enriched in persist_list:
                 if enriched:
-                    _persist(db, camera_id, fidx, enriched)
+                    _persist(
+                        db, camera_id, fidx, enriched,
+                        cam_lat=pipeline.cam.latitude, cam_lon=pipeline.cam.longitude,
+                    )
         log.info(
             "Recorded clip cam=%s: persisted %d detected frame(s) to pending queue.",
             camera_id, len(persist_list),
@@ -323,9 +372,8 @@ async def _run_recorded_clip(
     idx = 0
     # Per-track alarm throttle so replaying the drone over many consecutive
     # frames doesn't spam the "alarms" channel — fire at most once every
-    # ALARM_THROTTLE_S per track (matches how rarely the live loop emits,
-    # which runs inference every N frames). The frontend dedups by track too.
-    ALARM_THROTTLE_S = 3.0
+    # settings.alarm_throttle_s per track (same policy as the live loop).
+    ALARM_THROTTLE_S = settings.alarm_throttle_s
     last_alarm: dict[int, float] = {}
     while True:
         # Pause gate (operator stop button) — keeps the clip frozen at the
@@ -364,7 +412,7 @@ async def _run_recorded_clip(
 
 async def _run_camera(camera_id: int) -> None:
     settings = get_settings()
-    tracker_cfg = str(Path(settings.tracker_cfg).resolve())
+    tracker_cfg = str(settings.resolve_path(settings.tracker_cfg))
 
     # Snapshot the config; if the admin edits the camera we restart this task.
     with SessionLocal() as db:
@@ -402,6 +450,10 @@ async def _run_camera(camera_id: int) -> None:
         weights_for_camera = settings.yolo_weights_live
         imgsz_for_camera = settings.yolo_imgsz_live
     else:
+        # File-based source: resolve a relative stream_url (e.g. the demo
+        # clip "../data/raw/shahed.mp4") against backend/ so it opens no
+        # matter where uvicorn was launched from.
+        stream_url = str(settings.resolve_path(stream_url))
         source_iter = read_local_video_as_mjpeg(stream_url)
         is_remote = False
         weights_for_camera = settings.yolo_weights_video
@@ -414,7 +466,7 @@ async def _run_camera(camera_id: int) -> None:
         # clean sky footage where false positives are unlikely, so it gets
         # its own much more sensitive tracker config that lets faint
         # detections start tracks. Live cameras keep the strict default.
-        tracker_cfg = str(Path(settings.tracker_cfg_video).resolve())
+        tracker_cfg = str(settings.resolve_path(settings.tracker_cfg_video))
         # The recorded clip copies its geometry from a long-range
         # surveillance camera, whose multi-kilometre assumed distance
         # makes the demo footage's drone read at hundreds of km/h. Speed
@@ -457,7 +509,7 @@ async def _run_camera(camera_id: int) -> None:
         # previous analysis — stale boxes AND no new pending-approval rows
         # (Phase 1, the only place we persist, never re-runs).
         try:
-            _st = Path(stream_url).stat()
+            _st = Path(stream_url).stat()  # already resolved above
             file_sig = (int(_st.st_size), int(_st.st_mtime))
         except OSError:
             file_sig = (0, 0)
@@ -513,6 +565,9 @@ async def _run_camera(camera_id: int) -> None:
     HOLD_FRAMES = 25
     last_detection_frame = -10_000
     inference_task: asyncio.Task | None = None
+    # Per-track monotonic timestamp of the last alarm published on the
+    # live path — see the throttle in the harvest block below.
+    live_last_alarm: dict[int, float] = {}
     loop = asyncio.get_running_loop()
 
     async def _inference_pass(infer_frame, fc):
@@ -525,15 +580,22 @@ async def _run_camera(camera_id: int) -> None:
         concurrent calls from other cameras' inference passes don't need
         coordination. CPU contention is handled by PyTorch internally.
         """
+        # Real wall-clock timestamp for the Kalman velocity estimate. The
+        # live path only runs YOLO every Nth frame (and only when the
+        # previous pass has finished), so samples are NOT one frame apart —
+        # passing a monotonic clock here is what makes live speeds correct.
         output = await loop.run_in_executor(
-            None, pipeline.step, infer_frame, tracker_cfg
+            None, lambda: pipeline.step(infer_frame, tracker_cfg, t_s=time.monotonic())
         )
         with SessionLocal() as db:
             areas_local = load_areas(db)
             enriched_local, threats_local = _enrich_output(
                 camera_id, output, infer_frame, areas_local
             )
-            _persist(db, camera_id, output.frame_idx, enriched_local)
+            _persist(
+                db, camera_id, output.frame_idx, enriched_local,
+                cam_lat=pipeline.cam.latitude, cam_lon=pipeline.cam.longitude,
+            )
         return enriched_local, threats_local, output.frame_idx
 
     # Convert the source iterator to an explicit async-iter so we can
@@ -585,8 +647,16 @@ async def _run_camera(camera_id: int) -> None:
                         # keep drawing the previous boxes.
                         if frame_counter - last_detection_frame > HOLD_FRAMES:
                             last_enriched = []
+                    # Per-track alarm throttle — without this, a hostile
+                    # drone in view retriggers the audible alarm on every
+                    # YOLO pass (~1-2x per second). Mirrors the recorded-
+                    # clip replay's throttle.
+                    now_mono = time.monotonic()
                     for t in threats_r:
-                        await frame_bus.publish("alarms", t)
+                        tid = t.get("track_id")
+                        if now_mono - live_last_alarm.get(tid, -1e9) >= settings.alarm_throttle_s:
+                            live_last_alarm[tid] = now_mono
+                            await frame_bus.publish("alarms", t)
                 except Exception:  # noqa: BLE001
                     log.exception("Background YOLO task failed.")
                 inference_task = None
@@ -665,7 +735,8 @@ def _save_thumbnail(camera_id: int, track_id: int, jpeg_bytes: bytes) -> str | N
     try:
         import os
         from app.core.config import get_settings
-        thumb_dir = Path(get_settings().thumbnail_dir).resolve()
+        _s = get_settings()
+        thumb_dir = _s.resolve_path(_s.thumbnail_dir)
         thumb_dir.mkdir(parents=True, exist_ok=True)
         rel = f"cam_{camera_id}_track_{track_id}.jpg"
         full = thumb_dir / rel
@@ -708,9 +779,85 @@ def _save_thumbnail(camera_id: int, track_id: int, jpeg_bytes: bytes) -> str | N
         return None
 
 
-def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None:
+def _try_triangulate(db, det: dict, cam_lat: float, cam_lon: float, parent: Track, now: datetime) -> None:
+    """Refine a detection's position by intersecting this camera's bearing
+    with the linked parent track's last camera bearing.
+
+    The single-camera pixel→world projection places the target at an
+    ASSUMED distance; two bearings from different cameras give a measured
+    fix. Mutates ``det`` in place (lat/lon + position_source) when a valid
+    intersection exists; also refreshes nearest-area/ETA for the new spot.
+    """
+    settings = get_settings()
+    bearing_here = det.get("bearing_from_cam_deg")
+    if bearing_here is None or parent.last_cam_bearing_deg is None:
+        return
+    if (now - parent.last_seen_at).total_seconds() > settings.triangulation_window_s:
+        return
+    parent_cam = db.get(Camera, parent.camera_id)
+    if parent_cam is None:
+        return
+    fix = triangulate.bearing_intersection(
+        float(cam_lat), float(cam_lon), float(bearing_here),
+        float(parent_cam.latitude), float(parent_cam.longitude),
+        float(parent.last_cam_bearing_deg),
+        max_range_m=settings.triangulation_max_range_m,
+    )
+    if fix is None:
+        return
+    det["lat"], det["lon"] = fix
+    det["position_source"] = "triangulated"
+    # The nearest-area/ETA were computed from the assumed-distance
+    # position — refresh them for the measured one.
+    near = nearest(
+        det["lat"], det["lon"], det["speed_mps"], det["confidence"],
+        load_areas(db), angle_deg=det.get("angle_deg"),
+    )
+    det["nearest_area"] = near.name
+    det["dist_m"] = near.distance_m if near.distance_m != float("inf") else None
+    det["eta_s"] = near.eta_s
+    log.info(
+        "Triangulated fix for cam=%s track=%s via parent track id=%s: (%.5f, %.5f)",
+        det.get("track_id"), det.get("drone_class"), parent.id, det["lat"], det["lon"],
+    )
+
+
+def _persist(
+    db,
+    camera_id: int,
+    frame_idx: int,
+    detections: list[dict],
+    cam_lat: float | None = None,
+    cam_lon: float | None = None,
+) -> None:
     now = datetime.now(timezone.utc)
     for det in detections:
+        track = db.execute(
+            select(Track).where(Track.camera_id == camera_id, Track.track_id == det["track_id"])
+        ).scalar_one_or_none()
+
+        link_parent: Track | None = None
+        if track is None:
+            # First time we see this track on this camera. Try to link it to a
+            # recent, CLASS-COMPATIBLE track from another camera (cross-camera
+            # handoff) so the frontend can keep treating it as the same drone.
+            link_parent = cross_camera.find_link(
+                db, camera_id, float(det["lat"]), float(det["lon"]), now,
+                drone_class=det.get("drone_class"),
+            )
+        elif track.linked_track_id is not None:
+            link_parent = db.get(Track, track.linked_track_id)
+
+        # Two-camera triangulation: when a linked parent saw the drone
+        # within the last few seconds, replace the assumed-distance
+        # position with the bearing-intersection fix BEFORE any rows are
+        # written, so the Detection row, Track row, and WS payload agree.
+        if link_parent is not None and cam_lat is not None and cam_lon is not None:
+            try:
+                _try_triangulate(db, det, cam_lat, cam_lon, link_parent, now)
+            except Exception:  # noqa: BLE001
+                log.exception("Triangulation failed; keeping projected position.")
+
         db.add(
             Detection(
                 camera_id=camera_id,
@@ -734,20 +881,8 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
             )
         )
 
-        track = db.execute(
-            select(Track).where(Track.camera_id == camera_id, Track.track_id == det["track_id"])
-        ).scalar_one_or_none()
         if track is None:
-            # First time we see this track on this camera. Try to link it to a
-            # recent track from another camera (cross-camera handoff) so the
-            # frontend can keep treating it as the same drone.
-            link = cross_camera.find_link(db, camera_id, float(det["lat"]), float(det["lon"]), now)
-            link_id = link.id if link is not None else None
-            # Loud INFO so the operator can verify in uvicorn output that
-            # hostile tracks are actually being persisted with
-            # status="pending". If you see "non-hostile" classes here
-            # (bird/airplane/helicopter) they will be created BUT the
-            # frontend now filters them out — that's expected.
+            link_id = link_parent.id if link_parent is not None else None
             log.info(
                 "NEW TRACK cam=%s track=%s class=%s conf=%.2f -> status=pending",
                 camera_id, det["track_id"], det["drone_class"], float(det["confidence"]),
@@ -770,6 +905,11 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
                 last_lat=float(det["lat"]),
                 last_lon=float(det["lon"]),
                 last_heading_deg=float(det["angle_deg"]),
+                last_speed_mps=float(det["speed_mps"]),
+                last_cam_bearing_deg=(
+                    float(det["bearing_from_cam_deg"])
+                    if det.get("bearing_from_cam_deg") is not None else None
+                ),
                 linked_track_id=link_id,
                 thumbnail_path=thumb_rel,
                 status="pending",
@@ -778,8 +918,8 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
             db.add(track)
             # Make the link visible on the WebSocket payload so the frontend
             # can merge tracks across cameras into one drone.
-            det["linked_track_id"] = link.track_id if link is not None else None
-            det["link_root_camera_id"] = link.camera_id if link is not None else None
+            det["linked_track_id"] = link_parent.track_id if link_parent is not None else None
+            det["link_root_camera_id"] = link_parent.camera_id if link_parent is not None else None
         else:
             # ByteTrack restarts its ID counter from 1 every time the
             # worker (re)starts, so after a uvicorn restart a brand-new
@@ -787,9 +927,7 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
             # the row was approved or rejected AND the new sighting
             # arrives after a meaningful gap, treat it as a fresh
             # sighting: flip status back to "pending", clear the prior
-            # verdict, and re-stamp first_seen_at. Without this, old
-            # rejected decisions silently hide every future DJI track
-            # on the same ID.
+            # verdict, and re-stamp first_seen_at.
             gap_s = (now - track.last_seen_at).total_seconds()
             if track.status != "pending" and gap_s > 60:
                 log.info(
@@ -801,31 +939,19 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
                 track.outcome = None
                 track.alarm_fired_at = None
                 track.first_seen_at = now
-                # CRITICAL: also reset thumbnail_path and max_confidence
-                # so the next frame's _save_thumbnail call actually
-                # fires. Without this, an ID reused from a previous
-                # uvicorn session keeps pointing at the OLD (possibly
-                # missing) thumbnail file, and the "if
-                # track.thumbnail_path is None" backfill check below
-                # never triggers — so the row sits in pending forever
-                # with a broken-image placeholder.
+                # Also reset thumbnail_path and max_confidence so the next
+                # frame's _save_thumbnail call actually fires.
                 track.thumbnail_path = None
                 track.max_confidence = None
             track.last_seen_at = now
             track.voted_class = det["drone_class"]
             # Save a fresh thumbnail when the DB path is either None OR
-            # points at a file that no longer exists on disk (left over
-            # from a previous run after OneDrive deleted it, a cleared
-            # cache, a moved thumbnail_dir, etc.). The on-disk check
-            # protects against the exact bug we just chased: TRACK
-            # REUSED would reset status to pending but leave a stale
-            # thumbnail_path, so this branch never fired and the row
-            # rendered the dash placeholder forever.
+            # points at a file that no longer exists on disk.
             needs_thumb = track.thumbnail_path is None
             if not needs_thumb and track.thumbnail_path:
                 try:
                     from app.core.config import get_settings as _gs
-                    _td = Path(_gs().thumbnail_dir).resolve()
+                    _td = _gs().resolve_path(_gs().thumbnail_dir)
                     if not (_td / track.thumbnail_path).exists():
                         needs_thumb = True
                 except Exception:  # noqa: BLE001
@@ -852,18 +978,17 @@ def _persist(db, camera_id: int, frame_idx: int, detections: list[dict]) -> None
             track.last_lat = float(det["lat"])
             track.last_lon = float(det["lon"])
             track.last_heading_deg = float(det["angle_deg"])
-            # Stamp the first time an alarm fires for this track. Subsequent
-            # alarms keep the original timestamp so the field reads as "alarm
-            # has been raised at least once" rather than "most recent alarm".
+            track.last_speed_mps = float(det["speed_mps"])
+            if det.get("bearing_from_cam_deg") is not None:
+                track.last_cam_bearing_deg = float(det["bearing_from_cam_deg"])
+            # Stamp the first time an alarm fires for this track.
             if det.get("_threat_fired") and track.alarm_fired_at is None:
                 track.alarm_fired_at = now
             # Pass the existing link forward in subsequent frames too, so the
             # frontend always knows the merge key.
-            if track.linked_track_id is not None:
-                parent = db.get(Track, track.linked_track_id)
-                if parent is not None:
-                    det["linked_track_id"] = parent.track_id
-                    det["link_root_camera_id"] = parent.camera_id
+            if track.linked_track_id is not None and link_parent is not None:
+                det["linked_track_id"] = link_parent.track_id
+                det["link_root_camera_id"] = link_parent.camera_id
     db.commit()
 
 

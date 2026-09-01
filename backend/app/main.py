@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, analysis, areas, attacks, cameras, chatbot, detections, predictions, stream
+from app.api import admin, analysis, areas, attacks, auth, cameras, chatbot, detections, predictions, stream
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.workers.pipeline import shutdown_pipeline, startup_pipeline
@@ -14,6 +14,11 @@ from app.workers.pipeline import shutdown_pipeline, startup_pipeline
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     configure_logging()
+    # Bootstrap the default admin/operator accounts on first run.
+    from app.api.auth import ensure_default_users
+    from app.core.db import SessionLocal
+    with SessionLocal() as db:
+        ensure_default_users(db)
     await startup_pipeline()
     yield
     await shutdown_pipeline()
@@ -49,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(chatbot.router)
     app.include_router(stream.router)
     app.include_router(admin.router)
+    app.include_router(auth.router)
 
     return app
 

@@ -55,8 +55,8 @@ function Recenter({ lat, lon }: { lat: number; lon: number }) {
 export function LocationPicker({ lat, lon, onChange, height = "320px", zoom = 11 }: Props) {
   const { theme } = useTheme();
   const tileUrl = theme === "light"
-    ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    ? "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    : "https://tile.openstreetmap.org/{z}/{x}/{y}.png"; // dark look comes from the CSS invert filter
 
   const handlePick = (newLat: number, newLon: number) => {
     if (!isFiniteLatLng(newLat, newLon)) return;

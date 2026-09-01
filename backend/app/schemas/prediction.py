@@ -29,6 +29,10 @@ class ForecastPoint(BaseModel):
     # read `p.date` / `p.predicted_count` directly.
     date: DateType | None = None
     predicted_count: float | None = None
+    # How this point was produced: 'prophet' (trained model artifact) or
+    # 'heuristic' (seasonal fallback). Lets the UI label fallback curves
+    # honestly instead of presenting them as model output.
+    method: str = "heuristic"
 
 
 class TimelinePoint(BaseModel):

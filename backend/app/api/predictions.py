@@ -10,12 +10,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.security import require_user
 from app.models import Attack, SensitiveArea
 from app.schemas.prediction import ForecastPoint, RegionRisk
 from app.services import classifier, forecaster
 from app.services.geo import haversine_m
 
-router = APIRouter(prefix="/predict", tags=["predictions"])
+router = APIRouter(
+    prefix="/predict", tags=["predictions"],
+    dependencies=[Depends(require_user)],
+)
 
 
 # ---------------------------------------------------------------------------
@@ -77,8 +81,12 @@ def camera_placements(
     fov_h_deg: float = Query(default=82.6, ge=10.0, le=120.0),
     assumed_target_distance_m: float = Query(default=5000.0, ge=100.0, le=50000.0),
     n_clusters: int = Query(default=4, ge=1, le=10, description="Number of attack hotspots to detect"),
-    forward_offset: float = Query(default=0.30, ge=0.0, le=0.9, description="0..1 — how far from the area toward the hotspot to place the forward camera"),
-    early_warning_km: float = Query(default=15.0, ge=0.0, le=200.0, description="Distance to push the per-area camera FORWARD along the threat axis. 0 = at the area itself."),
+    # DEPRECATED: kept so old clients/bookmarks don't 422. Forward cameras
+    # now use `early_warning_km` too — one control, one unit, both camera
+    # kinds. The fraction-vs-km split confused operators (two knobs that
+    # both meant "how far toward the threat does the camera sit").
+    forward_offset: float = Query(default=0.30, ge=0.0, le=0.9, deprecated=True, description="Deprecated — ignored. Use early_warning_km."),
+    early_warning_km: float = Query(default=15.0, ge=0.0, le=200.0, description="How far ahead of each protected site (toward the threat / hotspot) its camera is placed, in km. 0 = at the site itself."),
 ) -> list[dict]:
     """Suggest camera placements per sensitive area + cluster-based forward cameras.
 
@@ -197,7 +205,12 @@ def camera_placements(
                 # Hotspot is essentially on top of the area — the per-area camera already covers it.
                 continue
 
-            cam_lat, cam_lon = _interpolate(ba_lat, ba_lon, c_lat, c_lon, forward_offset)
+            # Place the forward camera `early_warning_km` out from the site
+            # along the site→hotspot line, capped at 90% of the way so it
+            # never sits inside the hotspot itself. Same control (and unit)
+            # as the per-area cameras above.
+            push_m = min(early_warning_km * 1000.0, 0.9 * d_to_hotspot_m)
+            cam_lat, cam_lon = _interpolate(ba_lat, ba_lon, c_lat, c_lon, push_m / d_to_hotspot_m)
             heading = _bearing_compass(cam_lat, cam_lon, c_lat, c_lon)
             label = _label(heading)
 

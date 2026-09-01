@@ -7,10 +7,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.security import AuthUser, require_user
 from app.models import Attack
+from app.services.audit import audit
 from app.schemas.attack import AttackOut
 
-router = APIRouter(prefix="/attacks", tags=["attacks"])
+router = APIRouter(
+    prefix="/attacks", tags=["attacks"],
+    dependencies=[Depends(require_user)],
+)
 
 
 @router.get("", response_model=list[AttackOut])
@@ -55,7 +60,7 @@ from app.models import SensitiveArea
 def delete_attacks_by_target(
     name: str = Query(..., description="Attack.target_location to delete (exact match)."),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    user: AuthUser = Depends(require_admin),
 ) -> dict:
     """Delete every attack row whose target_location equals `name`.
 
@@ -67,6 +72,7 @@ def delete_attacks_by_target(
     res = db.execute(
         sql_delete(Attack).where(Attack.target_location == name)
     )
+    audit(db, user.username, "attacks_delete_by_target", {"target_location": name, "deleted": int(res.rowcount or 0)})
     db.commit()
     return {"deleted": int(res.rowcount or 0), "target_location": name}
 

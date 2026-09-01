@@ -6,9 +6,7 @@ ByteTrack state inside the model object (via the predictor when ``persist=True``
 is passed), so two cameras sharing a single model would corrupt each other's
 tracker state. The original codebase worked around that by serialising every
 call through a global ``asyncio.Lock`` in ``workers/pipeline.py`` — which fixed
-correctness at the cost of starving multi-camera setups, since whichever camera
-happened to re-queue first would monopolise the lock and effectively block
-every other camera from running inference at all.
+correctness at the cost of starving multi-camera setups.
 
 Moving the model into ``TrackingPipeline`` makes each camera fully independent:
 
@@ -18,8 +16,19 @@ Moving the model into ``TrackingPipeline`` makes each camera fully independent:
   pool fairly shares CPU between concurrent inference calls.
 * A missing weights file fails one worker cleanly instead of cascading.
 
-The cost is ~30-50 MB of resident memory per camera, which is fine for the
-2-5 camera setups this system targets.
+Velocity estimation
+-------------------
+Speed and heading come from a per-track constant-velocity Kalman filter
+(``services/kalman.py``) fed with REAL timestamps. The previous
+least-squares + EMA scheme assumed consecutive samples were exactly one
+video frame apart and multiplied by ``fps``; on the live path YOLO only
+runs every Nth frame (and only when the previous pass finished), so live
+speeds were inflated by the sampling gap. ``step()`` now takes an
+explicit ``t_s``: the worker passes a monotonic wall clock for live
+sources, and the recorded-clip pre-compute (which walks every frame in
+order) falls back to ``frame_idx / fps`` — both produce correct m/s.
+The filter also yields honest 1-sigma uncertainties on speed and heading,
+which ship with each detection so the UI can draw a prediction cone.
 """
 
 from __future__ import annotations
@@ -39,8 +48,11 @@ from app.services.geo import (
     angle_to_compass,
     pixel_to_world,
 )
+from app.services.kalman import CVKalman
 
 log = logging.getLogger(__name__)
+
+M_PER_DEG_LAT = 111_320.0
 
 
 @dataclass
@@ -51,52 +63,20 @@ class FrameOutput:
     detections: list[dict]
 
 
-def _lsq_slope(values: list[float]) -> float:
-    """Least-squares slope of ``values`` against their integer index
-    (0, 1, 2, …). Returns the change-per-index of the best-fit line.
-
-    This is the robust replacement for a first-to-last difference. A
-    distant drone's bounding-box center jitters several pixels per frame;
-    a first-to-last difference is fully exposed to noise in those two
-    endpoints, which is what made the displayed speed swing 125↔235 m/s
-    and the heading flip N↔NE frame to frame. A least-squares fit over a
-    window averages the jitter out (noise reduces ~√N) while still
-    tracking the true drift, so the velocity and heading are stable.
-
-    Returns 0.0 for fewer than 2 points.
-    """
-    n = len(values)
-    if n < 2:
-        return 0.0
-    mean_i = (n - 1) / 2.0
-    mean_v = sum(values) / n
-    num = 0.0
-    den = 0.0
-    for i, v in enumerate(values):
-        di = i - mean_i
-        num += di * (v - mean_v)
-        den += di * di
-    return (num / den) if den > 0 else 0.0
-
-
 class TrackingPipeline:
-    """Per-camera state: keeps a YOLO model + tracker + smoothing history.
+    """Per-camera state: keeps a YOLO model + tracker + Kalman smoothing.
 
     Each instance is fully self-contained. Two pipelines can run inference
     concurrently without coordinating because they share no mutable state.
     """
 
-    HISTORY_LEN = 40
-    SMOOTHING_LEN = 5
-    CLASS_VOTE_LEN = 10
-    # Number of recent frames the least-squares velocity / heading fit uses.
-    # ~1 s at 25-30 fps — long enough to average out bounding-box jitter on
-    # a tiny distant drone, short enough to follow a genuine turn.
-    VELOCITY_WINDOW = 25
-    # Display-smoothing factor on the fitted speed. The LSQ fit is already
-    # smooth; this extra exponential moving average removes residual wobble
-    # so the readout holds steady for a constant-speed target. Lower = smoother.
-    SPEED_EMA_ALPHA = 0.25
+    CLASS_VOTE_LEN = 15
+    # Drop per-track state (Kalman filter, class votes, id remap) for raw
+    # tracker ids not seen for this long. Without pruning these dicts grow
+    # one entry per ByteTrack id forever — a slow leak on a live camera
+    # that runs for weeks.
+    STATE_TTL_S = 120.0
+    PRUNE_EVERY_STEPS = 300
 
     def __init__(
         self,
@@ -113,39 +93,33 @@ class TrackingPipeline:
         # clip run a more sensitive floor than the live camera. None ->
         # fall back to the global ``settings.yolo_conf_hostile``.
         self._conf_hostile = conf_hostile
-        # Test-time augmentation (TTA). When True, YOLO runs each frame at
-        # multiple scales/flips and merges the results, which materially
-        # raises recall on hard views (e.g. a side-profile drone against
-        # bright sky, where the single-pass model emits ~0 confidence) at
-        # roughly 3x inference cost. Only enabled for the recorded clip,
-        # which pre-computes once and caches — so the cost is paid a single
-        # time and never affects live latency.
+        # Test-time augmentation (TTA). Only enabled for the recorded clip,
+        # which pre-computes once and caches — so the ~3x inference cost is
+        # paid a single time and never affects live latency.
         self._augment = augment
-        self._history: dict[int, deque[tuple[int, int]]] = defaultdict(lambda: deque(maxlen=self.HISTORY_LEN))
-        # World-frame lat/lon trajectory per track. Used to compute the
-        # actual compass heading of the drone (independent of camera orientation).
-        self._world_history: dict[int, deque[tuple[float, float]]] = defaultdict(
-            lambda: deque(maxlen=self.HISTORY_LEN)
+        # Class votes are (class_id, confidence) pairs; the voted class is
+        # the one with the highest SUMMED confidence over the window. A
+        # count-based majority let a run of low-confidence "dji" frames
+        # outvote fewer but confident "shahed_136" frames while a target
+        # was still small/distant.
+        self._class_votes: dict[int, deque[tuple[int, float]]] = defaultdict(
+            lambda: deque(maxlen=self.CLASS_VOTE_LEN)
         )
-        self._class_votes: dict[int, deque[int]] = defaultdict(lambda: deque(maxlen=self.CLASS_VOTE_LEN))
         self._id_remap: dict[int, int] = {}
         self._next_id = 1
         self._frame_idx = 0
-        # Per-track smoothed-speed state (EMA) and last stable heading. The
-        # heading is held across sub-pixel-drift frames instead of snapping
-        # back to 0° (North), which previously made the predicted line jump.
-        self._speed_ema: dict[int, float] = {}
+        # Per-track Kalman filter (world ENU frame anchored at the camera)
+        # and the last time each raw tracker id produced a detection —
+        # used both to hold a stable heading across near-static frames and
+        # to prune stale per-track state.
+        self._kf: dict[int, CVKalman] = {}
+        self._last_seen_t: dict[int, float] = {}
         self._last_angle: dict[int, float] = {}
         # Resolve imgsz: explicit arg wins; 0/None falls back to the legacy
-        # global default. Stored on the instance so `step()` doesn't have to
-        # re-read settings on every frame.
+        # global default.
         settings = get_settings()
         self._imgsz = imgsz if (imgsz is not None and imgsz > 0) else settings.yolo_imgsz
-        # Per-pipeline YOLO model — see module docstring for why this is
-        # owned per camera instead of being a global singleton. ``weights_path``
-        # lets the caller (workers/pipeline.py) pick a model that matches the
-        # camera's capture mode (live vs pre-recorded). If omitted, falls
-        # back to the legacy ``settings.yolo_weights``.
+        # Per-pipeline YOLO model — see module docstring.
         self._model, self._class_names = self._load_model(weights_path)
 
     @staticmethod
@@ -155,20 +129,17 @@ class TrackingPipeline:
         If ``weights_path`` is provided AND points at an existing file we use
         it directly. If the requested file is missing we fall back to the
         legacy ``settings.yolo_weights`` so a misconfigured per-source path
-        (e.g. operator added best_live.pt but not best_video.pt) doesn't take
-        the worker down — it just runs on the generic model with a warning.
-
-        Raised exceptions propagate to the worker's outer ``except`` and are
-        logged as ``worker crashed``. The worker stops; other cameras keep
-        running. This is intentional — a per-camera failure should never
-        take down the whole pipeline.
+        doesn't take the worker down — it just runs on the generic model
+        with a warning.
         """
         from ultralytics import YOLO  # heavy import, deferred
 
         settings = get_settings()
-        requested = Path(weights_path).resolve() if weights_path else None
+        # resolve_path anchors relative .env paths to backend/ so the
+        # launch directory doesn't matter.
+        requested = settings.resolve_path(weights_path) if weights_path else None
         if requested is not None and not requested.exists():
-            fallback = Path(settings.yolo_weights).resolve()
+            fallback = settings.resolve_path(settings.yolo_weights)
             log.warning(
                 "Requested YOLO weights %s not found; falling back to %s. "
                 "Add the file or update YOLO_WEIGHTS_LIVE / YOLO_WEIGHTS_VIDEO in .env "
@@ -177,7 +148,7 @@ class TrackingPipeline:
             )
             requested = fallback
         if requested is None:
-            requested = Path(settings.yolo_weights).resolve()
+            requested = settings.resolve_path(settings.yolo_weights)
         if not requested.exists():
             raise FileNotFoundError(f"YOLO weights not found at {requested}")
         log.info("Loading YOLO weights from %s", requested)
@@ -192,18 +163,43 @@ class TrackingPipeline:
             self._next_id += 1
         return self._id_remap[raw_id]
 
-    def step(self, frame_bgr: np.ndarray, tracker_cfg_path: str) -> FrameOutput:
+    def _prune_stale_state(self, now_t: float) -> None:
+        """Drop per-track dict entries for ids unseen for STATE_TTL_S."""
+        stale = [
+            rid for rid, seen in self._last_seen_t.items()
+            if now_t - seen > self.STATE_TTL_S
+        ]
+        for rid in stale:
+            self._last_seen_t.pop(rid, None)
+            self._kf.pop(rid, None)
+            self._last_angle.pop(rid, None)
+            self._class_votes.pop(rid, None)
+            # NOTE: _id_remap entries are kept intentionally — they're tiny
+            # (two ints) and dropping them could reassign a clean id that
+            # the DB still references. They only reset with the pipeline.
+        if stale:
+            log.debug("Pruned %d stale track states.", len(stale))
+
+    def step(
+        self,
+        frame_bgr: np.ndarray,
+        tracker_cfg_path: str,
+        t_s: float | None = None,
+    ) -> FrameOutput:
+        """Run detection + tracking on one frame.
+
+        ``t_s`` is the frame's timestamp in seconds on any monotonic clock
+        (only deltas matter). Live workers MUST pass a real clock so the
+        Kalman velocity uses true time deltas. When None (recorded-clip
+        pre-compute, which steps every frame in order), falls back to
+        ``frame_idx / fps``.
+        """
         model = self._model
         settings = get_settings()
         # Lower the floor we hand to YOLO to the *hostile* threshold so
         # marginal DJI/Shahed/Orlan detections survive past NMS and reach
         # the tracker. Non-hostile classes that come through at this low
-        # bar are dropped further down in the per-detection loop, so
-        # bird/airplane/helicopter noise stays at the regular yolo_conf
-        # floor. min(...) is defensive in case an operator inverts the
-        # two values via env vars. ``self._conf_hostile`` lets the recorded
-        # clip use a more sensitive floor than the live camera (None ->
-        # the global default).
+        # bar are dropped further down in the per-detection loop.
         hostile_floor = (
             self._conf_hostile if self._conf_hostile is not None else settings.yolo_conf_hostile
         )
@@ -220,6 +216,10 @@ class TrackingPipeline:
             stream=False,
         )
         self._frame_idx += 1
+        now_t = float(t_s) if t_s is not None else self._frame_idx / max(self.fps, 1e-6)
+        if self._frame_idx % self.PRUNE_EVERY_STEPS == 0:
+            self._prune_stale_state(now_t)
+
         out: list[dict] = []
         if not results:
             return FrameOutput(self._frame_idx, out)
@@ -234,9 +234,7 @@ class TrackingPipeline:
         classes = result.boxes.cls.cpu().numpy().astype(int)
 
         # Mirror of alarms.HOSTILE_CLASSES, duplicated here as a local
-        # set to avoid the circular import inference <-> alarms. If you
-        # add a new hostile class to alarms.HOSTILE_CLASSES, add it here
-        # too so its low-conf detections aren't filtered out.
+        # set to avoid the circular import inference <-> alarms.
         _HOSTILE = {
             "shahed", "shahed_136", "shahed-136", "shahed136",
             "orlan", "orlan-10", "orlan10", "orlan_10",
@@ -244,61 +242,50 @@ class TrackingPipeline:
         }
 
         frame_h, frame_w = frame_bgr.shape[:2]
+        cos_cam_lat = math.cos(math.radians(self.cam.latitude))
         for box, raw_tid, conf, cls_id in zip(boxes, ids, confs, classes):
             x1, y1, x2, y2 = map(int, box)
             cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
 
-            self._class_votes[raw_tid].append(int(cls_id))
-            voted_cls = max(set(self._class_votes[raw_tid]), key=self._class_votes[raw_tid].count)
+            self._class_votes[raw_tid].append((int(cls_id), float(conf)))
+            weights: dict[int, float] = {}
+            for cid, w in self._class_votes[raw_tid]:
+                weights[cid] = weights.get(cid, 0.0) + w
+            voted_cls = max(weights, key=lambda c: weights[c])
             drone_class = self._class_names.get(voted_cls, f"cls_{voted_cls}")
 
             # Per-class confidence gate: non-hostile classes still have
-            # to clear the regular yolo_conf bar (default 0.50). Hostile
-            # classes ride the looser yolo_conf_hostile floor we passed
-            # to YOLO above, so a marginal DJI sighting still gets
-            # tracked and ends up in the pending-approvals queue.
+            # to clear the regular yolo_conf bar (default 0.50).
             if drone_class.lower().strip() not in _HOSTILE and float(conf) < settings.yolo_conf:
                 continue
 
             # World-frame position (tangent-plane crossing model — a target
             # crossing the frame traces a STRAIGHT line on the map).
             lat, lon = pixel_to_world(cx, cy, frame_w, frame_h, self.cam)
-            world_hist = self._world_history[raw_tid]
-            world_hist.append((lat, lon))
 
-            # Speed AND heading from ONE least-squares fit of the world-frame
-            # trajectory over the recent window. Deriving both from the same
-            # straight world track keeps them consistent and stable:
-            #   • the LSQ fit averages out per-frame box jitter (the cause of
-            #     the 125↔235 m/s speed swing and the N↔NE heading flicker);
-            #   • the tangent-plane projection means a crossing target's track
-            #     is straight, so the heading no longer rotates with the FOV.
-            # An EMA holds the speed readout steady for a constant-speed
-            # target; the heading is HELD across near-static frames instead of
-            # snapping to North (which made the predicted line jump).
-            wwin = list(world_hist)[-self.VELOCITY_WINDOW :]
-            if len(wwin) >= 2:
-                dlat = _lsq_slope([p[0] for p in wwin])  # deg per frame
-                dlon = _lsq_slope([p[1] for p in wwin])
-                dN = dlat * 111_320.0
-                dE = dlon * 111_320.0 * math.cos(math.radians(lat))
-                step_m = math.hypot(dN, dE)  # metres travelled per frame
-                raw_speed = step_m * self.fps
-                prev = self._speed_ema.get(raw_tid)
-                speed_mps = (
-                    raw_speed
-                    if prev is None
-                    else self.SPEED_EMA_ALPHA * raw_speed + (1.0 - self.SPEED_EMA_ALPHA) * prev
-                )
-                self._speed_ema[raw_tid] = speed_mps
-                if step_m < 1e-3:
-                    angle_deg = self._last_angle.get(raw_tid, 0.0)
-                else:
-                    angle_deg = (math.degrees(math.atan2(dE, dN)) + 360.0) % 360.0
-                    self._last_angle[raw_tid] = angle_deg
-            else:
-                speed_mps = 0.0
+            # Local ENU metres relative to the camera — the Kalman filter's
+            # working frame, and the basis for the camera→target bearing
+            # used by cross-camera triangulation.
+            n_m = (lat - self.cam.latitude) * M_PER_DEG_LAT
+            e_m = (lon - self.cam.longitude) * M_PER_DEG_LAT * cos_cam_lat
+            bearing_from_cam = (math.degrees(math.atan2(e_m, n_m)) + 360.0) % 360.0
+
+            kf = self._kf.get(raw_tid)
+            if kf is None:
+                kf = CVKalman()
+                self._kf[raw_tid] = kf
+            kf.update(now_t, n_m, e_m)
+            self._last_seen_t[raw_tid] = now_t
+
+            speed_mps = kf.speed_mps()
+            heading = kf.heading_deg()
+            if heading is None:
+                # Hold the last stable heading across near-static frames
+                # instead of snapping to 0° (North).
                 angle_deg = self._last_angle.get(raw_tid, 0.0)
+            else:
+                angle_deg = heading
+                self._last_angle[raw_tid] = angle_deg
 
             direction = angle_to_compass(angle_deg)
             clean_tid = self._clean_id(int(raw_tid))
@@ -314,6 +301,15 @@ class TrackingPipeline:
                     "speed_mps": float(speed_mps),
                     "angle_deg": float(angle_deg),
                     "direction": direction,
+                    # Kalman 1-sigma uncertainties — the UI renders these
+                    # as a widening prediction cone instead of a single
+                    # false-precision line.
+                    "speed_std_mps": float(kf.speed_std_mps()),
+                    "heading_std_deg": float(kf.heading_std_deg()),
+                    # Bearing from the detecting camera to the target;
+                    # persisted so a second camera's bearing to the same
+                    # (linked) drone allows triangulating a real position.
+                    "bearing_from_cam_deg": float(bearing_from_cam),
                 }
             )
 
@@ -321,16 +317,11 @@ class TrackingPipeline:
 
 
 def class_names() -> dict[int, str]:
-    """Return the class names of the configured YOLO model.
-
-    Kept as a public helper for any callers that just want the class list
-    without spinning up a full pipeline. Loads weights on demand, so an
-    endpoint that never touches inference doesn't pay the startup cost.
-    """
+    """Return the class names of the configured YOLO model."""
     from ultralytics import YOLO
 
     settings = get_settings()
-    weights = Path(settings.yolo_weights).resolve()
+    weights = settings.resolve_path(settings.yolo_weights)
     if not weights.exists():
         return {}
     model = YOLO(str(weights))

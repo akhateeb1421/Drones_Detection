@@ -23,7 +23,6 @@ const DEFAULTS = {
   fov_h_deg: 82.6,
   assumed_target_distance_m: 5000,
   n_clusters: 4,
-  forward_offset: 0.30,
   early_warning_km: 15,
 };
 
@@ -52,7 +51,6 @@ export function CameraPlacementPage() {
       fov_h_deg: String(p.fov_h_deg),
       assumed_target_distance_m: String(p.assumed_target_distance_m),
       n_clusters: String(p.n_clusters),
-      forward_offset: String(p.forward_offset),
       early_warning_km: String(p.early_warning_km),
     };
     Predictions.cameraPlacements(query)
@@ -125,38 +123,41 @@ export function CameraPlacementPage() {
       </div>
 
       {/* Controls */}
-      <div className="card grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div className="card grid grid-cols-2 md:grid-cols-5 gap-3">
+        {/* Each control carries a one-line hint saying what the number
+            actually does — the raw parameter names (radius/FOV/offset)
+            meant nothing to operators. Units live in the label text. */}
         <div>
-          <div className="label">{t("placement.radius")} (km)</div>
+          <div className="label">{t("placement.radius")}</div>
           <input type="number" className="input" value={draft.radius_km}
             onChange={(e) => setDraft({ ...draft, radius_km: Number(e.target.value) })} />
+          <div className="mt-1 text-[11px] leading-snug text-muted">{t("placement.radius_hint")}</div>
         </div>
         <div>
           <div className="label">{t("placement.fov")}</div>
           <input type="number" className="input" value={draft.fov_h_deg}
             onChange={(e) => setDraft({ ...draft, fov_h_deg: Number(e.target.value) })} />
+          <div className="mt-1 text-[11px] leading-snug text-muted">{t("placement.fov_hint")}</div>
         </div>
         <div>
-          <div className="label">{t("placement.range")} (m)</div>
+          <div className="label">{t("placement.range")}</div>
           <input type="number" className="input" value={draft.assumed_target_distance_m}
             onChange={(e) => setDraft({ ...draft, assumed_target_distance_m: Number(e.target.value) })} />
+          <div className="mt-1 text-[11px] leading-snug text-muted">{t("placement.range_hint")}</div>
         </div>
         <div>
           <div className="label">{t("placement.clusters")}</div>
           <input type="number" className="input" value={draft.n_clusters}
             onChange={(e) => setDraft({ ...draft, n_clusters: Number(e.target.value) })} />
+          <div className="mt-1 text-[11px] leading-snug text-muted">{t("placement.clusters_hint")}</div>
         </div>
         <div>
-          <div className="label">{t("placement.forward")}</div>
-          <input type="number" step="0.05" className="input" value={draft.forward_offset}
-            onChange={(e) => setDraft({ ...draft, forward_offset: Number(e.target.value) })} />
-        </div>
-        <div>
-          <div className="label">{t("placement.early_warning")} (km)</div>
+          <div className="label">{t("placement.early_warning")}</div>
           <input type="number" className="input" value={draft.early_warning_km}
             onChange={(e) => setDraft({ ...draft, early_warning_km: Number(e.target.value) })} />
+          <div className="mt-1 text-[11px] leading-snug text-muted">{t("placement.early_warning_hint")}</div>
         </div>
-        <div className="col-span-2 md:col-span-6 flex items-center justify-end gap-2">
+        <div className="col-span-2 md:col-span-5 flex items-center justify-end gap-2">
           {loading && <span className="text-xs text-muted">{t("common.loading")}</span>}
           <button onClick={recompute} className="btn-primary">{t("placement.recompute")}</button>
         </div>
@@ -214,7 +215,7 @@ export function CameraPlacementPage() {
                     })
                   : t("placement.rationale_forward", {
                       area: placeLabel(s.for_area),
-                      km: (params.assumed_target_distance_m / 1000).toFixed(1),
+                      km: params.early_warning_km,
                       lat: s.lat.toFixed(3),
                       lon: s.lon.toFixed(3),
                       count: s.covers_attacks,

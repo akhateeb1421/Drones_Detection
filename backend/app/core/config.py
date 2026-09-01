@@ -7,10 +7,20 @@ from urllib.parse import quote_plus
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# backend/.env, located relative to THIS FILE (backend/app/core/config.py
+# -> parents[2] == backend/). The env_file used to be the relative string
+# ".env", which resolves against the CURRENT WORKING DIRECTORY — so
+# launching uvicorn from the repo root instead of backend/ silently loaded
+# nothing and every DB/auth setting fell back to its default ("password
+# authentication failed for user postgres"). Listing the absolute backend
+# path FIRST and the CWD ".env" second keeps both launch styles working
+# (later files win, so a CWD .env can still override for local tweaks).
+_BACKEND_ENV = Path(__file__).resolve().parents[2] / ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(str(_BACKEND_ENV), ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -30,7 +40,22 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # Auth
-    admin_token: str = "replace_me"
+    # Legacy shared admin token. Still accepted (X-Admin-Token header) so
+    # existing tooling keeps working, but the primary auth is now
+    # username/password accounts + signed session tokens (see /auth/login).
+    admin_token: str = ""
+    # Secret used to sign session tokens. If left empty, a secret is
+    # derived from admin_token — set AUTH_SECRET explicitly in production.
+    auth_secret: str = ""
+    # Session token lifetime in hours.
+    auth_token_ttl_hours: float = 12.0
+    # Bootstrap accounts, created on first startup when the users table is
+    # empty. Change these in .env before first run; passwords can also be
+    # changed later directly in the DB (pbkdf2 hashes via app.core.security).
+    admin_username: str = "admin"
+    admin_password: str = "admin"      # empty -> falls back to admin_token value
+    operator_username: str = "operator"
+    operator_password: str = "operator"   # empty -> "operator" (with a loud warning)
 
     # YOLO + tracker
     # `yolo_weights` is the LEGACY single-file fallback — used when neither
@@ -147,6 +172,18 @@ class Settings(BaseSettings):
     # badge for moderate-confidence sightings.
     threat_conf_threshold: float = 0.45
     threat_eta_seconds: float = 60.0
+    # Minimum seconds between alarm events for the SAME track. Applies to
+    # the live loop and the recorded-clip replay alike, so the audible
+    # alarm fires once per new threat instead of once per YOLO pass.
+    alarm_throttle_s: float = 3.0
+
+    # Cross-camera triangulation. When a track is linked across two
+    # cameras and both saw the drone within this window, the two bearing
+    # rays are intersected to compute a REAL position (instead of the
+    # per-camera assumed-distance estimate). max_range bounds how far from
+    # either camera an intersection may land before we call it spurious.
+    triangulation_window_s: float = 3.0
+    triangulation_max_range_m: float = 20000.0
 
     # --- LLM backend selection ----------------------------------------
     # "ollama" -> hit a local Ollama server (the original setup).
@@ -208,17 +245,31 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
+    @staticmethod
+    def resolve_path(p: str | Path) -> Path:
+        """Resolve a possibly-relative config path against backend/.
+
+        Relative paths in .env (../models/best.pt, ../data/..., etc.) were
+        historically resolved against the process CWD, which only worked
+        when uvicorn was launched from backend/. Anchoring them to this
+        package's location makes every launch directory equivalent.
+        """
+        path = Path(p)
+        if path.is_absolute():
+            return path
+        return (_BACKEND_ENV.parent / path).resolve()
+
     @property
     def yolo_weights_path(self) -> Path:
-        return Path(self.yolo_weights).resolve()
+        return self.resolve_path(self.yolo_weights)
 
     @property
     def tracker_cfg_path(self) -> Path:
-        return Path(self.tracker_cfg).resolve()
+        return self.resolve_path(self.tracker_cfg)
 
     @property
     def fallback_video_path(self) -> Path:
-        return Path(self.fallback_video).resolve()
+        return self.resolve_path(self.fallback_video)
 
 
 @lru_cache(maxsize=1)

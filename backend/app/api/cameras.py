@@ -5,11 +5,15 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.security import require_admin
+from app.core.security import AuthUser, require_admin, require_user
+from app.services.audit import audit
 from app.models import Camera, Detection, Track
 from app.schemas.camera import CameraIn, CameraOut, CameraUpdate
 
-router = APIRouter(prefix="/cameras", tags=["cameras"])
+router = APIRouter(
+    prefix="/cameras", tags=["cameras"],
+    dependencies=[Depends(require_user)],  # every camera endpoint needs a signed-in user
+)
 
 
 @router.get("", response_model=list[CameraOut])
@@ -21,10 +25,11 @@ def list_cameras(db: Session = Depends(get_db)) -> list[Camera]:
 def create_camera(
     payload: CameraIn,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    user: AuthUser = Depends(require_admin),
 ) -> Camera:
     cam = Camera(**payload.model_dump())
     db.add(cam)
+    audit(db, user.username, "camera_create", {"name": payload.name})
     db.commit()
     db.refresh(cam)
     return cam
@@ -35,7 +40,7 @@ def update_camera(
     camera_id: int,
     payload: CameraUpdate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    user: AuthUser = Depends(require_admin),
 ) -> Camera:
     cam = db.get(Camera, camera_id)
     if cam is None:
@@ -43,6 +48,7 @@ def update_camera(
     data = payload.model_dump(exclude_none=True)
     for k, v in data.items():
         setattr(cam, k, v)
+    audit(db, user.username, "camera_update", {"id": camera_id, "fields": list(data.keys())})
     db.commit()
     db.refresh(cam)
     return cam
@@ -52,7 +58,7 @@ def update_camera(
 def delete_camera(
     camera_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    user: AuthUser = Depends(require_admin),
 ) -> None:
     cam = db.get(Camera, camera_id)
     if cam is None:
@@ -60,6 +66,7 @@ def delete_camera(
     # Cascade-delete dependent rows so the FK constraints don't reject the delete.
     db.execute(delete(Detection).where(Detection.camera_id == camera_id))
     db.execute(delete(Track).where(Track.camera_id == camera_id))
+    audit(db, user.username, "camera_delete", {"id": camera_id, "name": cam.name})
     db.delete(cam)
     db.commit()
 
@@ -154,12 +161,15 @@ async def get_camera_state(
 async def pause_camera(
     camera_id: int,
     db: Session = Depends(get_db),
+    user: AuthUser = Depends(require_user),
 ) -> Camera:
     cam = db.get(Camera, camera_id)
     if cam is None:
         raise HTTPException(404, "Camera not found.")
     from app.workers import pipeline as _pipeline
     await _pipeline.pause_worker(camera_id)
+    audit(db, user.username, "camera_pause", {"id": camera_id})
+    db.commit()
     return cam
 
 
@@ -167,12 +177,15 @@ async def pause_camera(
 async def resume_camera(
     camera_id: int,
     db: Session = Depends(get_db),
+    user: AuthUser = Depends(require_user),
 ) -> Camera:
     cam = db.get(Camera, camera_id)
     if cam is None:
         raise HTTPException(404, "Camera not found.")
     from app.workers import pipeline as _pipeline
     await _pipeline.resume_worker(camera_id)
+    audit(db, user.username, "camera_resume", {"id": camera_id})
+    db.commit()
     return cam
 
 
@@ -180,7 +193,7 @@ async def resume_camera(
 async def copy_recorded_geo(
     src_camera_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    user: AuthUser = Depends(require_admin),
 ) -> Camera:
     """Copy lat/lon/heading/FOV from another camera onto the recorded-
     clip camera so the demo footage can be re-played at that camera\'s
@@ -202,6 +215,7 @@ async def copy_recorded_geo(
     rec.fov_v_deg = src.fov_v_deg
     rec.sensor_w_px = src.sensor_w_px
     rec.assumed_target_distance_m = src.assumed_target_distance_m
+    audit(db, user.username, "recorded_copy_geo", {"src_camera_id": src_camera_id})
     db.commit()
     db.refresh(rec)
     try:

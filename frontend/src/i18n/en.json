@@ -125,7 +125,8 @@
     "weather_cond_storm": "Thunderstorm",
     "weather_cond_unknown": "Unknown",
     "description": "Description",
-    "description_loading": "analyzing..."
+    "description_loading": "analyzing...",
+    "triangulated": "Position: two-camera triangulated fix"
   },
   "history": {
     "title": "Historical Attacks Map",
@@ -237,9 +238,9 @@
   },
   "placement": {
     "title": "Suggested camera placements & headings",
-    "radius": "Attack distance",
-    "fov": "Camera FOV",
-    "range": "Early-detection range",
+    "radius": "Use attacks within (km)",
+    "fov": "Camera view angle (°)",
+    "range": "Camera sight distance (m)",
     "recompute": "Recompute",
     "map": "Map",
     "suggestions": "Suggestions",
@@ -247,9 +248,8 @@
     "heading": "Heading",
     "attacks": "Attacks",
     "details": "Details",
-    "clusters": "Risk areas",
-    "forward": "Forward offset",
-    "early_warning": "Camera offset",
+    "clusters": "Number of hotspots",
+    "early_warning": "Camera distance from site (km)",
     "summary_counts": "{{area}} area · {{forward}} forward",
     "kind_area": "area",
     "kind_forward": "forward",
@@ -259,7 +259,12 @@
     "rationale_area": "Early-warning camera ahead of {{area}}, pushed {{km}} km along the threat axis ({{deg}}° {{dir}}). Buys ~{{secs}}s reaction time at 30 m/s. Top contributor: {{top}}. Spread: {{spread}}°.",
     "rationale_forward": "Forward observation camera ahead of {{area}}. Placed {{km}} km toward an attack hotspot at ({{lat}}, {{lon}}). Top contributor: {{top}}. Heading {{deg}}° ({{dir}}).",
     "spread_cluster": "~{{km}} km cluster",
-    "spread_deg": "±{{deg}}° spread"
+    "spread_deg": "±{{deg}}° spread",
+    "radius_hint": "Only past attacks closer than this to a protected site are used to decide where its camera should point.",
+    "fov_hint": "How wide each camera sees, side to side.",
+    "range_hint": "How far away the camera can spot a drone — sets the size of its coverage cone on the map.",
+    "clusters_hint": "How many attack-concentration zones to find in the history; each one gets its own watch camera.",
+    "early_warning_hint": "How far ahead of each protected site — toward the attacks — its camera is placed. Farther out = earlier warning."
   },
   "places": {
     "Riyadh": "Riyadh",
@@ -353,7 +358,13 @@
     "token_required": "Token is required",
     "admin_only": "This page is admin-only.",
     "invalid_token": "Invalid token",
-    "token_invalid": "Token rejected — check the value and try again."
+    "token_invalid": "Token rejected — check the value and try again.",
+    "login_title": "Sign in",
+    "username": "Username",
+    "password": "Password",
+    "credentials_required": "Username and password are required.",
+    "invalid_credentials": "Invalid username or password.",
+    "session_expired": "Session expired — please sign in again."
   },
   "theme": {
     "switch_to_light": "Switch to light mode",

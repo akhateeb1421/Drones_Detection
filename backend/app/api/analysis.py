@@ -7,10 +7,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.security import require_user
 from app.models import Attack
 from app.schemas.prediction import RegionStat, TimelinePoint, TypeStat
 
-router = APIRouter(prefix="/analysis", tags=["analysis"])
+router = APIRouter(
+    prefix="/analysis", tags=["analysis"],
+    dependencies=[Depends(require_user)],  # analytics require a signed-in user
+)
 
 
 @router.get("/total")

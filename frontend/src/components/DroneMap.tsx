@@ -43,7 +43,7 @@ function MapViewController({
     const key = JSON.stringify(bounds);
     if (key === lastKeyRef.current) return;
     lastKeyRef.current = key;
-    const lb = latLngBounds(bounds as LatLngBoundsExpression);
+    const lb = latLngBounds(bounds as [number, number][]);
     map.fitBounds(lb, {
       padding: [40, 40],
       maxZoom,
@@ -93,6 +93,10 @@ interface Props {
   sensitiveAreas?: SensitiveMarker[];
   cameras?: CameraMarker[];
   predictedPath?: LatLngExpression[] | null;
+  /** Uncertainty cone around the predicted path — a polygon (apex at the
+   *  drone, widening with the Kalman heading sigma). Rendered as a faint
+   *  fill under the dashed centre line. */
+  predictedCone?: [number, number][] | null;
   interceptPoint?: InterceptMarker | null;
   /** When set, the map flies to fit these points. Used by LiveDetection
    *  to zoom onto the camera + drone + predicted-path-end whenever a
@@ -130,6 +134,7 @@ export function DroneMap({
   sensitiveAreas = [],
   cameras = [],
   predictedPath = null,
+  predictedCone = null,
   interceptPoint = null,
   focusBounds = null,
   focusMaxZoom = 13,
@@ -161,9 +166,13 @@ export function DroneMap({
     };
   }, []);
 
-  const tileUrl = theme === "light"
-    ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+  // Standard OpenStreetMap tiles — keyless. The Carto basemaps used
+  // before started stamping an "API key required" watermark on
+  // anonymous requests. Dark mode is produced client-side with a CSS
+  // invert filter on .leaflet-tile (see App.tsx / index.css), so one
+  // tile source serves both themes.
+  const tileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  void theme; // theme now only drives marker colors below
   const camPinFill = theme === "light" ? "#ffffff" : "#0e1a14";
   const camThreat = "#ff4757";        // crimson when an alarm is live
   // Three distinct map-layer colors so the operator can tell them
@@ -178,7 +187,7 @@ export function DroneMap({
   return (
     <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="h-full w-full rounded-md">
       <MapViewController bounds={focusBounds} maxZoom={focusMaxZoom} redrawNonce={redrawNonce} />
-      <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' url={tileUrl} />
+      <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url={tileUrl} />
       {/* All vector overlays live under a keyed Fragment. When the tab
           becomes visible again, `redrawNonce` changes, the Fragment
           remounts, and react-leaflet re-adds every layer to the map —
@@ -214,6 +223,12 @@ export function DroneMap({
             <Popup>{m.label}</Popup>
           </CircleMarker>
         ))}
+        {predictedCone && predictedCone.length >= 3 && (
+          <Polygon
+            positions={predictedCone}
+            pathOptions={{ color: "#03B3DA", weight: 1, opacity: 0.35, fillColor: "#03B3DA", fillOpacity: 0.10, dashArray: "2 6" }}
+          />
+        )}
         {predictedPath && predictedPath.length >= 2 && (
           <Polyline positions={predictedPath} pathOptions={{ color: "#03B3DA", dashArray: "6 8", weight: 3 }} />
         )}

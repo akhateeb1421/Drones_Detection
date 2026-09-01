@@ -99,6 +99,7 @@ def _heuristic_forecast(history: pd.DataFrame, region: str, days: int) -> list[F
                 predicted_count=0.0,
                 lower=0.0,
                 upper=0.0,
+                method="heuristic",
             )
             for i in range(1, days + 1)
         ]
@@ -131,14 +132,11 @@ def _heuristic_forecast(history: pd.DataFrame, region: str, days: int) -> list[F
 
     today = datetime.now(timezone.utc).date()
 
-    # Per-region RNG so the noise is deterministic but uncorrelated
-    # across regions — they don't all jitter the same direction on the
-    # same day, which is what made every line move together before.
-    region_seed = sum(ord(c) for c in region) % 100003
-    rng = np.random.default_rng(region_seed)
-
-    # Noise sigma — 8% of the regional baseline, with a small floor so
-    # high-traffic regions don't end up looking unrealistically smooth.
+    # NOTE: an earlier version added per-region seeded Gaussian noise to
+    # every forecast point so lines "looked realistic". That is invented
+    # jitter presented as prediction — removed. Day-to-day uncertainty is
+    # expressed honestly through the lower/upper band instead; sigma here
+    # only feeds that band's width.
     sigma = max(daily_mean * 0.08, 0.15)
 
     points: list[ForecastPoint] = []
@@ -152,9 +150,8 @@ def _heuristic_forecast(history: pd.DataFrame, region: str, days: int) -> list[F
         weekly = a_week * math.cos(2 * math.pi * di_dow / 7.0) \
                + b_week * math.sin(2 * math.pi * di_dow / 7.0)
         trend  = slope * i
-        noise  = float(rng.normal(0.0, sigma))
 
-        yhat = max(0.0, daily_mean + annual + weekly + trend + noise)
+        yhat = max(0.0, daily_mean + annual + weekly + trend)
 
         # Confidence band scales with both the deterministic seasonality
         # and the noise floor — wider when seasonality is far from
@@ -173,6 +170,7 @@ def _heuristic_forecast(history: pd.DataFrame, region: str, days: int) -> list[F
                 predicted_count=ec,
                 lower=round(float(max(0.0, yhat - spread)), 3),
                 upper=round(float(yhat + spread), 3),
+                method="heuristic",
             )
         )
     return points
@@ -216,6 +214,7 @@ def forecast(db: Session, region: str | None, days: int = 30) -> list[ForecastPo
                         predicted_count=ec,
                         lower=float(max(row.get("yhat_lower", 0.0), 0.0)),
                         upper=float(max(row.get("yhat_upper", 0.0), 0.0)),
+                        method="prophet",
                     )
                 )
         except Exception:  # noqa: BLE001

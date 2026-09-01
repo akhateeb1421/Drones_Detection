@@ -7,13 +7,58 @@ export const api = axios.create({
   timeout: 30000,
 });
 
+// Session token (from /auth/login). Held in a module variable so the WS
+// helpers can read it synchronously; AuthContext persists it in
+// localStorage under "auth_token" and calls setAuthToken on load/login.
+let authToken: string | null = localStorage.getItem("auth_token");
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+}
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("admin_token");
-  if (token) {
-    config.headers["X-Admin-Token"] = token;
+  if (authToken) {
+    config.headers["Authorization"] = `Bearer ${authToken}`;
+  }
+  // Legacy shared admin token — still honoured by the backend for
+  // backwards compatibility (e.g. the admin token field on the Cameras
+  // page); the Bearer session token is the primary credential.
+  const legacy = localStorage.getItem("admin_token");
+  if (legacy) {
+    config.headers["X-Admin-Token"] = legacy;
   }
   return config;
 });
+
+// Any 401 (expired/revoked session) sends the app back to the login
+// screen via AuthContext — except for the login call itself, whose 401
+// just means "wrong password" and is handled locally.
+api.interceptors.response.use(
+  (r) => r,
+  (error) => {
+    const status = error?.response?.status;
+    const url: string = error?.config?.url ?? "";
+    if (status === 401 && !url.includes("/auth/login")) {
+      window.dispatchEvent(new Event("auth:expired"));
+    }
+    return Promise.reject(error);
+  },
+);
+
+export type LoginResponse = {
+  token: string;
+  username: string;
+  role: string;
+  expires_in_s: number;
+};
+
+export const Auth = {
+  login: (username: string, password: string) =>
+    api.post<LoginResponse>("/auth/login", { username, password }).then((r) => r.data),
+  me: () => api.get<{ username: string; role: string }>("/auth/me").then((r) => r.data),
+};
 
 export type Attack = {
   id: number;
@@ -57,8 +102,12 @@ export type Track = {
 };
 
 // Convenience helper: URL the frontend uses to load a track's thumbnail JPEG.
+// <img> tags can't send the Authorization header, so the session token
+// rides along as ?token= — the backend accepts it for exactly this case.
 export function trackThumbUrl(trackDbId: number): string {
-  return `${baseURL}/detections/tracks/${trackDbId}/thumb`;
+  const token = getAuthToken();
+  const q = token ? `?token=${encodeURIComponent(token)}` : "";
+  return `${baseURL}/detections/tracks/${trackDbId}/thumb${q}`;
 }
 
 export type Camera = {
@@ -106,6 +155,11 @@ export type ForecastPoint = {
   // still satisfy the type.
   date?: string;
   predicted_count?: number;
+  // Legacy alias some chart code still reads.
+  count?: number;
+  // 'prophet' (trained artifact) or 'heuristic' (seasonal fallback) —
+  // lets the UI label fallback forecasts honestly.
+  method?: string;
 };
 
 export type TimelinePoint = {
@@ -113,6 +167,8 @@ export type TimelinePoint = {
   count: number;
   // Alias of `period`. Optional for backwards compat.
   date?: string;
+  // Legacy alias some chart code still reads.
+  month?: string;
 };
 export type RegionStat = { region: string; count: number };
 export type TypeStat = { attack_type: string; count: number };

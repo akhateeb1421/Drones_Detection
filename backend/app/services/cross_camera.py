@@ -2,11 +2,12 @@
 
 When a brand-new track appears on Camera B, look at recently-active tracks
 on OTHER cameras. If one of them ended within the last few seconds at a
-position whose forward projection (last lat/lon + speed * elapsed * heading)
-lands close to where Camera B picked the drone up, treat them as the same
-drone and store the link.
+position whose forward projection (last lat/lon + last speed * elapsed *
+heading) lands close to where Camera B picked the drone up, treat them as
+the same drone and store the link.
 
-Spatial-temporal matching only — no visual re-identification.
+Spatial-temporal matching plus a class-compatibility gate — no visual
+re-identification.
 """
 
 from __future__ import annotations
@@ -28,6 +29,32 @@ MAX_AGE_S = 12.0
 # How close the forward-projected position has to be to count as a match (meters).
 MAX_GAP_M = 1500.0
 
+# Class-compatibility groups: a candidate only links when both sightings
+# fall in the same group. Prevents a bird track from being merged with a
+# Shahed sighting just because the geometry happens to line up.
+_HOSTILE = {
+    "shahed", "shahed_136", "shahed-136", "shahed136",
+    "orlan", "orlan-10", "orlan10", "orlan_10",
+    "dji", "drone",
+}
+
+
+def _class_group(cls: str | None) -> str:
+    c = str(cls or "").lower().strip()
+    if c in _HOSTILE:
+        return "hostile"
+    return c or "unknown"
+
+
+def classes_compatible(class_a: str | None, class_b: str | None) -> bool:
+    """True when two sightings may be the same object. All hostile drone
+    classes are mutually compatible (the per-frame class vote can flip
+    between DJI/Shahed spellings); non-hostile classes must match exactly."""
+    ga, gb = _class_group(class_a), _class_group(class_b)
+    if "unknown" in (ga, gb):
+        return False
+    return ga == gb
+
 
 def _project(lat: float, lon: float, heading_deg: float, speed_mps: float, dt_s: float) -> tuple[float, float]:
     distance = max(speed_mps, 0.0) * max(dt_s, 0.0)
@@ -35,12 +62,20 @@ def _project(lat: float, lon: float, heading_deg: float, speed_mps: float, dt_s:
     return offset_meters(lat, lon, distance * math.cos(bearing), distance * math.sin(bearing))
 
 
-def find_link(db: Session, camera_id: int, lat: float, lon: float, now: datetime) -> Track | None:
+def find_link(
+    db: Session,
+    camera_id: int,
+    lat: float,
+    lon: float,
+    now: datetime,
+    drone_class: str | None = None,
+) -> Track | None:
     """Return a Track from a different camera that probably matches this new sighting.
 
-    Uses each candidate's last known speed + heading + elapsed time to project
-    where it would be NOW, then picks the closest projection within MAX_GAP_M.
-    Returns None if no good match.
+    Uses each candidate's LAST OBSERVED speed + heading + elapsed time to
+    project where it would be NOW, then picks the closest projection within
+    MAX_GAP_M. Candidates with an incompatible class, or with no recorded
+    heading, are skipped. Returns None if no good match.
     """
     cutoff = now - timedelta(seconds=MAX_AGE_S)
     candidates = db.execute(
@@ -58,9 +93,22 @@ def find_link(db: Session, camera_id: int, lat: float, lon: float, now: datetime
     for t in candidates:
         if t.last_lat is None or t.last_lon is None:
             continue
+        # A candidate with no heading can't be projected forward — assuming
+        # "due North" (the old behavior) produced arbitrary matches.
+        if t.last_heading_deg is None:
+            continue
+        if drone_class is not None and not classes_compatible(drone_class, t.voted_class):
+            continue
         dt_s = (now - t.last_seen_at).total_seconds()
-        heading = float(t.last_heading_deg) if t.last_heading_deg is not None else 0.0
-        speed = float(t.max_speed_mps) if t.max_speed_mps is not None else 0.0
+        heading = float(t.last_heading_deg)
+        # Prefer the most recent speed; fall back to the historical max
+        # only for rows written before the last_speed_mps column existed.
+        if t.last_speed_mps is not None:
+            speed = float(t.last_speed_mps)
+        elif t.max_speed_mps is not None:
+            speed = float(t.max_speed_mps)
+        else:
+            speed = 0.0
         proj_lat, proj_lon = _project(float(t.last_lat), float(t.last_lon), heading, speed, dt_s)
         d = haversine_m(lat, lon, proj_lat, proj_lon)
         if d <= best_dist:

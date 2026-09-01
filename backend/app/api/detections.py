@@ -10,12 +10,16 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
-from app.core.security import require_admin
+from app.core.security import AuthUser, require_admin, require_user
+from app.services.audit import audit
 from app.models import Attack, Camera, Detection, Track
 from app.schemas.detection import ApprovalOut, ApproveIn, DetectionOut, TrackOut
 from app.services.synthetic import _region_for  # canonicalize "Area-A" -> "Riyadh"
 
-router = APIRouter(prefix="/detections", tags=["detections"])
+router = APIRouter(
+    prefix="/detections", tags=["detections"],
+    dependencies=[Depends(require_user)],
+)
 
 
 @router.get("/tracks/{track_id}/thumb")
@@ -24,7 +28,7 @@ def track_thumbnail(track_id: int, db: Session = Depends(get_db)):
     track = db.get(Track, track_id)
     if track is None or not track.thumbnail_path:
         raise HTTPException(status_code=404, detail="No thumbnail.")
-    base = Path(get_settings().thumbnail_dir).resolve()
+    base = get_settings().resolve_path(get_settings().thumbnail_dir)
     full = base / track.thumbnail_path
     if not full.exists():
         raise HTTPException(status_code=404, detail="Thumbnail file missing.")
@@ -67,7 +71,7 @@ def list_tracks(
     # the pending-approvals queue.
     try:
         from app.services.moondream import describe_thumbnail
-        thumb_dir = Path(get_settings().thumbnail_dir).resolve()
+        thumb_dir = get_settings().resolve_path(get_settings().thumbnail_dir)
     except Exception:  # noqa: BLE001
         describe_thumbnail = None  # type: ignore[assignment]
         thumb_dir = None  # type: ignore[assignment]
@@ -115,7 +119,7 @@ def approve_track(
     track_id: int,
     body: ApproveIn,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    user: AuthUser = Depends(require_admin),
 ) -> ApprovalOut:
     if body.outcome not in _ALLOWED_OUTCOMES:
         raise HTTPException(
@@ -126,6 +130,28 @@ def approve_track(
     track = _find_track(db, camera_id, track_id)
     if track.status == "approved":
         raise HTTPException(status_code=409, detail="Already approved.")
+
+    # Cross-camera duplicate guard: two cameras tracking the SAME drone are
+    # linked rows. Approving each would create two Attack rows for one
+    # incident and double-count it in every analytic. Walk the link chain
+    # and refuse when any ancestor is already approved.
+    seen_ids: set[int] = set()
+    parent_id = track.linked_track_id
+    while parent_id is not None and parent_id not in seen_ids:
+        seen_ids.add(parent_id)
+        parent = db.get(Track, parent_id)
+        if parent is None:
+            break
+        if parent.status == "approved":
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "This sighting is linked to a drone already approved on "
+                    f"camera {parent.camera_id} (track #{parent.track_id}) — "
+                    "approving it again would double-count the attack."
+                ),
+            )
+        parent_id = parent.linked_track_id
 
     # Snapshot the most recent detection for this track to write the attack row.
     latest = db.execute(
@@ -153,12 +179,16 @@ def approve_track(
         direction=latest.direction,
         nearest_area=latest.nearest_area,
         eta_s=latest.eta_s,
-        approved_by="admin",
+        approved_by=user.username,
     )
     db.add(attack)
     track.status = "approved"
     track.reviewed_at = datetime.now(timezone.utc)
     track.outcome = body.outcome
+    audit(db, user.username, "track_approve", {
+        "camera_id": camera_id, "track_id": track_id, "outcome": body.outcome,
+        "drone_class": latest.drone_class,
+    })
     db.commit()
     db.refresh(attack)
     return ApprovalOut(
@@ -174,18 +204,22 @@ def reject_track(
     camera_id: int,
     track_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    user: AuthUser = Depends(require_admin),
 ) -> ApprovalOut:
     track = _find_track(db, camera_id, track_id)
     track.status = "rejected"
     track.reviewed_at = datetime.now(timezone.utc)
     track.outcome = None
+    audit(db, user.username, "track_reject", {"camera_id": camera_id, "track_id": track_id})
     db.commit()
     return ApprovalOut(track_id=track_id, status="rejected")
 
 
 @router.get("/debug")
-def debug_state(db: Session = Depends(get_db)) -> dict:
+def debug_state(
+    db: Session = Depends(get_db),
+    _: AuthUser = Depends(require_admin),
+) -> dict:
     """Diagnostic snapshot of the live-detection pipeline state.
 
     Hit this from a browser or `curl http://localhost:8000/detections/debug`
@@ -251,7 +285,7 @@ def debug_state(db: Session = Depends(get_db)) -> dict:
 @router.post("/admin/reset-rejected")
 def reset_rejected_tracks(
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    user: AuthUser = Depends(require_admin),
 ) -> dict:
     """Flip every Track currently marked `rejected` back to `pending`.
 
@@ -274,6 +308,7 @@ def reset_rejected_tracks(
         track.reviewed_at = None
         track.outcome = None
         count += 1
+    audit(db, user.username, "tracks_reset_rejected", {"count": count})
     db.commit()
     return {"reset": count}
 

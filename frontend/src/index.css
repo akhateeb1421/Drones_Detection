@@ -83,7 +83,13 @@ body {
    marker "disappearing" whenever the operator clicked west/north/etc. */
 .leaflet-container { background: #08101a !important; position: relative; z-index: 0; isolation: isolate; }
 .leaflet-top, .leaflet-bottom { z-index: 1000; }
-.leaflet-tile { filter: saturate(0.6) brightness(0.75) hue-rotate(140deg); }
+/* Dark mode renders the (light) OSM tiles through an inversion so the
+   basemap reads as a night map; light mode shows them untouched. The
+   old saturate/brightness recipe was tuned for Carto's dark tiles,
+   which now watermark anonymous use. */
+.leaflet-tile { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.35); }
+html.light .leaflet-tile { filter: none; }
+html.light .leaflet-container { background: #dfe8e4 !important; }
 /* Leaflet popups always render on a white bubble — force dark text
    regardless of theme so the popup body never inherits a light
    --text-primary (invisible-on-white in dark mode). */

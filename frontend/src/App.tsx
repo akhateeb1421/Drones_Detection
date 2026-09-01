@@ -4,8 +4,9 @@ import { LanguageToggle } from "./components/LanguageToggle";
 import { AlarmBanner } from "./components/AlarmBanner";
 import { RoleToggle } from "./components/RoleToggle";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { AdminSignInButton } from "./components/AdminSignInButton";
+import { LoginPage } from "./components/LoginPage";
 import { AlarmsProvider, useAlarmsContext } from "./contexts/AlarmsContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { RoleProvider, useRole } from "./contexts/RoleContext";
 import { ChatbotProvider } from "./contexts/ChatbotContext";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
@@ -79,7 +80,8 @@ function SbLabel({ label }: { label: string }) {
 
 function Shell() {
   const { t, i18n } = useTranslation();
-  const { role, setRole } = useRole();
+  const { role } = useRole();
+  const { user, logout } = useAuth();
   const { theme } = useTheme();
   const isAdmin = role === "admin";
   const isAr = i18n.language === "ar";
@@ -95,7 +97,7 @@ function Shell() {
   const CHROME_BORDER = isLight ? "0.5px solid rgba(0,90,75,0.36)"
                                 : "0.5px solid rgba(1,242,207,0.10)";
 
-  const handleSignOut = () => { localStorage.removeItem("admin_token"); setRole("viewer"); };
+  const handleSignOut = () => { logout(); };
 
   return (
     <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", direction:isAr?"rtl":"ltr" }}>
@@ -243,8 +245,8 @@ function Shell() {
         .bg-danger{background:linear-gradient(135deg,#f87171,#dc2626)}
         .bg-warning{background:linear-gradient(135deg,#fbbf24,#d97706)}
         .bg-accent{background:linear-gradient(135deg,#01F2CF,#03B3DA);color:#0a1410}
-        .leaflet-container{background:#0f1f1c!important}
-        .leaflet-tile{filter:saturate(0.65) brightness(0.8) hue-rotate(140deg)}
+        .leaflet-container{background:${isLight ? "#dfe8e4" : "#0f1f1c"}!important}
+        .leaflet-tile{filter:${isLight ? "none" : "invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.35)"}}
 
         /* Recharts */
         .recharts-cartesian-axis-tick text{
@@ -377,26 +379,45 @@ function Shell() {
               <div style={{ flex:1 }}><LanguageToggle/></div>
               <div style={{ flex:1 }}><ThemeToggle/></div>
             </div>
-            {/* Sign-In (viewer) or Sign-Out (admin) — same slot, same
-                size, same shape. The Operator gets a gradient-accent
-                button to upgrade to Admin; the Admin gets a gradient-
-                red button to downgrade back to Viewer. */}
-            {isAdmin ? (
-              <button onClick={handleSignOut} style={{
-                width:"100%",padding:"10px 12px",borderRadius:11,
-                background:"linear-gradient(135deg,#f87171,#dc2626)",
-                color:"#fff",fontSize:isAr?14:13,fontWeight:700,
-                border:"none",cursor:"pointer",fontFamily:"inherit",
-                display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+            {/* Signed-in identity + sign out. Role changes now happen
+                by signing in with a different account — the server owns
+                the role, the client just displays it. */}
+            <div style={{
+              display:"flex",alignItems:"center",gap:8,
+              padding:"8px 10px",borderRadius:11,
+              background:"rgba(1,242,207,0.05)",
+              border:"0.5px solid rgba(1,242,207,0.14)",
+            }}>
+              <div style={{
+                width:26,height:26,borderRadius:"50%",flexShrink:0,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                background:isAdmin?"linear-gradient(135deg,#01F2CF,#03B3DA)":"rgba(95,160,154,0.25)",
+                color:isAdmin?"#0a1410":"#e0f5f2",
+                fontSize:12,fontWeight:800,textTransform:"uppercase",
               }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
-                </svg>
-                {t("auth.sign_out")}
-              </button>
-            ) : (
-              <AdminSignInButton/>
-            )}
+                {(user?.username ?? "?").slice(0,1)}
+              </div>
+              <div style={{ minWidth:0,flex:1 }}>
+                <div style={{ fontSize:12,fontWeight:700,color:"#e0f5f2",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                  {user?.username}
+                </div>
+                <div style={{ fontSize:10,color:"rgba(1,242,207,0.65)" }}>
+                  {isAdmin ? t("auth.role_admin") : t("auth.role_viewer")}
+                </div>
+              </div>
+            </div>
+            <button onClick={handleSignOut} style={{
+              width:"100%",padding:"10px 12px",borderRadius:11,
+              background:"linear-gradient(135deg,#f87171,#dc2626)",
+              color:"#fff",fontSize:isAr?14:13,fontWeight:700,
+              border:"none",cursor:"pointer",fontFamily:"inherit",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
+              </svg>
+              {t("auth.sign_out")}
+            </button>
           </div>
         </aside>
 
@@ -422,16 +443,35 @@ function Shell() {
   );
 }
 
+function Gate() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div style={{ minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#090d15",color:"rgba(224,245,242,0.6)",fontFamily:"system-ui" }}>
+        ...
+      </div>
+    );
+  }
+  if (!user) return <LoginPage/>;
+  // AlarmsProvider mounts INSIDE the gate so the alarms WebSocket only
+  // connects once a session token exists (the socket requires it).
+  return (
+    <AlarmsProvider>
+      <ChatbotProvider>
+        <Shell/>
+      </ChatbotProvider>
+    </AlarmsProvider>
+  );
+}
+
 export default function App() {
   return (
     <ThemeProvider>
-      <RoleProvider>
-        <AlarmsProvider>
-          <ChatbotProvider>
-            <Shell/>
-          </ChatbotProvider>
-        </AlarmsProvider>
-      </RoleProvider>
+      <AuthProvider>
+        <RoleProvider>
+          <Gate/>
+        </RoleProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
