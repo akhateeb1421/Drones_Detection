@@ -71,8 +71,8 @@ function MapViewController({
 
 const SENSITIVE_PIN = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
-    <path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 22 12.5 41 12.5 41S25 22 25 12.5C25 5.6 19.4 0 12.5 0Z" fill="#03DA9A" stroke="#0a1410" stroke-width="1.5"/>
-    <circle cx="12.5" cy="12.5" r="4.5" fill="#0a1410"/>
+    <path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 22 12.5 41 12.5 41S25 22 25 12.5C25 5.6 19.4 0 12.5 0Z" fill="#00ca7f" stroke="#020a05" stroke-width="1.5"/>
+    <circle cx="12.5" cy="12.5" r="4.5" fill="#020a05"/>
   </svg>`,
 );
 const sensitiveIcon = new Icon({
@@ -173,16 +173,16 @@ export function DroneMap({
   // tile source serves both themes.
   const tileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
   void theme; // theme now only drives marker colors below
-  const camPinFill = theme === "light" ? "#ffffff" : "#0e1a14";
-  const camThreat = "#ff4757";        // crimson when an alarm is live
+  const camPinFill = theme === "light" ? "#ffffff" : "#0c140f";
+  const camThreat = "#ff6266";        // crimson when an alarm is live
   // Three distinct map-layer colors so the operator can tell them
   // apart at a glance:
-  //   • Camera markers + sensitive pins → mint #03DA9A (friendly assets)
-  //   • Predicted path polyline         → sky  #03B3DA (future track)
+  //   • Camera markers + sensitive pins → mint #00ca7f (friendly assets)
+  //   • Predicted path polyline         → sky  #b5f745 (future track)
   //   • Predicted-now drone ghost dot   → amber #fbbf24 (warning — see LiveDetection.tsx)
   //   • Intercept point                 → purple #a78bfa (action target)
-  //   • Shahed threat                   → crimson #ff4757
-  const camNormal = "#03DA9A";
+  //   • Shahed threat                   → crimson #ff6266
+  const camNormal = "#00ca7f";
   const interceptColor = "#a78bfa";
   return (
     <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="h-full w-full rounded-md">
@@ -226,11 +226,11 @@ export function DroneMap({
         {predictedCone && predictedCone.length >= 3 && (
           <Polygon
             positions={predictedCone}
-            pathOptions={{ color: "#03B3DA", weight: 1, opacity: 0.35, fillColor: "#03B3DA", fillOpacity: 0.10, dashArray: "2 6" }}
+            pathOptions={{ color: "#b5f745", weight: 1, opacity: 0.35, fillColor: "#b5f745", fillOpacity: 0.10, dashArray: "2 6" }}
           />
         )}
         {predictedPath && predictedPath.length >= 2 && (
-          <Polyline positions={predictedPath} pathOptions={{ color: "#03B3DA", dashArray: "6 8", weight: 3 }} />
+          <Polyline positions={predictedPath} pathOptions={{ color: "#b5f745", dashArray: "6 8", weight: 3 }} />
         )}
         {interceptPoint && (
           <>

@@ -15,7 +15,9 @@
     "placement": "Camera Placement",
     "drones": "Drones",
     "about": "About",
-    "recorded": "Recorded Clip"
+    "recorded": "Recorded Clip",
+    "collapse": "Collapse",
+    "expand": "Expand"
   },
   "common": {
     "language": "Language",

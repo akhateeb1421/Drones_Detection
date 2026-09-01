@@ -79,9 +79,9 @@ export function Drones() {
                   fontSize:13, fontWeight:700,
                   transition:"all 0.15s",
                   background: isActive
-                    ? "linear-gradient(135deg,#01F2CF,#03B3DA)"
+                    ? "linear-gradient(135deg,#00ca7f,#b5f745)"
                     : "transparent",
-                  color: isActive ? "#0a1410" : "var(--text-muted)",
+                  color: isActive ? "var(--primary-foreground)" : "var(--text-muted)",
                 }}
               >
                 {t(`${d.keyBase}.name`)}

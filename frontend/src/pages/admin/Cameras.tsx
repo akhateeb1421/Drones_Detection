@@ -4,7 +4,7 @@ import { Cameras, Camera } from "../../services/api";
 import { LocationPicker } from "../../components/LocationPicker";
 import { useBilingualName } from "../../i18n/places";
 
-const C1 = "#01F2CF";
+const C1 = "#00ca7f";
 const DANGER = "#f87171";
 
 const blank: Omit<Camera, "id" | "created_at"> = {
@@ -28,7 +28,7 @@ const cardStyle: React.CSSProperties = {
 };
 const cardShine: React.CSSProperties = {
   position:"absolute", top:0, left:0, right:0, height:1,
-  background:"linear-gradient(90deg,transparent,rgba(1,242,207,0.16),transparent)",
+  background:"linear-gradient(90deg,transparent,rgba(0,202,127,0.16),transparent)",
   pointerEvents:"none",
 };
 const labelStyle: React.CSSProperties = {
@@ -60,8 +60,8 @@ function FormInput({ label, value, onChange, type="text", placeholder="", requir
         type={type} value={value} placeholder={placeholder} required={required}
         onChange={e => onChange(type==="number" ? Number(e.target.value) : e.target.value)}
         style={inputStyle}
-        onFocus={e=>{e.currentTarget.style.borderColor="rgba(1,242,207,0.48)";e.currentTarget.style.boxShadow="0 0 0 3px rgba(1,242,207,0.09)"}}
-        onBlur={e=>{e.currentTarget.style.borderColor="rgba(1,242,207,0.14)";e.currentTarget.style.boxShadow="none"}}
+        onFocus={e=>{e.currentTarget.style.borderColor="rgba(0,202,127,0.48)";e.currentTarget.style.boxShadow="0 0 0 3px rgba(0,202,127,0.09)"}}
+        onBlur={e=>{e.currentTarget.style.borderColor="rgba(0,202,127,0.14)";e.currentTarget.style.boxShadow="none"}}
       />
     </div>
   );
@@ -183,12 +183,12 @@ export function CamerasAdmin() {
             onChange={e => { setToken(e.target.value); localStorage.setItem("admin_token", e.target.value); }}
             style={{ ...inputStyle, flex:1 }}
             placeholder="••••••••••••"
-            onFocus={e=>{e.currentTarget.style.borderColor="rgba(1,242,207,0.48)"}}
-            onBlur={e=>{e.currentTarget.style.borderColor="rgba(1,242,207,0.14)"}}
+            onFocus={e=>{e.currentTarget.style.borderColor="rgba(0,202,127,0.48)"}}
+            onBlur={e=>{e.currentTarget.style.borderColor="rgba(0,202,127,0.14)"}}
           />
           <button
             onClick={() => localStorage.setItem("admin_token", token)}
-            style={{ padding:"11px 18px",borderRadius:11,background:`linear-gradient(135deg,${C1},#03B3DA)`,color:"#0a1410",fontWeight:700,fontSize:14,border:"none",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit" }}
+            style={{ padding:"11px 18px",borderRadius:11,background:`linear-gradient(135deg,${C1},#b5f745)`,color:"var(--primary-foreground)",fontWeight:700,fontSize:14,border:"none",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit" }}
           >
             {t("admin.save_token","Save token")}
           </button>
@@ -219,13 +219,13 @@ export function CamerasAdmin() {
           <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10 }}>
             <div style={{ fontSize:13,color:"var(--text-muted)" }}>{t("cameras.pick_on_map","Pick on map")}</div>
             <button type="button" onClick={()=>setShowMap(v=>!v)}
-              style={{ padding:"8px 14px",borderRadius:10,background:"rgba(1,242,207,0.07)",border:"0.5px solid rgba(1,242,207,0.18)",color:"var(--text-primary)",fontSize:13,cursor:"pointer",fontFamily:"inherit" }}>
+              style={{ padding:"8px 14px",borderRadius:10,background:"rgba(0,202,127,0.07)",border:"0.5px solid rgba(0,202,127,0.18)",color:"var(--text-primary)",fontSize:13,cursor:"pointer",fontFamily:"inherit" }}>
               {showMap ? t("cameras.hide_map","Hide map") : t("cameras.show_map","Show map")}
             </button>
           </div>
 
           {showMap && (
-            <div style={{ height:320,borderRadius:12,overflow:"hidden",marginBottom:14,border:"0.5px solid rgba(1,242,207,0.10)" }}>
+            <div style={{ height:320,borderRadius:12,overflow:"hidden",marginBottom:14,border:"0.5px solid rgba(0,202,127,0.10)" }}>
               <LocationPicker lat={draft.latitude} lon={draft.longitude}
                 onChange={(lat,lon)=>setDraft(d=>({...d,latitude:lat,longitude:lon}))}/>
             </div>
@@ -260,7 +260,7 @@ export function CamerasAdmin() {
                 </button>
               )}
               <button type="submit"
-                style={{ padding:"11px 24px",borderRadius:11,background:`linear-gradient(135deg,${C1},#03DA9A)`,color:"#0a1410",fontWeight:700,fontSize:14,border:"none",cursor:"pointer",fontFamily:"inherit",boxShadow:"0 0 14px rgba(1,242,207,0.25)" }}>
+                style={{ padding:"11px 24px",borderRadius:11,background:`linear-gradient(135deg,${C1},#00ca7f)`,color:"var(--primary-foreground)",fontWeight:700,fontSize:14,border:"none",cursor:"pointer",fontFamily:"inherit",boxShadow:"0 0 14px rgba(0,202,127,0.25)" }}>
                 {editingId !== null
                   ? t("common.save","Save changes")
                   : t("cameras.add","Add Camera")}
@@ -297,9 +297,9 @@ export function CamerasAdmin() {
                   <td className="px-5 text-start font-data"><span dir="ltr">{cam.heading_deg}°</span></td>
                   <td className="px-5 text-start">
                     <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:20, fontSize:11, fontWeight:700,
-                      background: cam.enabled ? "rgba(1,242,207,0.10)" : "rgba(95,160,154,0.08)",
+                      background: cam.enabled ? "rgba(0,202,127,0.10)" : "rgba(95,160,154,0.08)",
                       color: cam.enabled ? C1 : "var(--text-muted)",
-                      border: `0.5px solid ${cam.enabled ? "rgba(1,242,207,0.22)" : "rgba(95,160,154,0.18)"}`,
+                      border: `0.5px solid ${cam.enabled ? "rgba(0,202,127,0.22)" : "rgba(95,160,154,0.18)"}`,
                     }}>
                       {cam.enabled ? "✓" : "✗"} {cam.enabled ? t("cameras.active","Active") : t("cameras.inactive","Off")}
                     </span>
@@ -308,8 +308,8 @@ export function CamerasAdmin() {
                     <div style={{ display:"inline-flex", gap:6 }}>
                       <button onClick={() => startEdit(cam)}
                         style={{ padding:"8px 14px", borderRadius:10,
-                          background: `linear-gradient(135deg,${C1},#03DA9A)`,
-                          color:"#0a1410", fontWeight:700, fontSize:13,
+                          background: `linear-gradient(135deg,${C1},#00ca7f)`,
+                          color:"var(--primary-foreground)", fontWeight:700, fontSize:13,
                           border:"none", cursor:"pointer", fontFamily:"inherit" }}>
                         {t("common.edit","Edit")}
                       </button>

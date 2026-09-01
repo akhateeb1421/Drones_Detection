@@ -63,7 +63,7 @@ export function ToastHost() {
               // stay light. Inline color overrides the index.css light-
               // mode `text-slate-100` rule which would otherwise make
               // the text near-black on the dark bg (1.2:1 — unreadable).
-              color: "#e0f5f2",
+              color: "var(--foreground)",
               border: `1px solid ${s.border}`,
               boxShadow: `0 0 0 1px ${s.tint} inset`,
             }}

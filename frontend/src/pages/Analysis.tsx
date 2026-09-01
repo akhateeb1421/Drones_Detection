@@ -7,9 +7,9 @@ import {
 import { Analysis as AnalysisAPI, Predictions, ForecastPoint, TimelinePoint } from "../services/api";
 import { usePlaceLabel } from "../i18n/places";
 
-const C1 = "#01F2CF";
-const C2 = "#03DA9A";
-const C3 = "#03B3DA";
+const C1 = "#00ca7f";
+const C2 = "#00ca7f";
+const C3 = "#b5f745";
 const DANGER = "#f87171";
 const WARN = "#fbbf24";
 const PURPLE = "#a78bfa";
@@ -41,11 +41,11 @@ const TTI: React.CSSProperties = { color: "var(--text-muted)" };
 // Axis tick labels need to read on white cards in light mode — use
 // --text-muted (the html.light grid override in index.css upgrades
 // the cyan grid stroke for light too).
-const GRID = { stroke: "rgba(1,242,207,0.05)", strokeDasharray: "4 4" };
+const GRID = { stroke: "rgba(0,202,127,0.05)", strokeDasharray: "4 4" };
 const AXIS = { fill: "var(--text-muted)", fontSize: 11 };
 
 function CardShine() {
-  return <div style={{ position:"absolute",top:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,rgba(1,242,207,0.16),transparent)",pointerEvents:"none" }}/>;
+  return <div style={{ position:"absolute",top:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,rgba(0,202,127,0.16),transparent)",pointerEvents:"none" }}/>;
 }
 function Tag({ label }: { label: string }) {
   return <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"var(--text-muted)",marginBottom:4 }}>{label}</div>;
@@ -163,7 +163,7 @@ export function Analysis() {
                 <Tooltip contentStyle={TT} labelStyle={TTL} itemStyle={TTI}/>
                 <Area type="monotone" dataKey="count" name={t("analysis.attacks","الهجمات")}
                   stroke={C1} strokeWidth={2.5} fill="url(#tg1)"
-                  dot={false} activeDot={{ r:5,fill:C1,stroke:"#0d1117",strokeWidth:2 }}/>
+                  dot={false} activeDot={{ r:5,fill:C1,stroke:"#050806",strokeWidth:2 }}/>
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -188,7 +188,7 @@ export function Analysis() {
               <button key={d} onClick={() => setHorizon(d)}
                 style={{ padding:"6px 12px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s",
                   background: horizon===d ? `linear-gradient(135deg,${C1},${C3})` : "transparent",
-                  color: horizon===d ? "#0a1410" : "var(--text-muted)",
+                  color: horizon===d ? "var(--primary-foreground)" : "var(--text-muted)",
                 }}
                 title={d === 365 ? t("analysis.year_horizon","سنة كاملة") : `${d} ${t("analysis.days","يوم")}`}>
                 {d === 365 ? t("analysis.year_label","سنة") : d}

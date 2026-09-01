@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # Legacy shared admin token. Still accepted (X-Admin-Token header) so
     # existing tooling keeps working, but the primary auth is now
     # username/password accounts + signed session tokens (see /auth/login).
-    admin_token: str = ""
+    admin_token: str = "replace_me"
     # Secret used to sign session tokens. If left empty, a secret is
     # derived from admin_token — set AUTH_SECRET explicitly in production.
     auth_secret: str = ""
@@ -53,9 +53,9 @@ class Settings(BaseSettings):
     # empty. Change these in .env before first run; passwords can also be
     # changed later directly in the DB (pbkdf2 hashes via app.core.security).
     admin_username: str = "admin"
-    admin_password: str = "admin"      # empty -> falls back to admin_token value
+    admin_password: str = ""      # empty -> falls back to admin_token value
     operator_username: str = "operator"
-    operator_password: str = "operator"   # empty -> "operator" (with a loud warning)
+    operator_password: str = ""   # empty -> "operator" (with a loud warning)
 
     # YOLO + tracker
     # `yolo_weights` is the LEGACY single-file fallback — used when neither
@@ -145,6 +145,16 @@ class Settings(BaseSettings):
     # drone reads too fast, lower it; too slow, raise it. ~350 m makes a
     # target that crosses ~40 % of the frame in the 5 s clip read ~180 km/h.
     recorded_clip_distance_m: float = 60.0
+
+    # Spurious-track filter for the recorded clip. The clip runs an
+    # ultra-low confidence floor (yolo_conf_video, default 0.01) so the
+    # tiny distant demo drone is caught — but that floor also lets faint
+    # noise blobs open short-lived tracks (the "dji that isn't in the
+    # clip"). A real drone crossing the clip is detected across many
+    # frames and reaches a modest peak confidence at least once; a track
+    # that achieves NEITHER is discarded after the full-clip analysis.
+    recorded_clip_min_track_frames: int = 5
+    recorded_clip_min_track_conf: float = 0.12
 
     # Dashboard playback speed multiplier for the recorded clip. This ONLY
     # affects how fast the cached clip is replayed to the dashboard — the

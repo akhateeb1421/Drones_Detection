@@ -1,64 +1,29 @@
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../contexts/ThemeContext";
 
-/**
- * Small circular sun/moon button that flips between dark and light modes.
- * Persists the choice via ThemeContext (localStorage-backed).
- */
 export function ThemeToggle() {
   const { t } = useTranslation();
   const { theme, toggle } = useTheme();
   const isDark = theme === "dark";
-  const aria = isDark ? t("theme.switch_to_light") : t("theme.switch_to_dark");
+  const label  = isDark ? t("theme.switch_to_light","Switch to light mode") : t("theme.switch_to_dark","Switch to dark mode");
+  const Sun = () => (
+    <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0 }}>
+      <circle cx="10" cy="10" r="3.4"/>
+      <line x1="10" y1="1.6" x2="10" y2="3.4"/>  <line x1="10" y1="16.6" x2="10" y2="18.4"/>
+      <line x1="1.6" y1="10" x2="3.4" y2="10"/>  <line x1="16.6" y1="10" x2="18.4" y2="10"/>
+      <line x1="3.7" y1="3.7" x2="4.9" y2="4.9"/>  <line x1="15.1" y1="15.1" x2="16.3" y2="16.3"/>
+      <line x1="3.7" y1="16.3" x2="4.9" y2="15.1"/> <line x1="15.1" y1="4.9" x2="16.3" y2="3.7"/>
+    </svg>
+  );
+  const Moon = () => (
+    <svg viewBox="0 0 20 20" width="17" height="17" fill="currentColor" style={{ flexShrink:0 }}>
+      <path d="M14.5 13.5A6 6 0 0 1 7 5.7a.7.7 0 0 0-1-.78A7.5 7.5 0 1 0 15.3 14.5a.7.7 0 0 0-.78-1Z"/>
+    </svg>
+  );
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      title={aria}
-      aria-label={aria}
-      // Mirror LanguageToggle's pill design — same border radius,
-      // border color, background tint, padding, height — so the two
-      // sidebar-bottom controls read as a matched pair instead of a
-      // pill + an orphan circle.
-      style={{
-        // Same dimensions and styling as LanguageToggle so the two
-        // pills look identical side-by-side in the sidebar bottom.
-        width: "100%",
-        height: 40,
-        padding: "0 12px",
-        borderRadius: 11,
-        background: "rgba(1,242,207,0.07)",
-        border: "0.5px solid var(--border-medium)",
-        color: "var(--text-primary)",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "inherit",
-        transition: "all 0.15s",
-      }}
-      onMouseEnter={(e)=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(1,242,207,0.12)";}}
-      onMouseLeave={(e)=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(1,242,207,0.07)";}}
-    >
-      {isDark ? (
-        // Sun glyph (means: click to go light)
-        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="10" cy="10" r="3.4" />
-          <line x1="10" y1="2" x2="10" y2="4" />
-          <line x1="10" y1="16" x2="10" y2="18" />
-          <line x1="2" y1="10" x2="4" y2="10" />
-          <line x1="16" y1="10" x2="18" y2="10" />
-          <line x1="4.2" y1="4.2" x2="5.6" y2="5.6" />
-          <line x1="14.4" y1="14.4" x2="15.8" y2="15.8" />
-          <line x1="4.2" y1="15.8" x2="5.6" y2="14.4" />
-          <line x1="14.4" y1="5.6" x2="15.8" y2="4.2" />
-        </svg>
-      ) : (
-        // Moon glyph (means: click to go dark)
-        <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true">
-          <path d="M14.5 13.5A6 6 0 0 1 7 5.7a.7.7 0 0 0-1-.78A7.5 7.5 0 1 0 15.3 14.5a.7.7 0 0 0-.78-1Z" />
-        </svg>
-      )}
+    <button type="button" onClick={toggle} title={label} aria-label={label} className="sidebar-ctrl" style={{ fontFamily:"inherit" }}>
+      {isDark ? <Sun/> : <Moon/>}
+      <span className="sidebar-ctrl-label">{label}</span>
     </button>
   );
 }

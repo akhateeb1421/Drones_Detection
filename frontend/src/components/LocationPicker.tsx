@@ -5,8 +5,8 @@ import { useTheme } from "../contexts/ThemeContext";
 
 const PIN_SVG = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
-    <path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 22 12.5 41 12.5 41S25 22 25 12.5C25 5.6 19.4 0 12.5 0Z" fill="#03DA9A" stroke="#0a1410" stroke-width="1.5"/>
-    <circle cx="12.5" cy="12.5" r="4.5" fill="#0a1410"/>
+    <path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 22 12.5 41 12.5 41S25 22 25 12.5C25 5.6 19.4 0 12.5 0Z" fill="#00ca7f" stroke="#020a05" stroke-width="1.5"/>
+    <circle cx="12.5" cy="12.5" r="4.5" fill="#020a05"/>
   </svg>`,
 );
 const pinIcon = new Icon({

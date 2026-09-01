@@ -20,7 +20,7 @@ from pathlib import Path
 
 import cv2  # type: ignore[import-untyped]
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete, select
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
@@ -264,6 +264,41 @@ async def _run_recorded_clip(
         finally:
             cap.release()
 
+        # ── Spurious-track filter ──────────────────────────────────────
+        # Drop tracks that never looked like a real object: fewer than
+        # recorded_clip_min_track_frames detections across the whole clip,
+        # or a peak confidence below recorded_clip_min_track_conf. These
+        # are noise blobs admitted by the clip's ultra-low conf floor —
+        # the classic symptom is a phantom "dji" box for a few frames.
+        track_stats: dict[int, dict] = {}
+        for enriched, _thr, _fi in frame_dets:
+            for d in enriched:
+                st = track_stats.setdefault(d["track_id"], {"frames": 0, "max_conf": 0.0})
+                st["frames"] += 1
+                st["max_conf"] = max(st["max_conf"], float(d["confidence"]))
+        spurious = {
+            tid for tid, st in track_stats.items()
+            if st["frames"] < settings.recorded_clip_min_track_frames
+            or st["max_conf"] < settings.recorded_clip_min_track_conf
+        }
+        if spurious:
+            log.info(
+                "Recorded clip cam=%s: dropping %d spurious track(s) %s "
+                "(fewer than %d frames or peak conf < %.2f).",
+                camera_id, len(spurious),
+                {t: track_stats[t] for t in spurious},
+                settings.recorded_clip_min_track_frames,
+                settings.recorded_clip_min_track_conf,
+            )
+            frame_dets = [
+                (
+                    [d for d in enriched if d["track_id"] not in spurious],
+                    [thr for thr in threats if thr.get("track_id") not in spurious],
+                    fi,
+                )
+                for enriched, threats, fi in frame_dets
+            ]
+
         # ── Retroactive class vote (confidence-weighted, whole clip) ───
         class_weight: dict[int, dict[str, float]] = {}
         for enriched, _thr, _fi in frame_dets:
@@ -344,14 +379,33 @@ async def _run_recorded_clip(
     # so re-runs are idempotent (an already-approved/rejected track is only
     # flipped back to pending after a >60s gap — see the REUSED branch).
     persist_list = cached.get("persist", [])
+    current_ids = {d["track_id"] for _fi, enriched in persist_list for d in enriched}
+    with SessionLocal() as db:
+        for fidx, enriched in persist_list:
+            if enriched:
+                _persist(
+                    db, camera_id, fidx, enriched,
+                    cam_lat=pipeline.cam.latitude, cam_lon=pipeline.cam.longitude,
+                )
+        # Purge ghost PENDING rows for this camera: tracks left over from
+        # previous runs / older code that this analysis did not produce
+        # (e.g. phantom "dji" entries). Reviewed rows (approved/rejected)
+        # are never touched.
+        stale_q = (
+            sa_delete(Track)
+            .where(Track.camera_id == camera_id)
+            .where(Track.status == "pending")
+        )
+        if current_ids:
+            stale_q = stale_q.where(Track.track_id.not_in(current_ids))
+        res = db.execute(stale_q)
+        if res.rowcount:
+            log.info(
+                "Recorded clip cam=%s: purged %d stale pending track(s) not present "
+                "in the current analysis.", camera_id, res.rowcount,
+            )
+        db.commit()
     if persist_list:
-        with SessionLocal() as db:
-            for fidx, enriched in persist_list:
-                if enriched:
-                    _persist(
-                        db, camera_id, fidx, enriched,
-                        cam_lat=pipeline.cam.latitude, cam_lon=pipeline.cam.longitude,
-                    )
         log.info(
             "Recorded clip cam=%s: persisted %d detected frame(s) to pending queue.",
             camera_id, len(persist_list),

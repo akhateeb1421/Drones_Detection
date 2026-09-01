@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
+import { BrandLogo } from "./BrandLogo";
 
 /**
  * Full-screen sign-in gate. Every user — operator and admin alike — signs
@@ -42,7 +43,7 @@ export function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "radial-gradient(1200px 600px at 50% -10%, rgba(1,242,207,0.08), transparent), #090d15",
+        background: "radial-gradient(1200px 600px at 50% -10%, rgba(0,202,127,0.10), transparent), #050806",
         fontFamily: isAr ? "'Tajawal', system-ui, sans-serif" : "'Inter', system-ui, sans-serif",
         padding: 16,
       }}
@@ -53,8 +54,8 @@ export function LoginPage() {
         style={{
           width: "100%",
           maxWidth: 380,
-          background: "rgba(14,22,32,0.9)",
-          border: "1px solid rgba(1,242,207,0.14)",
+          background: "rgba(12,20,15,0.92)",
+          border: "1px solid rgba(0,202,127,0.14)",
           borderRadius: 18,
           padding: "34px 30px",
           display: "flex",
@@ -64,39 +65,31 @@ export function LoginPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-          <div
-            style={{
-              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: "rgba(1,242,207,0.06)",
-              border: "0.5px solid rgba(1,242,207,0.22)",
-              boxShadow: "0 0 20px rgba(1,242,207,0.18)",
-            }}
-          >
-            <img src="/logo.svg" alt="رقيب" width="30" height="30" style={{ display: "block" }} />
+          <div style={{ flexShrink: 0 }}>
+            <BrandLogo size={44} />
           </div>
           <div>
             <div
               style={{
                 fontSize: 22, fontWeight: 800, lineHeight: 1.1,
-                background: "linear-gradient(90deg,#01F2CF,#03DA9A 50%,#03B3DA)",
+                background: "linear-gradient(90deg,#00ca7f,#b5f745)",
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
               }}
             >
               رقيب
             </div>
-            <div style={{ fontSize: 11, color: "rgba(224,245,242,0.75)", marginTop: 1 }}>
+            <div style={{ fontSize: 11, color: "rgba(235,245,240,0.75)", marginTop: 1 }}>
               {isAr ? "منظومة الدفاع ضد المسيّرات" : "Counter-UAS Defense System"}
             </div>
           </div>
         </div>
 
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#e0f5f2" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#f2f7f4" }}>
           {t("auth.login_title", "Sign in")}
         </div>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(1,242,207,0.65)" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(0,202,127,0.65)" }}>
             {t("auth.username", "Username")}
           </span>
           <input
@@ -106,14 +99,14 @@ export function LoginPage() {
             autoFocus
             dir="ltr"
             style={{
-              background: "rgba(9,13,21,0.8)", border: "0.5px solid rgba(1,242,207,0.2)",
-              borderRadius: 11, padding: "11px 14px", color: "#e0f5f2", fontSize: 14, fontFamily: "inherit",
+              background: "rgba(5,8,6,0.8)", border: "0.5px solid rgba(0,202,127,0.2)",
+              borderRadius: 11, padding: "11px 14px", color: "var(--foreground)", fontSize: 14, fontFamily: "inherit",
             }}
           />
         </label>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(1,242,207,0.65)" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(0,202,127,0.65)" }}>
             {t("auth.password", "Password")}
           </span>
           <input
@@ -123,14 +116,14 @@ export function LoginPage() {
             autoComplete="current-password"
             dir="ltr"
             style={{
-              background: "rgba(9,13,21,0.8)", border: "0.5px solid rgba(1,242,207,0.2)",
-              borderRadius: 11, padding: "11px 14px", color: "#e0f5f2", fontSize: 14, fontFamily: "inherit",
+              background: "rgba(5,8,6,0.8)", border: "0.5px solid rgba(0,202,127,0.2)",
+              borderRadius: 11, padding: "11px 14px", color: "var(--foreground)", fontSize: 14, fontFamily: "inherit",
             }}
           />
         </label>
 
         {error && (
-          <div style={{ fontSize: 13, color: "#f87171" }}>{error}</div>
+          <div style={{ fontSize: 13, color: "#ff6266" }}>{error}</div>
         )}
 
         <button
@@ -138,11 +131,11 @@ export function LoginPage() {
           disabled={busy}
           style={{
             marginTop: 4,
-            background: "linear-gradient(135deg,#01F2CF,#03DA9A 50%,#03B3DA)",
-            color: "#0a1410", fontWeight: 700, border: "none", borderRadius: 11,
+            background: "linear-gradient(135deg,#00ca7f,#b5f745)",
+            color: "#020a05", fontWeight: 700, border: "none", borderRadius: 11,
             padding: "12px 20px", cursor: busy ? "wait" : "pointer",
             fontSize: 14, fontFamily: "inherit", opacity: busy ? 0.7 : 1,
-            boxShadow: "0 0 0 1px rgba(1,242,207,0.25), 0 4px 16px -4px rgba(1,242,207,0.3)",
+            boxShadow: "0 0 0 1px rgba(0,202,127,0.25), 0 4px 16px -4px rgba(0,202,127,0.3)",
           }}
         >
           {busy ? t("common.loading", "...") : t("auth.sign_in", "Sign in")}

@@ -11,9 +11,9 @@ import { CountUp } from "../components/CountUp";
 import { useAlarmsContext } from "../contexts/AlarmsContext";
 
 /* ── System palette ── */
-const C1 = "#01F2CF";
-const C2 = "#03DA9A";
-const C3 = "#03B3DA";
+const C1 = "#00ca7f";
+const C2 = "#00ca7f";
+const C3 = "#b5f745";
 const DANGER = "#f87171";
 const WARN = "#fbbf24";
 const PURPLE = "#a78bfa";
@@ -56,7 +56,7 @@ const TTI: React.CSSProperties = { color: "var(--text-muted)" };
 // ~4.4:1 on dark card). GRID stroke kept as low-alpha brand cyan
 // because the html.light .recharts-cartesian-grid line override in
 // index.css upgrades it for light mode.
-const GRID = { stroke: "rgba(1,242,207,0.05)", strokeDasharray: "4 4" };
+const GRID = { stroke: "rgba(0,202,127,0.05)", strokeDasharray: "4 4" };
 const AXIS = { fill: "var(--text-muted)", fontSize: 11 };
 
 function filterMin<T extends { count: number }>(rows: T[], total: number, key: keyof T): T[] {
@@ -68,7 +68,7 @@ function filterMin<T extends { count: number }>(rows: T[], total: number, key: k
 }
 
 function CardShine() {
-  return <div style={{ position:"absolute",top:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,rgba(1,242,207,0.16),transparent)",pointerEvents:"none" }}/>;
+  return <div style={{ position:"absolute",top:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,rgba(0,202,127,0.16),transparent)",pointerEvents:"none" }}/>;
 }
 
 function Tag({ label }: { label: string }) {
@@ -294,7 +294,7 @@ export function Overview() {
                     transition:"all 0.15s",
                     background: isActive ? `linear-gradient(135deg,${a},${b})` : "transparent",
                     borderColor: isActive ? "transparent" : "var(--border-medium)",
-                    color: isActive ? "#0a1410" : "var(--text-muted)",
+                    color: isActive ? "var(--primary-foreground)" : "var(--text-muted)",
                   }}
                 >
                   {placeLabel(r)}
@@ -337,7 +337,7 @@ export function Overview() {
                       strokeWidth={2.2}
                       fill={`url(#wg${idx})`}
                       dot={false}
-                      activeDot={{ r:4, fill:a, stroke:"#0d1117", strokeWidth:2 }}
+                      activeDot={{ r:4, fill:a, stroke:"#050806", strokeWidth:2 }}
                       isAnimationActive
                       animationDuration={500}
                     />
@@ -364,7 +364,7 @@ export function Overview() {
           <div style={{ direction:"ltr",height:"clamp(150px,20vw,220px)" }}>
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={radarData}>
-                <PolarGrid stroke="rgba(1,242,207,0.07)"/>
+                <PolarGrid stroke="rgba(0,202,127,0.07)"/>
                 <PolarAngleAxis dataKey="subject" tick={{ fill:"var(--text-muted)",fontSize:"clamp(9px,1.1vw,12px)" }}/>
                 <Radar dataKey="value" name={t("overview.attacks","هجمات")} stroke={C1} fill={C1} fillOpacity={0.13} strokeWidth={2}/>
                 <Tooltip contentStyle={TT} labelStyle={TTL} itemStyle={TTI}/>

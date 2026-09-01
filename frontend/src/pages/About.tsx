@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "../contexts/ThemeContext";
 
 /* ── Colors matching the main system ── */
-const C1 = "#01F2CF";
-const C2 = "#03DA9A";
-const C3 = "#03B3DA";
+const C1 = "#00ca7f";
+const C2 = "#00ca7f";
+const C3 = "#b5f745";
 const DANGER = "#f87171";
 const WARN = "#fbbf24";
 
@@ -63,7 +63,7 @@ function Card({
           right: 0,
           height: 1,
           background:
-            "linear-gradient(90deg,transparent,rgba(1,242,207,0.16),transparent)",
+            "linear-gradient(90deg,transparent,rgba(0,202,127,0.16),transparent)",
           pointerEvents: "none",
         }}
       />
@@ -650,7 +650,7 @@ export function About() {
                 tab === i
                   ? `linear-gradient(135deg,${C1},${C3})`
                   : "transparent",
-              color: tab === i ? "#0a1410" : "#5fa09a",
+              color: tab === i ? "var(--primary-foreground)" : "var(--muted-foreground)",
             }}
           >
             {t}

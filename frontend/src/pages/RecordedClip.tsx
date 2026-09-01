@@ -370,7 +370,7 @@ export function RecordedClip() {
       // with the predicted line, intercept point, and details panel.
       if (elapsedS > PREDICT_HORIZON_S) return;
       const isStale = elapsedS > 0.5;
-      const baseColor = String(s.droneClass ?? "").toLowerCase().includes("shahed") ? "#ff4757" : "#01F2CF";
+      const baseColor = String(s.droneClass ?? "").toLowerCase().includes("shahed") ? "#ff6266" : "#00ca7f";
       items.push({
         id: `seen-${s.trackId}`,
         lat: s.lat, lon: s.lon, color: baseColor,
@@ -646,7 +646,7 @@ export function RecordedClip() {
                       : "border-slate-700 bg-slate-900/50 text-muted hover:text-slate-200",
                   ].join(" ")}
                 >
-                  <span className="h-2 w-2 rounded-full" style={{ background: "#03DA9A" }} aria-hidden />
+                  <span className="h-2 w-2 rounded-full" style={{ background: "#00ca7f" }} aria-hidden />
                   {t("live.toggle_areas")}
                 </button>
                 <button
@@ -660,7 +660,7 @@ export function RecordedClip() {
                       : "border-slate-700 bg-slate-900/50 text-muted hover:text-slate-200",
                   ].join(" ")}
                 >
-                  <span className="h-2 w-2 rounded-full" style={{ background: "#03DA9A" }} aria-hidden />
+                  <span className="h-2 w-2 rounded-full" style={{ background: "#00ca7f" }} aria-hidden />
                   {t("live.toggle_cameras")}
                 </button>
                 <button

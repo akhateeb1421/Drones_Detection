@@ -48,7 +48,7 @@ export function HistoryMap() {
     lat: a.latitude,
     lon: a.longitude,
     // Mint for drone strikes, crimson for missile attacks — semantic and distinct.
-    color: a.attack_type.includes("missile") ? "#ff4757" : "#03DA9A",
+    color: a.attack_type.includes("missile") ? "#ff6266" : "#00ca7f",
     label: `${typeLabel(a.attack_type)} · ${a.region ? placeLabel(a.region) : ""} · ${a.occurred_at.slice(0, 10)}`,
     radius: 5,
   }));
